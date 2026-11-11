@@ -29,3 +29,16 @@ The built mod JAR will be in `build/libs/`.
 
 ## Important
 Radeonium is experimental software. Back up worlds before testing development builds. Never assume a performance change is beneficial until it has been benchmarked on representative hardware.
+
+## Current implementation
+
+### GPU detection foundation
+
+The first GPU-detection layer is in place:
+
+- Normalizes GPU vendor names into AMD, NVIDIA, Intel, Apple, Qualcomm, ARM, or unknown.
+- Represents the active graphics backend separately (OpenGL, Vulkan, other, or unknown).
+- Stores renderer and driver information without assuming that every field is available.
+- Uses an explicit unknown fallback instead of guessing a vendor.
+
+This is the data model and classification layer only. Live device information is **not yet connected** to Minecraft's renderer. That integration is the next step and must use Minecraft's backend-neutral rendering interfaces so Radeonium can support both OpenGL and Vulkan safely.
