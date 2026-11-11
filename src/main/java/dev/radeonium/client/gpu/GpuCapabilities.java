@@ -13,18 +13,21 @@ public record GpuCapabilities(
         boolean multiDrawDirectInterleaved,
         boolean multiDrawDirectSeparate,
         boolean shaderDrawParameters,
+        boolean nonZeroFirstInstance,
         boolean persistentMapping,
         boolean wireframeFillMode,
         int maxDrawIndirectCount,
-        int maxMultiDrawDirectCount,
+        int maxMultiDrawDirectInterleavedCount,
         int maxTextureSize,
         int maxAnisotropy,
+        int maxColorAttachments,
+        int minUniformOffsetAlignment,
         long maxMemoryAllocationSize
 ) {
     public static GpuCapabilities unavailable() {
         return new GpuCapabilities(
-                false, false, false, false, false, false, false,
-                0, 0, 0, 0, 0L
+                false, false, false, false, false, false, false, false,
+                0, 0, 0, 0, 0, 0, 0L
         );
     }
 }
