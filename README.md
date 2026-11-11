@@ -42,3 +42,20 @@ The first GPU-detection layer is in place:
 - Uses an explicit unknown fallback instead of guessing a vendor.
 
 This is the data model and classification layer only. Live device information is **not yet connected** to Minecraft's renderer. That integration is the next step and must use Minecraft's backend-neutral rendering interfaces so Radeonium can support both OpenGL and Vulkan safely.
+
+### Live graphics-device detection
+
+Radeonium now registers a detection callback for Fabric's client-started event.
+At that point Minecraft has already selected and initialized its graphics device.
+The detector reads the public RenderPearl `DeviceInfo` through
+`RenderSystem.tryGetDevice()`, then records the device name, vendor, driver,
+and backend in `GpuInfo`.
+
+This is backend-neutral: Radeonium does not call raw OpenGL functions and can
+read the device information when Minecraft uses either OpenGL or Vulkan.
+If the device is not available or inspection fails, detection falls back to an
+unknown device instead of preventing the game from starting.
+
+The source has been added, but a full Gradle compile and in-game verification
+are still pending. The next milestone is to inspect the reported device
+capabilities and build conservative per-feature support checks.
