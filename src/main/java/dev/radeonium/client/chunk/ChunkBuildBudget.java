@@ -96,6 +96,7 @@ public final class ChunkBuildBudget {
      * let it resume the pending slice on a later frame.
      */
     public static boolean shouldDeferTranslucencyResort() {
-        return enabled && (lastFrameIntervalNanos >= TRANSLUCENCY_DEFER_FRAME_NANOS\n                || MemoryPressureMonitor.isCritical());
+        return enabled && (lastFrameIntervalNanos >= TRANSLUCENCY_DEFER_FRAME_NANOS
+                || MemoryPressureMonitor.isCritical());
     }
 }
