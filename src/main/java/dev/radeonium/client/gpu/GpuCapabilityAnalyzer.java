@@ -26,12 +26,15 @@ public final class GpuCapabilityAnalyzer {
                 features.multiDrawDirectInterleaved(),
                 features.multiDrawDirectSeparate(),
                 features.shaderDrawParameters(),
+                features.nonZeroFirstInstance(),
                 features.persistentMapping(),
                 features.wireframeFillMode(),
                 nonNegative(limits.maxDrawIndirectDrawCount()),
                 nonNegative(limits.maxMultiDrawDirectInterleavedDrawCount()),
                 nonNegative(limits.maxTextureSize()),
                 nonNegative(limits.maxAnisotropy()),
+                nonNegative(limits.maxColorAttachments()),
+                nonNegative(limits.minUniformOffsetAlignment()),
                 Math.max(0L, limits.maxMemoryAllocationSize())
         );
     }
