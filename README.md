@@ -56,6 +56,19 @@ The goal is to reduce render-thread spikes under load while using available head
 - Uses the JVM's available-processor count, which respects CPU limits imposed by the operating system or runtime environment; it does not attempt to guess physical core topology.
 - This is a conservative scheduling heuristic, not a CPU overclock, thread-pool replacement, or guaranteed FPS gain. Benchmark on target hardware before treating it as beneficial.
 
+### Radeonium toggle
+- Radeonium optimizations are enabled by default.
+- The default physical key is the key labelled **W on a French AZERTY keyboard**. Minecraft 26.3 uses SDL scancodes based on the US physical-key positions, so the default mapping uses the corresponding Z-position scancode; the Controls screen can remap it.
+- The binding appears under the **Radeonium** category in Options → Controls.
+- Press once to disable Radeonium's chunk scheduling and translucent-resort deferral; press again to re-enable them. Status is printed in chat, not in the center of the screen.
+- With Radeonium disabled, the chunk rebuild redirect returns to Minecraft's synchronous path and translucent resorting is not deferred.
+
+### GPU capability profiling — fourth development stage
+- Builds a backend-neutral profile from Minecraft's active GPU, backend, and reported device features.
+- Only marks optional paths as eligible when the active device explicitly reports the required capability and a valid limit.
+- Unknown vendors or backends use a safe fallback profile; no OpenGL calls are made on Vulkan.
+- This stage is capability gating and groundwork, not a claim that indirect drawing, persistent mapping, or another GPU fast path has already been implemented. Such paths must be added individually and benchmarked before they are enabled.
+
 ## Build
 
 Use a Java 25 JDK and a Gradle version compatible with the selected Fabric Loom version.
