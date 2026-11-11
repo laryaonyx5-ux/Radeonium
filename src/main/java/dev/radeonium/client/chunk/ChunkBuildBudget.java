@@ -24,12 +24,17 @@ public final class ChunkBuildBudget {
     }
 
     /**
-     * Called once at the start of LevelRenderer.compileSections.
-     * The interval between calls is used as a lightweight frame-time signal.
+     * Called at the start of LevelRenderer.compileSections. The interval
+     * between calls is used as a lightweight frame-time signal.
      */
     public static void beginFrame(long nowNanos) {
         if (lastFrameStartNanos != 0L) {
             long frameInterval = Math.max(0L, nowNanos - lastFrameStartNanos);
+            if (synchronousBuildsThisFrame == 0 && synchronousBudget == 0) {
+                consecutiveFramesWithoutSync++;
+            } else {
+                consecutiveFramesWithoutSync = 0;
+            }
 
             if (frameInterval >= SLOW_FRAME_NANOS) {
                 synchronousBudget = 0;
@@ -42,7 +47,7 @@ public final class ChunkBuildBudget {
             synchronousBudget = 1;
         }
 
-        // Never starve urgent terrain updates if the machine remains overloaded.
+        // Never starve urgent terrain updates during sustained slow frames.
         if (synchronousBudget == 0
                 && consecutiveFramesWithoutSync >= MAX_DEFERRED_FRAMES) {
             synchronousBudget = 1;
@@ -54,12 +59,10 @@ public final class ChunkBuildBudget {
 
     public static boolean reserveSynchronousBuild() {
         if (synchronousBuildsThisFrame >= synchronousBudget) {
-            consecutiveFramesWithoutSync++;
             return false;
         }
 
         synchronousBuildsThisFrame++;
-        consecutiveFramesWithoutSync = 0;
         return true;
     }
 }
