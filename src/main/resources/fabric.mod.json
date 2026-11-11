@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "id": "radeonium",
+  "version": "${version}",
+  "name": "Radeonium",
+  "description": "A performance-focused Minecraft client mod with AMD Radeon-aware optimizations.",
+  "authors": [
+    "Radeonium contributors"
+  ],
+  "contact": {
+    "sources": "https://github.com/laryaonyx5-ux/Radeonium"
+  },
+  "license": "All-Rights-Reserved",
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "dev.radeonium.client.RadeoniumClient"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.20.1",
+    "minecraft": "26.3",
+    "java": ">=25",
+    "fabric-api": "*"
+  }
+}
