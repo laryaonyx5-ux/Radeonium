@@ -20,7 +20,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class LevelRendererMixin {
     @Inject(method = "compileSections", at = @At("HEAD"))
     private void radeonium$beginChunkBuildFrame(CallbackInfo ci) {
-        ChunkBuildBudget.beginFrame();
+        ChunkBuildBudget.beginFrame(System.nanoTime());
     }
 
     @Redirect(
