@@ -82,7 +82,14 @@ public final class ChunkBuildBudget {
         if (!enabled) {
             return true;
         }
-        if (synchronousBuildsThisFrame >= synchronousBudget) {
+        if (MemoryPressureMonitor.isCritical()) {
+            return false;
+        }
+
+        int effectiveBudget = MemoryPressureMonitor.isElevated()
+                ? Math.min(synchronousBudget, 1)
+                : synchronousBudget;
+        if (synchronousBuildsThisFrame >= effectiveBudget) {
             return false;
         }
 
