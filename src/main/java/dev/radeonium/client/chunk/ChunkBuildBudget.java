@@ -1,7 +1,8 @@
 package dev.radeonium.client.chunk;
 
 /**
- * Adapts synchronous chunk-section work to the recent frame interval.
+ * Adapts synchronous chunk-section work and optional chunk maintenance to
+ * recent frame pacing.
  *
  * Synchronous section compilation runs on the render thread. When frames are
  * already slow, Radeonium defers more work to Minecraft's existing async
@@ -12,10 +13,12 @@ package dev.radeonium.client.chunk;
 public final class ChunkBuildBudget {
     private static final long FAST_FRAME_NANOS = 12_000_000L;
     private static final long SLOW_FRAME_NANOS = 20_000_000L;
+    private static final long TRANSLUCENCY_DEFER_FRAME_NANOS = 25_000_000L;
     private static final int MAX_SYNCHRONOUS_BUILDS = 2;
     private static final int MAX_DEFERRED_FRAMES = 3;
 
     private static long lastFrameStartNanos;
+    private static long lastFrameIntervalNanos;
     private static int synchronousBuildsThisFrame;
     private static int synchronousBudget = 1;
     private static int consecutiveFramesWithoutSync;
@@ -30,6 +33,7 @@ public final class ChunkBuildBudget {
     public static void beginFrame(long nowNanos) {
         if (lastFrameStartNanos != 0L) {
             long frameInterval = Math.max(0L, nowNanos - lastFrameStartNanos);
+            lastFrameIntervalNanos = frameInterval;
             if (synchronousBuildsThisFrame == 0 && synchronousBudget == 0) {
                 consecutiveFramesWithoutSync++;
             } else {
@@ -44,6 +48,7 @@ public final class ChunkBuildBudget {
                 synchronousBudget = 1;
             }
         } else {
+            lastFrameIntervalNanos = 0L;
             synchronousBudget = 1;
         }
 
@@ -64,5 +69,14 @@ public final class ChunkBuildBudget {
 
         synchronousBuildsThisFrame++;
         return true;
+    }
+
+    /**
+     * Translucent resorting is maintenance work: if the previous frame was
+     * especially slow, leave Minecraft's round-robin cursor untouched and
+     * let it resume the pending slice on a later frame.
+     */
+    public static boolean shouldDeferTranslucencyResort() {
+        return lastFrameIntervalNanos >= TRANSLUCENCY_DEFER_FRAME_NANOS;
     }
 }
