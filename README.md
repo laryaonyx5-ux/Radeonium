@@ -32,12 +32,14 @@ The capability snapshot is informational. A reported feature is not automaticall
 ### Chunk rebuild scheduling — first optimization
 Radeonium now hooks Minecraft 26.3's `LevelRenderer.compileSections` path.
 
-- Allows at most **one synchronous chunk-section rebuild per frame**.
-- Routes additional synchronous rebuild requests into Minecraft's existing asynchronous section task queue.
+- Measures the interval between calls to Minecraft's section-compilation phase as a lightweight frame-pacing signal.
+- Allows up to **two synchronous section rebuilds** when recent frames are fast, one at normal frame pacing, and none during slow frames.
+- Guarantees a periodic synchronous slot so urgent terrain updates are not deferred indefinitely.
+- Routes deferred work into Minecraft's existing asynchronous section task queue.
 - Leaves Minecraft responsible for task cancellation, queue ordering, section compilation and GPU uploads.
 - Does not change block models, shaders, lighting, texture quality or render distance.
 
-The goal is to reduce render-thread frame-time spikes when many nearby sections need rebuilding at once. The trade-off is that some updated terrain may appear a little later because more work is completed asynchronously. This is a first scheduling optimization, not yet a measured FPS result.
+The goal is to reduce render-thread spikes under load while using available headroom when frame pacing is healthy. Some terrain updates may be completed later during sustained slow frames. This is a scheduling heuristic, not a guaranteed FPS increase; it must be benchmarked in-game against the unmodified build.
 
 ## Build
 
