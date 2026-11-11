@@ -2,7 +2,8 @@ package dev.radeonium.client;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import dev.radeonium.client.chunk.ChunkBuildBudget;
-import dev.radeonium.client.gpu.GpuDetector;\nimport dev.radeonium.client.memory.MemoryPressureMonitor;
+import dev.radeonium.client.gpu.GpuDetector;
+import dev.radeonium.client.memory.MemoryPressureMonitor;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
@@ -41,6 +42,10 @@ public final class RadeoniumClient implements ClientModInitializer {
         ClientLifecycleEvents.CLIENT_STARTED.register(client -> GpuDetector.detectAndLog());
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
+            if (MemoryPressureMonitor.tickAndSample()) {
+                LOGGER.info("JVM heap pressure: {}", MemoryPressureMonitor.current());
+            }
+
             while (TOGGLE_MODE.consumeClick()) {
                 boolean enabled = !ChunkBuildBudget.isEnabled();
                 ChunkBuildBudget.setEnabled(enabled);
