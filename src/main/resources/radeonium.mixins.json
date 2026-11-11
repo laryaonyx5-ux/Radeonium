@@ -1,0 +1,10 @@
+{
+  "required": true,
+  "package": "dev.radeonium.mixin",
+  "client": [
+    "LevelRendererMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
