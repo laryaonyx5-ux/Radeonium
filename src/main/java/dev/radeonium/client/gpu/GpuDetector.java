@@ -45,6 +45,7 @@ public final class GpuDetector {
                     GraphicsBackend.fromName(info.backendName())
             );
             currentCapabilities = GpuCapabilityAnalyzer.analyze(info);
+            GpuOptimizationProfile profile = GpuOptimizationProfile.from(current, currentCapabilities);
 
             RadeoniumClient.LOGGER.info(
                     "Detected GPU: {} | vendor: {} | driver: {} | backend: {}",
@@ -61,6 +62,12 @@ public final class GpuDetector {
                     currentCapabilities.persistentMapping(),
                     currentCapabilities.maxTextureSize(),
                     currentCapabilities.maxAnisotropy()
+            );
+
+            RadeoniumClient.LOGGER.info(
+                    "GPU optimization profile: {} | indirectDraw={} | multiDrawIndirect={} | persistentMapping={} | shaderDrawParameters={}",
+                    profile.strategy(), profile.indirectDraw(), profile.multiDrawIndirect(),
+                    profile.persistentMapping(), profile.shaderDrawParameters()
             );
 
             if (current.isAmd()) {
