@@ -59,3 +59,15 @@ unknown device instead of preventing the game from starting.
 The source has been added, but a full Gradle compile and in-game verification
 are still pending. The next milestone is to inspect the reported device
 capabilities and build conservative per-feature support checks.
+
+### GPU capability analysis
+
+Radeonium now reads the capability and limit records supplied by RenderPearl:
+indirect drawing, multi-draw support, shader draw parameters, persistent
+mapping, wireframe support, and reported limits such as maximum texture size,
+anisotropy, and indirect draw count.
+
+The capability snapshot is informational only. A reported feature is not
+automatically activated: each future optimization must have a compatible
+implementation and pass correctness and performance tests. Missing information
+is represented conservatively as unsupported/zero rather than guessed.
