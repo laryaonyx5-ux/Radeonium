@@ -14,7 +14,7 @@ public final class ChunkBuildBudget {
     private static final long FAST_FRAME_NANOS = 12_000_000L;
     private static final long SLOW_FRAME_NANOS = 20_000_000L;
     private static final long TRANSLUCENCY_DEFER_FRAME_NANOS = 25_000_000L;
-    private static final int MAX_SYNCHRONOUS_BUILDS = 2;
+    private static final int MAX_SYNCHRONOUS_BUILDS = CpuWorkProfile.maxSynchronousChunkBuilds();
     private static final int MAX_DEFERRED_FRAMES = 3;
 
     private static long lastFrameStartNanos;
