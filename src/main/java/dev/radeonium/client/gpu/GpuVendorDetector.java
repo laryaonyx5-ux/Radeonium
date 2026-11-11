@@ -18,7 +18,7 @@ public final class GpuVendorDetector {
                 .toLowerCase(Locale.ROOT);
 
         if (containsAny(text, "advanced micro devices", "amd", "ati technologies",
-                "radeon", "火") ) {
+                "radeon") ) {
             return GpuVendor.AMD;
         }
         if (containsAny(text, "nvidia", "geforce", "quadro", "tesla")) {
@@ -27,7 +27,7 @@ public final class GpuVendorDetector {
         if (containsAny(text, "intel", "iris", "uhd graphics", "arc graphics")) {
             return GpuVendor.INTEL;
         }
-        if (containsAny(text, "apple", "m1", "m2", "m3", "m4", "m5")) {
+        if (containsAny(text, "apple", "apple m1", "apple m2", "apple m3", "apple m4", "apple m5")) {
             return GpuVendor.APPLE;
         }
         if (containsAny(text, "qualcomm", "adreno")) {
