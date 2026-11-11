@@ -41,6 +41,12 @@ Radeonium now hooks Minecraft 26.3's `LevelRenderer.compileSections` path.
 
 The goal is to reduce render-thread spikes under load while using available headroom when frame pacing is healthy. Some terrain updates may be completed later during sustained slow frames. This is a scheduling heuristic, not a guaranteed FPS increase; it must be benchmarked in-game against the unmodified build.
 
+### Adaptive translucent chunk maintenance — second optimization
+- Uses the same recent frame-interval signal to detect especially slow frames.
+- Temporarily postpones the per-frame translucent-section resort pass when the previous frame took at least 25 ms.
+- Does not rebuild meshes, change transparency settings, or alter geometry. Minecraft's own round-robin resort cursor is left untouched, so the pending slice can resume on a later frame.
+- This trades potentially stale translucent sorting for a short period of lower background rendering work during severe frame-time spikes. It is experimental and must be checked for visible sorting artifacts and measured in-game.
+
 ## Build
 
 Use a Java 25 JDK and a Gradle version compatible with the selected Fabric Loom version.
