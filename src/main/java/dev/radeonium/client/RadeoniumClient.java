@@ -1,6 +1,8 @@
 package dev.radeonium.client;
 
+import dev.radeonium.client.gpu.GpuDetector;
 import net.fabricmc.api.ClientModInitializer;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -16,9 +18,10 @@ public final class RadeoniumClient implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
-        LOGGER.info("Radeonium {} initialized. Performance modules are not enabled yet.",
-                getClass().getPackage().getImplementationVersion() == null
-                        ? "development build"
-                        : getClass().getPackage().getImplementationVersion());
+        LOGGER.info("Radeonium client initialized.");
+
+        // Minecraft creates its graphics device before CLIENT_STARTED.
+        // Query it here rather than probing OpenGL during mod initialization.
+        ClientLifecycleEvents.CLIENT_STARTED.register(client -> GpuDetector.detectAndLog());
     }
 }
