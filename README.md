@@ -47,6 +47,15 @@ The goal is to reduce render-thread spikes under load while using available head
 - Does not rebuild meshes, change transparency settings, or alter geometry. Minecraft's own round-robin resort cursor is left untouched, so the pending slice can resume on a later frame.
 - This trades potentially stale translucent sorting for a short period of lower background rendering work during severe frame-time spikes. It is experimental and must be checked for visible sorting artifacts and measured in-game.
 
+
+
+### CPU-aware chunk scheduling — third optimization
+- Captures the number of logical processors available to the Java runtime once at startup.
+- Caps synchronous render-thread chunk rebuilds at one on systems with four or fewer available logical processors, and at two on larger systems.
+- The existing frame-pacing budget can still lower that cap to one or zero during normal or slow frames.
+- Uses the JVM's available-processor count, which respects CPU limits imposed by the operating system or runtime environment; it does not attempt to guess physical core topology.
+- This is a conservative scheduling heuristic, not a CPU overclock, thread-pool replacement, or guaranteed FPS gain. Benchmark on target hardware before treating it as beneficial.
+
 ## Build
 
 Use a Java 25 JDK and a Gradle version compatible with the selected Fabric Loom version.
