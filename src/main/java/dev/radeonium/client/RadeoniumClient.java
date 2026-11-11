@@ -2,7 +2,7 @@ package dev.radeonium.client;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import dev.radeonium.client.chunk.ChunkBuildBudget;
-import dev.radeonium.client.gpu.GpuDetector;
+import dev.radeonium.client.gpu.GpuDetector;\nimport dev.radeonium.client.memory.MemoryPressureMonitor;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
