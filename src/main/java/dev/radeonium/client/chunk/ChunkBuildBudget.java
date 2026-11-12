@@ -1,5 +1,7 @@
 package dev.radeonium.client.chunk;
 
+import dev.radeonium.client.memory.MemoryPressureMonitor;
+
 /**
  * Adapts synchronous chunk-section work and optional chunk maintenance to
  * recent frame pacing. The complete Radeonium scheduling layer can be toggled
