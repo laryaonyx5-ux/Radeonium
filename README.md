@@ -81,3 +81,12 @@ The built mod JAR will be in `build/libs/`.
 
 ## Important
 Radeonium is experimental software. Back up worlds before testing development builds. Never assume a performance change is beneficial until it has been benchmarked on representative hardware.
+
+### Frame pacing and stability — sixth development stage
+- Smooths the chunk-compilation interval signal with an exponential moving average (75% previous estimate, 25% new sample).
+- Uses separate enter/exit thresholds for fast and slow pacing, reducing rapid budget changes when measurements hover near a threshold.
+- Caps a single timing sample at 100 ms so a long pause does not dominate the estimate for an extended period.
+- Applies the same smoothed signal when deciding whether to postpone translucent-section maintenance.
+- The signal is still sampled at the `compileSections` hook and is only a pacing proxy; it is not a direct measurement of every rendered frame or a frame-time guarantee.
+- This is scheduling stabilization, not a frame limiter or a measured FPS improvement. Validate smoothness and visual correctness in-game during the final test stage.
+
