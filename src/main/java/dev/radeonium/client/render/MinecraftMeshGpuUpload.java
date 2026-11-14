@@ -3,6 +3,8 @@ package dev.radeonium.client.render;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.renderpearl.api.buffers.GpuBuffer;
 import com.mojang.renderpearl.api.buffers.GpuBufferSlice;
+import com.mojang.renderpearl.api.commands.RenderPass;
+import com.mojang.renderpearl.api.pipeline.CompiledRenderPipeline;
 import com.mojang.renderpearl.api.device.GpuDevice;
 
 import java.nio.ByteBuffer;
@@ -78,6 +80,18 @@ public final class MinecraftMeshGpuUpload implements AutoCloseable {
 
     public long byteSize() {
         return vertexBuffer == null ? 0L : vertexBuffer.size();
+    }
+
+    /**
+     * Binds this upload to an already-open RenderPearl pass and submits its
+     * triangle-list vertices. The caller owns the pass, pipeline, uniforms,
+     * render target and draw ordering. This method never opens or submits a pass.
+     */
+    public void drawInto(RenderPass pass) {
+        if (pass == null) throw new IllegalArgumentException("pass cannot be null");
+        if (isEmpty()) return;
+        pass.setVertexBuffer(0, vertexBufferSlice());
+        pass.draw(vertexCount, 1, 0, 0);
     }
 
     /**
