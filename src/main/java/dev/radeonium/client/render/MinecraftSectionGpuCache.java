@@ -1,6 +1,8 @@
 package dev.radeonium.client.render;
 
 import net.minecraft.client.renderer.block.dispatch.BlockStateModelPart;
+import com.mojang.renderpearl.api.commands.RenderPass;
+import com.mojang.renderpearl.api.pipeline.CompiledRenderPipeline;
 
 import java.util.HashMap;
 import java.util.List;
@@ -75,6 +77,28 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
             total = Math.addExact(total, entry.upload.byteSize());
         }
         return total;
+    }
+
+    /**
+     * Submits every non-empty cached section into a caller-owned RenderPearl
+     * pass. The pass must already target the intended terrain attachments and
+     * the supplied pipeline must match the 20-byte Radeonium vertex layout.
+     *
+     * This is the draw-submission bridge; it deliberately does not create a
+     * nested pass or take ownership of Minecraft's frame graph.
+     */
+    public synchronized int drawAll(RenderPass pass, CompiledRenderPipeline pipeline) {
+        if (pass == null) throw new IllegalArgumentException("pass cannot be null");
+        if (pipeline == null) throw new IllegalArgumentException("pipeline cannot be null");
+
+        int submitted = 0;
+        for (Entry entry : sections.values()) {
+            if (entry.upload.isEmpty()) continue;
+            if (submitted == 0) pass.setPipeline(pipeline);
+            entry.upload.drawInto(pass);
+            submitted++;
+        }
+        return submitted;
     }
 
     public synchronized MinecraftMeshGpuUpload upload(SectionPos position) {
