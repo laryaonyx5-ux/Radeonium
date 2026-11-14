@@ -21,6 +21,7 @@ public final class ChunkRenderPipeline {
     private final Set<SectionPos> queuedDirty = new HashSet<>();
     private final SectionVisibilityGraph visibility = new SectionVisibilityGraph();
     private final Set<SectionPos> visibleSections = new HashSet<>();
+    private final Map<SectionPos, VanillaSectionMeshSnapshot> vanillaMeshes = new HashMap<>();
 
     /**
      * Reconciles the currently visible Minecraft sections with Radeonium's
@@ -44,6 +45,25 @@ public final class ChunkRenderPipeline {
         }
     }
 
+    /**
+     * Records the real vanilla-compiled mesh metadata for a visible section.
+     * This is an observation bridge only: it does not take ownership of
+     * vanilla GPU buffers or replace vanilla draw submission.
+     */
+    public synchronized void observeVanillaMesh(
+            SectionPos position, VanillaSectionMeshSnapshot snapshot
+    ) {
+        if (sections.containsKey(position)) vanillaMeshes.put(position, snapshot);
+    }
+
+    public synchronized VanillaSectionMeshSnapshot vanillaMesh(SectionPos position) {
+        return vanillaMeshes.get(position);
+    }
+
+    public synchronized int observedVanillaMeshCount() {
+        return vanillaMeshes.size();
+    }
+
     public synchronized int visibleSectionCount() {
         return visibleSections.size();
     }
@@ -56,6 +76,7 @@ public final class ChunkRenderPipeline {
 
     public synchronized void removeSection(SectionPos position) {
         sections.remove(position);
+        vanillaMeshes.remove(position);
         visibleSections.remove(position);
         visibility.remove(position);
         queuedDirty.remove(position);
