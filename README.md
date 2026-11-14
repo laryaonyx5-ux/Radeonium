@@ -130,3 +130,13 @@ This is a working generic voxel-meshing stage, **not yet the Minecraft block-mod
 - Tracks vanilla section-dirty notifications for sections Radeonium currently observes.
 - Reuses packed section-node sets between frames and rebuilds the object snapshot only when the visible set changes.
 - This is a real live lifecycle connection, but it is **not** custom terrain rendering: vanilla still owns block-model compilation, mesh upload, visibility decisions, GPU resources and terrain draw submission. Radeonium's generic voxel mesher is still not a replacement for Minecraft's block/model renderer. No FPS gain is claimed for the tracking bridge itself.
+
+
+### Minecraft baked block-model geometry — 0.7.0 development stage
+- Adds a first model-geometry extraction layer using Minecraft 26.3's real `BlockStateModelPart` and `BakedQuad` data.
+- Reads all unculled and direction-culled baked quads from the supplied model parts.
+- Preserves each quad's four model-space positions, packed UV coordinates, face direction and original `MaterialInfo`.
+- Retains Minecraft's per-quad atlas sprite, render layer, tint index, light-emission and ambient-occlusion metadata instead of reducing blocks to numeric voxel material IDs.
+- Keeps the extracted result immutable and reports quad counts by Minecraft's terrain layer.
+
+This is the first real-block-model geometry step, **not yet a complete Minecraft section mesher**. The caller must still supply correctly selected model parts. Context-sensitive/multipart model resolution, neighbor-face visibility, biome tint evaluation, smooth lighting and AO calculation, fluid geometry, block entities, modded renderer hooks, translucent sort state and conversion to Radeonium's final GPU vertex format are not yet implemented. This extraction layer is not connected to live section rebuilds or terrain drawing, and no FPS gain is claimed.
