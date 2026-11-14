@@ -59,3 +59,30 @@ A replacement must preserve the rest of the frame: sky, entities, block entities
 - Vanilla still owns all terrain draw submission.
 
 **Safety rule:** do not cancel or suppress vanilla terrain draws until Radeonium has a validated replacement for the same render layer and frame-graph path. A partial replacement must fall back to vanilla rather than produce missing terrain.
+
+## 7.5 — Validation record
+
+### Automated build validation
+
+| Check | Result | Evidence |
+|---|---|---|
+| Java 25 setup | Passed | GitHub Actions run #68 |
+| Gradle `clean build` | Passed | Workflow step “Compile and test” completed successfully |
+| Mod JAR packaging | Passed | Workflow step “Upload mod JAR” completed successfully |
+| Build artifact | Produced | `radeonium-2d4997391f1fcbc833f8236e6b8d0493b0c11f22`, 80,536 bytes |
+| Unit/integration test suite | Not demonstrated | No `src/test` directory is currently present |
+
+Run #68 validated commit `2d4997391f1fcbc833f8236e6b8d0493b0c11f22`:
+https://github.com/laryaonyx5-ux/Radeonium/actions/runs/43615917352
+
+### Runtime validation — not yet performed
+
+The following checks remain **not tested**: launching Minecraft 26.3, OpenGL rendering, Vulkan rendering, terrain correctness, translucent/OIT behavior, resource reloads, dimension changes, chunk rebuild/removal, screenshots, and frame-time comparisons.
+
+This environment can verify the repository and its CI build, but it cannot launch the user's Minecraft client or inspect the user's graphics hardware. A successful Gradle build is not evidence that the mod renders correctly in-game.
+
+### Final 7.5 result
+
+**Build/package validation: passed. Full runtime validation: pending.**
+
+Step 7.5 cannot be marked fully complete, and the full terrain replacement cannot be called finished, until steps 7.1–7.4 have supplied a real replacement path and the runtime matrix above has passed. Vanilla terrain rendering remains authoritative; no vanilla terrain draws have been disabled.
