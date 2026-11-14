@@ -17,8 +17,13 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  */
 @Mixin(LevelRenderer.class)
 public abstract class LevelRendererMixin {
-    @Inject(method = "compileSections", at = @At("HEAD"))
-    private void radeonium$beginChunkBuildFrame(CallbackInfo ci) {
+    /**
+     * endFrame is the renderer's frame boundary. Sampling here measures the
+     * complete interval between rendered frames instead of only the time
+     * between two entries into compileSections.
+     */
+    @Inject(method = "endFrame", at = @At("HEAD"))
+    private void radeonium$sampleCompletedFrameInterval(CallbackInfo ci) {
         ChunkBuildBudget.beginFrame(System.nanoTime());
     }
 
