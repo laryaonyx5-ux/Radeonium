@@ -160,3 +160,13 @@ This is **GPU data transfer only**, not terrain rendering. The current uploaded 
 - Keeps GPU creation and destruction on the render thread; CPU model extraction remains separable.
 
 This connects the baked-model mesher to the GPU upload owner through a section cache, but it is **not yet wired into Minecraft's live section compiler**: callers must still supply the correctly resolved BlockStateModelPart list. Automatic block-state/model resolution, neighbor culling, tint, lighting/AO, fluids, atlas/shader binding, and Radeonium draw submission remain future work. Vanilla continues to render the world, and no FPS gain is claimed.
+
+
+### Radeonium material and shader foundation — 1.0
+- Introduces a renderer-owned material table that deduplicates Minecraft baked-quad MaterialInfo entries and records their terrain layer.
+- Returns a material index for each mesh quad while retaining the original Minecraft metadata for future atlas and pipeline binding.
+- Adds a GLSL 4.50 vertex/fragment shader pair for the current 20-byte upload layout: float3 position and two packed UV words.
+- Uses explicit shader input/output locations, compatible with the ShaderC-based shader compilation model used by Minecraft 26.3 on OpenGL and Vulkan.
+- Sets the project version to exactly 1.0.
+
+**Scope:** this is the material-index and shader-source foundation, not an active terrain pipeline. The shaders are not yet registered or loaded by RenderPearl; there is no atlas descriptor binding, per-section transform upload, lighting/tint/AO evaluation, pipeline creation or draw submission. The material table retains Minecraft metadata but does not yet resolve texture handles. Vanilla remains responsible for terrain rendering, and no performance improvement is claimed.
