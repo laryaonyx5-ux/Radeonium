@@ -29,6 +29,15 @@ public abstract class LevelExtractorMixin {
         }
     }
 
+    @Inject(method = "extract", at = @At("TAIL"))
+    private void radeonium$captureCompiledSectionMeshes(CallbackInfo ci) {
+        if (this.levelRenderer != null) {
+            RendererSectionTracker.captureCompiledMeshes(
+                    this.levelRenderer.visibleSections()
+            );
+        }
+    }
+
     @Inject(method = "setSectionDirty", at = @At("HEAD"))
     private void radeonium$trackDirtySection(
             int sectionX, int sectionY, int sectionZ, CallbackInfo ci
