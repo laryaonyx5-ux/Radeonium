@@ -33,7 +33,7 @@ The capability snapshot is informational. A reported feature is not automaticall
 Radeonium now hooks Minecraft 26.3's `LevelRenderer.compileSections` path.
 
 - Measures the interval between calls to Minecraft's section-compilation phase as a lightweight frame-pacing signal.
-- Allows up to **two synchronous section rebuilds** when recent frames are fast, one at normal frame pacing, and none during slow frames.
+- Adapts synchronous section rebuilds to recent pacing and measured rebuild cost: up to three on CPUs with at least 12 logical processors, up to two on CPUs with at least six, and one on smaller CPUs, but only while recent frames are fast. Normal pacing allows one; slow pacing allows none temporarily.
 - Guarantees a periodic synchronous slot so urgent terrain updates are not deferred indefinitely.
 - Routes deferred work into Minecraft's existing asynchronous section task queue.
 - Leaves Minecraft responsible for task cancellation, queue ordering, section compilation and GPU uploads.
@@ -51,7 +51,7 @@ The goal is to reduce render-thread spikes under load while using available head
 
 ### CPU-aware chunk scheduling — third optimization
 - Captures the number of logical processors available to the Java runtime once at startup.
-- Caps synchronous render-thread chunk rebuilds at one on systems with four or fewer available logical processors, and at two on larger systems.
+- Sets the fast-frame ceiling to one synchronous rebuild on systems with fewer than six logical processors, two on systems with six to eleven, and three on systems with twelve or more.
 - The existing frame-pacing budget can still lower that cap to one or zero during normal or slow frames.
 - Uses the JVM's available-processor count, which respects CPU limits imposed by the operating system or runtime environment; it does not attempt to guess physical core topology.
 - This is a conservative scheduling heuristic, not a CPU overclock, thread-pool replacement, or guaranteed FPS gain. Benchmark on target hardware before treating it as beneficial.
@@ -81,6 +81,13 @@ The built mod JAR will be in `build/libs/`.
 
 ## Important
 Radeonium is experimental software. Back up worlds before testing development builds. Never assume a performance change is beneficial until it has been benchmarked on representative hardware.
+
+### Measured-cost adaptive scheduling — consolidated update
+- Measures the actual duration of each synchronous section rebuild and feeds a smoothed cost estimate back into the next frame's budget.
+- When synchronous rebuilds are expensive, the fast-frame ceiling is reduced to one or two instead of blindly using the CPU's maximum count.
+- Elevated JVM heap pressure limits synchronous rebuilds to one; critical pressure temporarily sends rebuilds through Minecraft's asynchronous path.
+- The scheduler performs no logging or object allocation in the per-build timing path.
+- This is intended to reduce render-thread spikes and adapt to the actual chunk workload instead of relying only on CPU core count. It does not replace Minecraft's chunk renderer or guarantee a higher average FPS.
 
 ### Frame pacing and stability — sixth development stage
 - Smooths the chunk-compilation interval signal with an exponential moving average (75% previous estimate, 25% new sample).
