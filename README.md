@@ -170,3 +170,10 @@ This connects the baked-model mesher to the GPU upload owner through a section c
 - Sets the project version to exactly 1.0.
 
 **Scope:** this is the material-index and shader-source foundation, not an active terrain pipeline. The shaders are not yet registered or loaded by RenderPearl; there is no atlas descriptor binding, per-section transform upload, lighting/tint/AO evaluation, pipeline creation or draw submission. The material table retains Minecraft metadata but does not yet resolve texture handles. Vanilla remains responsible for terrain rendering, and no performance improvement is claimed.
+
+
+### RenderPearl draw-submission bridge — step 6 foundation
+- Adds a draw method that binds Radeonium's uploaded vertex slice to an already-open RenderPearl `RenderPass` and issues a triangle-list draw.
+- Adds a section-cache batch entry point that binds the supplied compiled pipeline once and submits each non-empty cached section.
+- The caller remains responsible for creating the correct pass, binding uniforms/atlas resources, supplying the camera transform, and preserving SOLID/CUTOUT/TRANSLUCENT ordering.
+- This is a real RenderPearl draw-command path, but it is not yet injected into Minecraft's live terrain frame graph and does not replace vanilla terrain rendering. No FPS gain is claimed.
