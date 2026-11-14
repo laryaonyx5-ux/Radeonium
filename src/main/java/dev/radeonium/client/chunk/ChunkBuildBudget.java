@@ -3,9 +3,11 @@ package dev.radeonium.client.chunk;
 import dev.radeonium.client.memory.MemoryPressureMonitor;
 
 /**
- * Adapts synchronous chunk-section work and optional chunk maintenance to
- * a smoothed pacing signal. The complete Radeonium scheduling layer can be
- * toggled without changing Minecraft's own renderer behavior.
+ * Adaptive budget for render-thread chunk section compilation.
+ *
+ * Synchronous builds are only allowed when recent frame pacing is healthy.
+ * Their measured cost then adapts the per-frame count ceiling, while all
+ * deferred builds use Minecraft's own asynchronous task pipeline.
  */
 public final class ChunkBuildBudget {
     private static final long FAST_ENTER_NANOS = 11_000_000L;
@@ -14,8 +16,13 @@ public final class ChunkBuildBudget {
     private static final long SLOW_ENTER_NANOS = 22_000_000L;
     private static final long TRANSLUCENCY_DEFER_FRAME_NANOS = 25_000_000L;
     private static final long MAX_PACING_SAMPLE_NANOS = 100_000_000L;
-    private static final int MAX_SYNCHRONOUS_BUILDS = CpuWorkProfile.maxSynchronousChunkBuilds();
+
+    // If a synchronous rebuild is expensive, spend less render-thread time on
+    // further rebuilds. These are adaptation thresholds, not hard timeouts.
+    private static final long CHEAP_BUILD_NANOS = 750_000L;
+    private static final long MODERATE_BUILD_NANOS = 2_000_000L;
     private static final int MAX_DEFERRED_FRAMES = 3;
+    private static final int MAX_SYNCHRONOUS_BUILDS = CpuWorkProfile.maxSynchronousChunkBuilds();
 
     private enum PacingState {
         FAST,
@@ -26,6 +33,7 @@ public final class ChunkBuildBudget {
     private static volatile boolean enabled = true;
     private static long lastFrameStartNanos;
     private static long smoothedFrameIntervalNanos;
+    private static long smoothedSynchronousBuildNanos;
     private static int synchronousBuildsThisFrame;
     private static int synchronousBudget = 1;
     private static int consecutiveFramesWithoutSync;
@@ -40,30 +48,19 @@ public final class ChunkBuildBudget {
 
     public static void setEnabled(boolean value) {
         enabled = value;
-        if (!value) {
-            // Restore vanilla's synchronous behavior immediately while off.
-            synchronousBudget = Integer.MAX_VALUE;
-            lastFrameStartNanos = 0L;
-            smoothedFrameIntervalNanos = 0L;
-            synchronousBuildsThisFrame = 0;
-            consecutiveFramesWithoutSync = 0;
-            pacingState = PacingState.NORMAL;
-        } else {
-            // Start with a neutral estimate; do not reuse stale measurements.
-            lastFrameStartNanos = 0L;
-            smoothedFrameIntervalNanos = 0L;
-            synchronousBudget = 1;
-            synchronousBuildsThisFrame = 0;
-            consecutiveFramesWithoutSync = 0;
-            pacingState = PacingState.NORMAL;
-        }
+        lastFrameStartNanos = 0L;
+        smoothedFrameIntervalNanos = 0L;
+        smoothedSynchronousBuildNanos = 0L;
+        synchronousBuildsThisFrame = 0;
+        consecutiveFramesWithoutSync = 0;
+        pacingState = PacingState.NORMAL;
+        synchronousBudget = value ? 1 : Integer.MAX_VALUE;
     }
 
     /**
-     * Called at the start of LevelRenderer.compileSections. The interval
-     * between calls is only a proxy for pacing, not a guaranteed render-frame
-     * measurement. An exponential moving average and hysteresis prevent the
-     * chunk budget from rapidly switching around a single threshold.
+     * Called at the start of the section-compilation phase. This interval is
+     * a pacing proxy rather than a guaranteed measurement of every rendered
+     * frame; smoothing and hysteresis keep it from reacting to one spike.
      */
     public static void beginFrame(long nowNanos) {
         if (!enabled) {
@@ -74,14 +71,7 @@ public final class ChunkBuildBudget {
         if (lastFrameStartNanos != 0L) {
             long sample = Math.max(0L, nowNanos - lastFrameStartNanos);
             sample = Math.min(sample, MAX_PACING_SAMPLE_NANOS);
-
-            if (smoothedFrameIntervalNanos == 0L) {
-                smoothedFrameIntervalNanos = sample;
-            } else {
-                smoothedFrameIntervalNanos =
-                        (smoothedFrameIntervalNanos * 3L + sample) / 4L;
-            }
-
+            smoothedFrameIntervalNanos = smooth(smoothedFrameIntervalNanos, sample);
             updatePacingState(smoothedFrameIntervalNanos);
 
             if (synchronousBuildsThisFrame == 0 && synchronousBudget == 0) {
@@ -90,16 +80,11 @@ public final class ChunkBuildBudget {
                 consecutiveFramesWithoutSync = 0;
             }
 
-            synchronousBudget = switch (pacingState) {
-                case FAST -> MAX_SYNCHRONOUS_BUILDS;
-                case NORMAL -> 1;
-                case SLOW -> 0;
-            };
-
-            // Never starve urgent terrain updates during sustained slow pacing.
-            // Critical heap pressure still overrides this in reserveSynchronousBuild.
+            synchronousBudget = calculateBudget();
+            // Avoid indefinitely postponing urgent terrain changes.
             if (synchronousBudget == 0
-                    && consecutiveFramesWithoutSync >= MAX_DEFERRED_FRAMES) {
+                    && consecutiveFramesWithoutSync >= MAX_DEFERRED_FRAMES
+                    && !MemoryPressureMonitor.isCritical()) {
                 synchronousBudget = 1;
             }
         } else {
@@ -109,6 +94,35 @@ public final class ChunkBuildBudget {
 
         lastFrameStartNanos = nowNanos;
         synchronousBuildsThisFrame = 0;
+    }
+
+    private static long smooth(long previous, long sample) {
+        return previous == 0L ? sample : (previous * 3L + sample) / 4L;
+    }
+
+    private static int calculateBudget() {
+        if (MemoryPressureMonitor.isCritical()) {
+            return 0;
+        }
+        if (pacingState == PacingState.SLOW) {
+            return 0;
+        }
+        if (pacingState == PacingState.NORMAL) {
+            return 1;
+        }
+
+        int budget = MAX_SYNCHRONOUS_BUILDS;
+        if (MemoryPressureMonitor.isElevated()) {
+            budget = Math.min(budget, 1);
+        }
+
+        long buildCost = smoothedSynchronousBuildNanos;
+        if (buildCost >= MODERATE_BUILD_NANOS) {
+            budget = Math.min(budget, 1);
+        } else if (buildCost >= CHEAP_BUILD_NANOS) {
+            budget = Math.min(budget, 2);
+        }
+        return budget;
     }
 
     private static void updatePacingState(long intervalNanos) {
@@ -155,9 +169,22 @@ public final class ChunkBuildBudget {
     }
 
     /**
-     * Translucent resorting is maintenance work: if the smoothed pacing signal
-     * is especially slow, leave Minecraft's round-robin cursor untouched and
-     * let it resume the pending slice later.
+     * Feeds the real duration of a synchronous section build back into the
+     * scheduler. No allocation or logging occurs on this hot path.
+     */
+    public static void recordSynchronousBuild(long elapsedNanos) {
+        if (elapsedNanos <= 0L) {
+            return;
+        }
+        smoothedSynchronousBuildNanos = smooth(
+                smoothedSynchronousBuildNanos,
+                Math.min(elapsedNanos, MAX_PACING_SAMPLE_NANOS)
+        );
+    }
+
+    /**
+     * Translucent resorting is maintenance work. During sustained slow pacing
+     * its round-robin cursor is left untouched so Minecraft can resume later.
      */
     public static boolean shouldDeferTranslucencyResort() {
         return enabled && (smoothedFrameIntervalNanos >= TRANSLUCENCY_DEFER_FRAME_NANOS
