@@ -32,7 +32,7 @@ The capability snapshot is informational. A reported feature is not automaticall
 ### Chunk rebuild scheduling — first optimization
 Radeonium now hooks Minecraft 26.3's `LevelRenderer.compileSections` path.
 
-- Measures the interval between calls to Minecraft's section-compilation phase as a lightweight frame-pacing signal.
+- Samples frame intervals at `LevelRenderer.endFrame`, giving the scheduler a full renderer-frame boundary rather than timing only the chunk-compilation phase.
 - Adapts synchronous section rebuilds to recent pacing and measured rebuild cost: up to three on CPUs with at least 12 logical processors, up to two on CPUs with at least six, and one on smaller CPUs, but only while recent frames are fast. Normal pacing allows one; slow pacing allows none temporarily.
 - Guarantees a periodic synchronous slot so urgent terrain updates are not deferred indefinitely.
 - Routes deferred work into Minecraft's existing asynchronous section task queue.
@@ -97,3 +97,9 @@ Radeonium is experimental software. Back up worlds before testing development bu
 - The signal is still sampled at the `compileSections` hook and is only a pacing proxy; it is not a direct measurement of every rendered frame or a frame-time guarantee.
 - This is scheduling stabilization, not a frame limiter or a measured FPS improvement. Validate smoothness and visual correctness in-game during the final test stage.
 
+
+
+### Renderer integration — 0.3.0 development update
+- Frame pacing is now sampled at Minecraft's `LevelRenderer.endFrame` boundary. This makes the scheduler's timing signal correspond to complete renderer-frame intervals instead of the interval between chunk-compilation hooks.
+- Minecraft 26.3 already uses its own MultiDrawIndirect terrain path on supported graphics devices. Radeonium detects the relevant device capabilities and leaves that backend-managed path intact; it does not issue duplicate GPU commands or force unsupported features.
+- Radeonium still uses Minecraft's section mesher, mesh storage, visibility/occlusion system, upload queue, and draw submission. Replacing those systems with a Sodium-style renderer is a separate renderer implementation, not something that can be safely achieved by toggling a GPU capability flag. No such replacement is claimed in this release.
