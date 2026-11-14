@@ -2,6 +2,7 @@ package dev.radeonium.client;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import dev.radeonium.client.chunk.ChunkBuildBudget;
+import dev.radeonium.client.chunk.CpuWorkProfile;
 import dev.radeonium.client.gpu.GpuDetector;
 import dev.radeonium.client.memory.MemoryPressureMonitor;
 import net.fabricmc.api.ClientModInitializer;
@@ -38,6 +39,9 @@ public final class RadeoniumClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         LOGGER.info("Radeonium client initialized.");
+        LOGGER.info("CPU profile: {} logical processors; up to {} synchronous chunk builds on fast frames.",
+                CpuWorkProfile.availableLogicalProcessors(),
+                CpuWorkProfile.maxSynchronousChunkBuilds());
 
         ClientLifecycleEvents.CLIENT_STARTED.register(client -> GpuDetector.detectAndLog());
 
