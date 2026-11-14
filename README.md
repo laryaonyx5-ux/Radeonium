@@ -103,3 +103,13 @@ Radeonium is experimental software. Back up worlds before testing development bu
 - Frame pacing is now sampled at Minecraft's `LevelRenderer.endFrame` boundary. This makes the scheduler's timing signal correspond to complete renderer-frame intervals instead of the interval between chunk-compilation hooks.
 - Minecraft 26.3 already uses its own MultiDrawIndirect terrain path on supported graphics devices. Radeonium detects the relevant device capabilities and leaves that backend-managed path intact; it does not issue duplicate GPU commands or force unsupported features.
 - Radeonium still uses Minecraft's section mesher, mesh storage, visibility/occlusion system, upload queue, and draw submission. Replacing those systems with a Sodium-style renderer is a separate renderer implementation, not something that can be safely achieved by toggling a GPU capability flag. No such replacement is claimed in this release.
+
+
+### Renderer architecture — initial foundation (0.4.0)
+Radeonium now has the first renderer-owned CPU-side building blocks:
+- section coordinates and 4×4×4 render-region grouping;
+- immutable CPU mesh payloads and region-level mesh ownership/accounting;
+- a dirty-section queue that can feed independent meshing workers;
+- a section-face visibility graph that traverses only mutually open neighboring faces.
+
+This is **architecture groundwork, not yet a replacement renderer**. The current game still draws terrain through Minecraft's renderer. The next stages must connect real Minecraft section data to this pipeline, implement a backend-neutral upload layer, and take ownership of terrain draw submission. No FPS gain is claimed for these currently unconnected primitives.
