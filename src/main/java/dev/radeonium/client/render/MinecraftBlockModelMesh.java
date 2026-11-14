@@ -7,6 +7,7 @@ import net.minecraft.core.Direction;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.nio.ByteBuffer;
 
 /**
  * Immutable CPU-side geometry extracted from Minecraft's baked block models.
@@ -84,6 +85,22 @@ public final class MinecraftBlockModelMesh {
 
         public BakedQuad.MaterialInfo material() {
             return material;
+        }
+
+        /**
+         * Writes two triangles in the vertex format used by
+         * MinecraftMeshGpuUpload: float3 position + packed UV split into ints.
+         */
+        void writeTriangleVertices(ByteBuffer target) {
+            int[] order = {0, 1, 2, 0, 2, 3};
+            for (int vertex : order) {
+                int offset = vertex * 3;
+                target.putFloat(positions[offset]);
+                target.putFloat(positions[offset + 1]);
+                target.putFloat(positions[offset + 2]);
+                target.putInt((int) packedUv[vertex]);
+                target.putInt((int) (packedUv[vertex] >>> 32));
+            }
         }
     }
 }

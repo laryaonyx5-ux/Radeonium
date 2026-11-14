@@ -140,3 +140,13 @@ This is a working generic voxel-meshing stage, **not yet the Minecraft block-mod
 - Keeps the extracted result immutable and reports quad counts by Minecraft's terrain layer.
 
 This is the first real-block-model geometry step, **not yet a complete Minecraft section mesher**. The caller must still supply correctly selected model parts. Context-sensitive/multipart model resolution, neighbor-face visibility, biome tint evaluation, smooth lighting and AO calculation, fluid geometry, block entities, modded renderer hooks, translucent sort state and conversion to Radeonium's final GPU vertex format are not yet implemented. This extraction layer is not connected to live section rebuilds or terrain drawing, and no FPS gain is claimed.
+
+
+### RenderPearl GPU vertex upload — 0.8.0 development stage
+- Adds a RenderPearl-backed GPU upload owner for extracted Minecraft baked-model geometry.
+- Expands each quad into six triangle-list vertices and uploads position plus packed UV data into a GPU vertex buffer using the active `GpuDevice`.
+- Uses Minecraft 26.3's public RenderPearl device/buffer contracts, so the upload does not call raw OpenGL and is designed to work through whichever supported backend Minecraft has selected.
+- Keeps GPU resource lifetime explicit: the upload object owns its buffer, exposes a slice for a future render pass, and closes the buffer when released.
+- GPU creation is render-thread work; CPU model extraction must remain separate from this upload step.
+
+This is **GPU data transfer only**, not terrain rendering. The current uploaded vertex layout contains position and packed UV data; it does not yet bind the block atlas/material state, tint, lighting/AO, shader pipeline, index batching or a terrain draw pass. The uploader is not yet connected to live section rebuilds, and Minecraft still draws terrain through its vanilla renderer. No FPS gain is claimed.
