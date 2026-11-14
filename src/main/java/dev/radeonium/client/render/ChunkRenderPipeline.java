@@ -79,6 +79,7 @@ public final class ChunkRenderPipeline {
     private void markDirtyInternal(SectionPos position) {
         SectionState state = sections.get(position);
         if (state != null) {
+            state.generation++;
             state.dirty = true;
             if (queuedDirty.add(position)) dirtyQueue.addLast(position);
         }
@@ -98,16 +99,45 @@ public final class ChunkRenderPipeline {
         return result;
     }
 
-    /** Installs a completed CPU mesh if the section still exists. */
-    public synchronized boolean installMesh(SectionPos position, SectionMesh mesh) {
+    /**
+     * Returns the current generation token for a section build.
+     *
+     * A caller must capture this value before starting asynchronous meshing and
+     * pass it to the generation-aware installMesh overload when the result is
+     * ready. Any invalidation or removal makes the old token unusable.
+     */
+    public synchronized long beginMeshBuild(SectionPos position) {
         SectionState state = sections.get(position);
-        if (state == null) return false;
+        return state == null ? -1L : state.generation;
+    }
+
+    /**
+     * Installs a completed CPU mesh only if no newer invalidation has occurred
+     * since the caller captured its generation token.
+     */
+    public synchronized boolean installMesh(
+            SectionPos position, long expectedGeneration, SectionMesh mesh
+    ) {
+        SectionState state = sections.get(position);
+        if (state == null || expectedGeneration < 0L
+                || state.generation != expectedGeneration) {
+            return false;
+        }
 
         RenderRegion region = regions.computeIfAbsent(position.region(), RenderRegion::new);
         region.put(position.regionIndex(), mesh);
         state.dirty = false;
         state.hasMesh = mesh != null && !mesh.isEmpty();
         return true;
+    }
+
+    /**
+     * Legacy convenience for synchronous callers. Asynchronous callers must
+     * use the token-aware overload to prevent stale mesh installation.
+     */
+    public synchronized boolean installMesh(SectionPos position, SectionMesh mesh) {
+        long generation = beginMeshBuild(position);
+        return installMesh(position, generation, mesh);
     }
 
     public SectionVisibilityGraph visibilityGraph() { return visibility; }
@@ -128,5 +158,6 @@ public final class ChunkRenderPipeline {
     private static final class SectionState {
         private boolean dirty = true;
         private boolean hasMesh;
+        private long generation = 1L;
     }
 }
