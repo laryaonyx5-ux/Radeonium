@@ -12,11 +12,8 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * Smooths chunk rebuild spikes by limiting synchronous section compilation
- * and postponing non-urgent translucent resort work during slow frames.
- *
- * Minecraft's existing async queue, cancellation, ordering and GPU upload
- * pipeline remain responsible for all deferred work.
+ * Adapts render-thread chunk rebuild work while preserving Minecraft's own
+ * asynchronous task queue, cancellation, ordering and GPU upload pipeline.
  */
 @Mixin(LevelRenderer.class)
 public abstract class LevelRendererMixin {
@@ -50,10 +47,16 @@ public abstract class LevelRendererMixin {
             SectionRenderDispatcher.RenderSection section,
             RenderSectionRegion region
     ) {
-        if (ChunkBuildBudget.reserveSynchronousBuild()) {
-            section.compileSync(region);
-        } else {
+        if (!ChunkBuildBudget.reserveSynchronousBuild()) {
             section.compileAsync(region);
+            return;
+        }
+
+        long startedAt = System.nanoTime();
+        try {
+            section.compileSync(region);
+        } finally {
+            ChunkBuildBudget.recordSynchronousBuild(System.nanoTime() - startedAt);
         }
     }
 }
