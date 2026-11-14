@@ -12,13 +12,11 @@ import java.nio.ByteOrder;
  */
 public final class SectionMeshBuilder {
     private static final int FLOATS_PER_VERTEX = 7;
-    private static final int BYTES_PER_VERTEX = FLOATS_PER_VERTEX * Float.BYTES;
 
     public SectionMesh build(VoxelSectionSnapshot snapshot) {
         if (snapshot == null) throw new IllegalArgumentException("snapshot cannot be null");
 
-        ByteBuffer output = ByteBuffer.allocate(estimateWorstCaseBytes())
-                .order(ByteOrder.nativeOrder());
+        FloatBuilder output = new FloatBuilder(4096);
         int quadCount = 0;
         short[] mask = new short[16 * 16];
 
@@ -68,7 +66,8 @@ public final class SectionMeshBuilder {
                             }
 
                             float plane = slice + (sign > 0 ? 1.0f : 0.0f);
-                            emitQuad(output, axis, uAxis, vAxis, plane, u, v, width, height, sign, material);
+                            emitQuad(output, axis, uAxis, vAxis, plane, u, v,
+                                    width, height, sign, material);
                             quadCount++;
 
                             for (int dy = 0; dy < height; dy++) {
@@ -83,15 +82,10 @@ public final class SectionMeshBuilder {
             }
         }
 
-        output.flip();
-        byte[] bytes = new byte[output.remaining()];
-        output.get(bytes);
-        return new SectionMesh(bytes, quadCount * 6);
-    }
-
-    private static int estimateWorstCaseBytes() {
-        // Six faces for every voxel, six vertices per face, seven floats per vertex.
-        return VoxelSectionSnapshot.VOLUME * 6 * 6 * BYTES_PER_VERTEX;
+        ByteBuffer bytes = ByteBuffer.allocate(output.size() * Float.BYTES)
+                .order(ByteOrder.nativeOrder());
+        output.writeTo(bytes);
+        return new SectionMesh(bytes.array(), quadCount * 6);
     }
 
     private static int[] coordinates(int axis, int uAxis, int vAxis,
@@ -103,7 +97,7 @@ public final class SectionMeshBuilder {
         return p;
     }
 
-    private static void emitQuad(ByteBuffer out, int axis, int uAxis, int vAxis,
+    private static void emitQuad(FloatBuilder out, int axis, int uAxis, int vAxis,
                                  float plane, int u, int v, int width, int height,
                                  int sign, short material) {
         float[][] corners = new float[4][3];
@@ -120,8 +114,13 @@ public final class SectionMeshBuilder {
 
         for (int index : order) {
             float[] point = corners[index];
-            out.putFloat(point[0]).putFloat(point[1]).putFloat(point[2]);
-            out.putFloat(nx).putFloat(ny).putFloat(nz).putFloat(material);
+            out.add(point[0]);
+            out.add(point[1]);
+            out.add(point[2]);
+            out.add(nx);
+            out.add(ny);
+            out.add(nz);
+            out.add(material);
         }
     }
 
@@ -130,5 +129,30 @@ public final class SectionMeshBuilder {
         point[axis] = plane;
         point[uAxis] = u;
         point[vAxis] = v;
+    }
+
+    /** Small growable primitive buffer: avoids allocating a worst-case 41 MiB per section. */
+    private static final class FloatBuilder {
+        private float[] values;
+        private int size;
+
+        private FloatBuilder(int initialCapacity) {
+            values = new float[initialCapacity];
+        }
+
+        private void add(float value) {
+            if (size == values.length) {
+                values = java.util.Arrays.copyOf(values, Math.max(16, values.length * 2));
+            }
+            values[size++] = value;
+        }
+
+        private int size() {
+            return size;
+        }
+
+        private void writeTo(ByteBuffer target) {
+            for (int i = 0; i < size; i++) target.putFloat(values[i]);
+        }
     }
 }
