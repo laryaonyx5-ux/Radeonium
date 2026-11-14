@@ -22,9 +22,15 @@ A replacement must preserve the rest of the frame: sky, entities, block entities
 ## Required implementation sequence
 
 ### 7.1 — Capture the real section lifecycle
-- Resolve each visible `RenderSection` to its current compiled section data.
-- Track section rebuilds, removals, world changes, resource reloads, and render-distance grid movement.
-- Reject stale asynchronous results using a section generation/version token.
+
+**Partial implementation committed:** `0dbfdcc684ffd766c771ff93c75c49f1715e11e1`.
+
+- The existing extractor mixin observes the visible section set and dirty-section notifications.
+- `ChunkRenderPipeline` now assigns a monotonically increasing generation to each live section state.
+- Asynchronous mesh callers can capture a generation with `beginMeshBuild` and install only with the matching token. Dirty notifications advance the generation; removed sections reject late results.
+- The legacy install method remains for synchronous callers only.
+
+**Still missing:** extracting the actual compiled vanilla section data, wiring the generation token through the real section compile task, and clearing/reconciling all section state on world swaps, resource reloads and render-distance grid movement. Therefore 7.1 is not complete.
 
 ### 7.2 — Build complete Minecraft section meshes
 - Resolve block states and multipart/model parts using Minecraft's model system.
@@ -86,3 +92,10 @@ This environment can verify the repository and its CI build, but it cannot launc
 **Build/package validation: passed. Full runtime validation: pending.**
 
 Step 7.5 cannot be marked fully complete, and the full terrain replacement cannot be called finished, until steps 7.1–7.4 have supplied a real replacement path and the runtime matrix above has passed. Vanilla terrain rendering remains authoritative; no vanilla terrain draws have been disabled.
+
+
+## Latest implementation progress
+
+- Commit `0dbfdcc684ffd766c771ff93c75c49f1715e11e1` adds stale-result protection to the CPU section pipeline.
+- This is infrastructure only: it does not yet feed real Minecraft-compiled section geometry into Radeonium, upload full terrain, or replace any draw calls.
+- The next implementation target is the real compiled-section lifecycle bridge, followed by complete section extraction and layer-aware GPU uploads.
