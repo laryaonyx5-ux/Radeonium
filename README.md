@@ -150,3 +150,13 @@ This is the first real-block-model geometry step, **not yet a complete Minecraft
 - GPU creation is render-thread work; CPU model extraction must remain separate from this upload step.
 
 This is **GPU data transfer only**, not terrain rendering. The current uploaded vertex layout contains position and packed UV data; it does not yet bind the block atlas/material state, tint, lighting/AO, shader pipeline, index batching or a terrain draw pass. The uploader is not yet connected to live section rebuilds, and Minecraft still draws terrain through its vanilla renderer. No FPS gain is claimed.
+
+
+### Minecraft section GPU cache — 0.9.0 development stage
+- Adds a section-keyed owner for Minecraft baked-model meshes and their RenderPearl GPU vertex uploads.
+- Provides a rebuild operation that extracts quads, uploads them, then replaces and releases the previous section buffer.
+- Provides section removal, cache clearing, vertex/byte counters and access to the retained CPU mesh or GPU upload.
+- Exposes the cache from the client entrypoint and releases cached buffers during client shutdown.
+- Keeps GPU creation and destruction on the render thread; CPU model extraction remains separable.
+
+This connects the baked-model mesher to the GPU upload owner through a section cache, but it is **not yet wired into Minecraft's live section compiler**: callers must still supply the correctly resolved BlockStateModelPart list. Automatic block-state/model resolution, neighbor culling, tint, lighting/AO, fluids, atlas/shader binding, and Radeonium draw submission remain future work. Vanilla continues to render the world, and no FPS gain is claimed.

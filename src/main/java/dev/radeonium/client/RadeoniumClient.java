@@ -6,6 +6,7 @@ import dev.radeonium.client.chunk.CpuWorkProfile;
 import dev.radeonium.client.gpu.GpuDetector;
 import dev.radeonium.client.memory.MemoryPressureMonitor;
 import dev.radeonium.client.render.ChunkRenderPipeline;
+import dev.radeonium.client.render.MinecraftSectionGpuCache;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
@@ -16,16 +17,20 @@ import net.minecraft.resources.Identifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * Client entrypoint for Radeonium.
- */
+/** Client entrypoint for Radeonium. */
 public final class RadeoniumClient implements ClientModInitializer {
     public static final String MOD_ID = "radeonium";
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
     private static final ChunkRenderPipeline RENDERER_PIPELINE = new ChunkRenderPipeline();
+    private static final MinecraftSectionGpuCache MINECRAFT_GPU_CACHE = new MinecraftSectionGpuCache();
 
     public static ChunkRenderPipeline rendererPipeline() {
         return RENDERER_PIPELINE;
+    }
+
+    /** Section-model uploads are owned here and must be changed on the render thread. */
+    public static MinecraftSectionGpuCache minecraftGpuCache() {
+        return MINECRAFT_GPU_CACHE;
     }
 
     private static final KeyMapping.Category KEY_CATEGORY = KeyMapping.Category.register(
@@ -50,6 +55,7 @@ public final class RadeoniumClient implements ClientModInitializer {
                 CpuWorkProfile.maxSynchronousChunkBuilds());
 
         ClientLifecycleEvents.CLIENT_STARTED.register(client -> GpuDetector.detectAndLog());
+        ClientLifecycleEvents.CLIENT_STOPPING.register(client -> MINECRAFT_GPU_CACHE.close());
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             if (MemoryPressureMonitor.tickAndSample()) {
