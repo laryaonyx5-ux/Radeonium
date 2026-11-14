@@ -113,3 +113,12 @@ Radeonium now has the first renderer-owned CPU-side building blocks:
 - a section-face visibility graph that traverses only mutually open neighboring faces.
 
 This is **architecture groundwork, not yet a replacement renderer**. The current game still draws terrain through Minecraft's renderer. The next stages must connect real Minecraft section data to this pipeline, implement a backend-neutral upload layer, and take ownership of terrain draw submission. No FPS gain is claimed for these currently unconnected primitives.
+
+
+### CPU meshing and worker stage — 0.5.0
+- Adds an immutable 16×16×16 voxel snapshot format.
+- Adds a greedy mesher that merges adjacent coplanar faces with matching material IDs.
+- Produces Radeonium-owned CPU vertex data (position, normal, material) without touching the GPU from worker threads.
+- Adds a bounded background meshing executor with back-pressure and explicit rejection instead of falling back to expensive work on the render thread.
+
+This is a working generic voxel-meshing stage, **not yet the Minecraft block-model mesher**. Minecraft blocks require model baking, multipart geometry, block/fluid render layers, biome tint, AO/light, animated textures, transparency sorting and modded block renderers. The worker output is not yet consumed by the live terrain renderer. GPU buffer arenas, upload synchronization, material/shader integration, and replacing vanilla draw submission remain subsequent integration work. No FPS gain is claimed until the complete path is connected and benchmarked.
