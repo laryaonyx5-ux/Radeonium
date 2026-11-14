@@ -4,6 +4,8 @@ import dev.radeonium.client.RadeoniumClient;
 import it.unimi.dsi.fastutil.longs.LongIterator;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import net.minecraft.client.renderer.chunk.SectionRenderDispatcher;
+import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
+import net.minecraft.client.renderer.chunk.SectionMesh;
 import net.minecraft.core.SectionPos;
 
 import java.util.ArrayList;
@@ -50,6 +52,37 @@ public final class RendererSectionTracker {
         }
 
         working.clear();
+    }
+
+    /**
+     * Copies stable metadata from Minecraft's compiled mesh after extraction.
+     * The SectionMesh and its GPU resources remain owned by vanilla.
+     */
+    public static void captureCompiledMeshes(
+            Iterable<SectionRenderDispatcher.RenderSection> sections
+    ) {
+        for (SectionRenderDispatcher.RenderSection section : sections) {
+            net.minecraft.client.renderer.chunk.SectionMesh mesh = section.getSectionMesh();
+            if (mesh == null) continue;
+
+            SectionMesh.SectionDraw solid = mesh.getSectionDraw(ChunkSectionLayer.SOLID);
+            SectionMesh.SectionDraw cutout = mesh.getSectionDraw(ChunkSectionLayer.CUTOUT);
+            SectionMesh.SectionDraw translucent = mesh.getSectionDraw(ChunkSectionLayer.TRANSLUCENT);
+
+            long packed = section.getSectionNode();
+            SectionPos position = SectionPos.of(packed);
+            RadeoniumClient.rendererPipeline().observeVanillaMesh(
+                    new dev.radeonium.client.render.SectionPos(position.x(), position.y(), position.z()),
+                    new VanillaSectionMeshSnapshot(
+                            solid == null ? 0 : solid.indexCount(),
+                            cutout == null ? 0 : cutout.indexCount(),
+                            translucent == null ? 0 : translucent.indexCount(),
+                            mesh.hasTranslucentGeometry(),
+                            mesh.getRenderableBlockEntities().size(),
+                            mesh.getCompileTaskStartTime()
+                    )
+            );
+        }
     }
 
     public static void markSectionDirty(int sectionX, int sectionY, int sectionZ) {
