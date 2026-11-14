@@ -20,6 +20,33 @@ public final class ChunkRenderPipeline {
     private final ArrayDeque<SectionPos> dirtyQueue = new ArrayDeque<>();
     private final Set<SectionPos> queuedDirty = new HashSet<>();
     private final SectionVisibilityGraph visibility = new SectionVisibilityGraph();
+    private final Set<SectionPos> visibleSections = new HashSet<>();
+
+    /**
+     * Reconciles the currently visible Minecraft sections with Radeonium's
+     * CPU-side lifetime tracker. Visibility here mirrors vanilla's frustum /
+     * occlusion result; it is not a second occlusion decision.
+     */
+    public synchronized void syncVisibleSections(Iterable<SectionPos> current) {
+        Set<SectionPos> next = new HashSet<>();
+        for (SectionPos position : current) next.add(position);
+
+        for (SectionPos previous : new HashSet<>(visibleSections)) {
+            if (!next.contains(previous)) removeSection(previous);
+        }
+
+        for (SectionPos position : next) {
+            if (visibleSections.add(position)) {
+                sections.putIfAbsent(position, new SectionState());
+                visibility.put(position, 0);
+                markDirtyInternal(position);
+            }
+        }
+    }
+
+    public synchronized int visibleSectionCount() {
+        return visibleSections.size();
+    }
 
     public synchronized void addSection(SectionPos position, int openFaceMask) {
         SectionState previous = sections.putIfAbsent(position, new SectionState());
@@ -29,6 +56,7 @@ public final class ChunkRenderPipeline {
 
     public synchronized void removeSection(SectionPos position) {
         sections.remove(position);
+        visibleSections.remove(position);
         visibility.remove(position);
         queuedDirty.remove(position);
         dirtyQueue.removeIf(position::equals);

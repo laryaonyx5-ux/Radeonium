@@ -5,6 +5,7 @@ import dev.radeonium.client.chunk.ChunkBuildBudget;
 import dev.radeonium.client.chunk.CpuWorkProfile;
 import dev.radeonium.client.gpu.GpuDetector;
 import dev.radeonium.client.memory.MemoryPressureMonitor;
+import dev.radeonium.client.render.ChunkRenderPipeline;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
@@ -21,6 +22,11 @@ import org.slf4j.LoggerFactory;
 public final class RadeoniumClient implements ClientModInitializer {
     public static final String MOD_ID = "radeonium";
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
+    private static final ChunkRenderPipeline RENDERER_PIPELINE = new ChunkRenderPipeline();
+
+    public static ChunkRenderPipeline rendererPipeline() {
+        return RENDERER_PIPELINE;
+    }
 
     private static final KeyMapping.Category KEY_CATEGORY = KeyMapping.Category.register(
             Identifier.fromNamespaceAndPath(MOD_ID, "main")

@@ -122,3 +122,11 @@ This is **architecture groundwork, not yet a replacement renderer**. The current
 - Adds a bounded background meshing executor with back-pressure and explicit rejection instead of falling back to expensive work on the render thread.
 
 This is a working generic voxel-meshing stage, **not yet the Minecraft block-model mesher**. Minecraft blocks require model baking, multipart geometry, block/fluid render layers, biome tint, AO/light, animated textures, transparency sorting and modded block renderers. The worker output is not yet consumed by the live terrain renderer. GPU buffer arenas, upload synchronization, material/shader integration, and replacing vanilla draw submission remain subsequent integration work. No FPS gain is claimed until the complete path is connected and benchmarked.
+
+
+### Live Minecraft section lifecycle bridge — 0.6.0
+- Hooks Minecraft 26.3's `LevelExtractor`, the stage that already enumerates vanilla-visible render sections while preparing the frame's level render state.
+- Mirrors the current visible section set into Radeonium's CPU-side section lifetime tracker.
+- Tracks vanilla section-dirty notifications for sections Radeonium currently observes.
+- Reuses packed section-node sets between frames and rebuilds the object snapshot only when the visible set changes.
+- This is a real live lifecycle connection, but it is **not** custom terrain rendering: vanilla still owns block-model compilation, mesh upload, visibility decisions, GPU resources and terrain draw submission. Radeonium's generic voxel mesher is still not a replacement for Minecraft's block/model renderer. No FPS gain is claimed for the tracking bridge itself.
