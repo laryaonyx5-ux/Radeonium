@@ -72,16 +72,17 @@ Milestone B must not begin until the final CI item is green. This milestone does
 - `MinecraftBlockModelMesher` extracts baked quad positions, packed UVs, face directions and Minecraft render-layer/material references from supplied model parts.
 - `MinecraftBlockModelMesh` stores copied quad geometry and can filter by vanilla render layer.
 - `MinecraftMaterialTable` assigns renderer-side material indices while retaining the source Minecraft material metadata for later translation.
-- `SectionMeshBuilder` contains a greedy voxel-mesh prototype for immutable 16×16×16 material snapshots.
+- `SectionMeshBuilder` contains a greedy opaque-voxel mesher for immutable 16×16×16 material snapshots; it merges coplanar faces of equal material and culls faces against any non-air opaque neighbor.
 - `SectionMeshingExecutor` uses a bounded worker queue and reports rejected work instead of running expensive builds on the caller thread.
+- `VoxelSectionSnapshot` supports an immutable 18×18×18 one-cell neighbor halo, allowing correct culling at section borders when the caller supplies all six neighboring edge samples.
 - `SectionMesh` validates the prototype's fixed 28-byte vertex stride and defensively copies its payload.
-- Focused tests cover empty sections, single voxels, greedy merging, material boundaries, payload validation and vertex sanity.
+- Focused tests cover empty sections, single voxels, greedy merging, shared-face culling between opaque materials, neighbor-halo boundary culling, defensive copies, payload validation and vertex sanity.
 
 ### Remaining acceptance blockers
 
 - Capture immutable per-block model inputs on the permitted Minecraft build thread; worker inputs must not retain live world objects or mutable Minecraft state.
 - Resolve block-state variants and multipart model selection for each actual block position.
-- Implement neighbor-aware face culling across section boundaries; the current voxel snapshot treats out-of-range neighbors as air and is not suitable for final terrain.
+- Feed the halo from the six actual neighboring sections and invalidate/rebuild both sides when a boundary block changes; the snapshot API supports the halo, but world capture and invalidation are not yet wired.
 - Preserve tint resolution, packed block/sky light, ambient occlusion, emissive behavior, atlas UVs and animated texture references.
 - Integrate fluid surfaces, model-specific special geometry, block entities and modded model hooks with explicit unsupported-content fallback.
 - Produce independent per-layer meshes and prove parity against vanilla before switching any terrain layer away from vanilla.
