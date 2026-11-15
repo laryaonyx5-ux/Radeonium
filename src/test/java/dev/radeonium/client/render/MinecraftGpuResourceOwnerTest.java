@@ -219,7 +219,7 @@ class MinecraftGpuResourceOwnerTest {
         owner.track(independent, null);
 
         assertThrows(IllegalStateException.class, owner::releaseAll);
-        assertTrue(retryable.isClosed() == false);
+        assertFalse(retryable.isClosed());
         assertTrue(independent.isClosed());
         assertEquals(1, owner.allocationCount());
         assertEquals(40L, owner.allocatedBytes());
