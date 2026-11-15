@@ -92,9 +92,13 @@ public final class MinecraftGpuResourceOwner implements AutoCloseable {
             if (upload.isClosed()) return false;
             throw new IllegalArgumentException("GPU upload is not owned by this resource owner");
         }
-        if (!allocation.releaseReference()) return true;
+        if (allocation.referenceCount() > 1) {
+            allocation.releaseReference();
+            return true;
+        }
 
         upload.close();
+        allocation.releaseReference();
         allocations.remove(upload);
         if (allocation.key != null) reusableUploads.remove(allocation.key, upload);
         allocatedBytes -= allocation.bytes;
