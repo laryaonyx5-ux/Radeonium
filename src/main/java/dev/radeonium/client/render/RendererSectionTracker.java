@@ -71,7 +71,8 @@ public final class RendererSectionTracker {
         // These sentinels have no compiled VisibilitySet to consult. Treat them
         // as transparent for traversal so a not-yet-compiled/empty section
         // cannot incorrectly hide already-visible terrain behind it.
-        if (mesh == null || mesh == SectionMesh.UNCOMPILED || mesh == SectionMesh.EMPTY) {
+        if (mesh == null || mesh == net.minecraft.client.renderer.chunk.CompiledSectionMesh.UNCOMPILED
+                || mesh == net.minecraft.client.renderer.chunk.CompiledSectionMesh.EMPTY) {
             return ALL_CONNECTIONS;
         }
         long mask = 0L;
