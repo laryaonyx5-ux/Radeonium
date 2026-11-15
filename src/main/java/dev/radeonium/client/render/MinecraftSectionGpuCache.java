@@ -110,6 +110,8 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
         if (position == null || sectionMesh == null || parityVerifiedLayers == null) {
             throw new IllegalArgumentException("position and sectionMesh are required");
         }
+        // Validate/copy the set before acquiring any GPU or material resources.
+        Set<ChunkSectionLayer> verifiedLayers = Set.copyOf(parityVerifiedLayers);
 
         EnumMap<ChunkSectionLayer, MinecraftMeshGpuUpload> layerUploads =
                 new EnumMap<>(ChunkSectionLayer.class);
@@ -118,7 +120,7 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
         int[] materialIndices;
         try {
             for (ChunkSectionLayer layer : ChunkSectionLayer.values()) {
-                if (!parityVerifiedLayers.contains(layer)) continue;
+                if (!verifiedLayers.contains(layer)) continue;
                 MinecraftBlockModelMesh layerMesh = sectionMesh.layer(layer);
                 MinecraftFluidSectionMesher.FluidLayerMesh fluidLayer = sectionMesh.fluids(layer);
                 if (layerMesh.quadCount() > 0 || !fluidLayer.quads().isEmpty()) {
@@ -139,7 +141,7 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
 
         // Keep the old section intact until the complete replacement is prepared.
         Entry replacement = new Entry(combined, sectionMesh.fluidMesh(), sourceSnapshot,
-                Set.copyOf(parityVerifiedLayers), layerUploads, materialIndices);
+                verifiedLayers, layerUploads, materialIndices);
         Entry previous = sections.get(position);
         if (previous != null) {
             try {
