@@ -265,6 +265,11 @@ public final class MinecraftMeshGpuUpload implements AutoCloseable {
         return vertexCount == 0;
     }
 
+    /** True when this upload has no live Radeonium-owned GPU buffer. */
+    public boolean isClosed() {
+        return vertexBuffer == null || vertexBuffer.isClosed();
+    }
+
     public int vertexCount() {
         return vertexCount;
     }
