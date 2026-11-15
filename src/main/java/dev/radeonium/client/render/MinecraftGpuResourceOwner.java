@@ -75,7 +75,14 @@ public final class MinecraftGpuResourceOwner implements AutoCloseable {
             throw new IllegalStateException("GPU upload is already owned");
         }
         long bytes = upload.byteSize();
-        long nextAllocatedBytes = Math.addExact(allocatedBytes, bytes);
+        final long nextAllocatedBytes;
+        try {
+            nextAllocatedBytes = Math.addExact(allocatedBytes, bytes);
+        } catch (ArithmeticException overflow) {
+            // The GPU buffer already exists; dispose it if accounting cannot accept it.
+            upload.close();
+            throw overflow;
+        }
         Allocation allocation = new Allocation(bytes, key);
         allocations.put(upload, allocation);
         if (key != null) reusableUploads.put(key, upload);
