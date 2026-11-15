@@ -15,7 +15,7 @@ class MinecraftSectionParityCheckerTest {
     void emptyRadeoniumAndVanillaSectionsVerifyEveryLayer() {
         var mesh = new MinecraftSectionModelMesher().buildResolved(java.util.List.of());
         var vanilla = new MinecraftCompiledGeometryStore.Snapshot(
-                new SectionPos(0, 0, 0), Map.of(), 1L, 1L);
+                SectionPos.of(0, 0, 0), Map.of(), 1L, 1L);
 
         var report = MinecraftSectionParityChecker.compare(mesh, vanilla);
 
@@ -30,7 +30,7 @@ class MinecraftSectionParityCheckerTest {
                 vanillaVertices, new byte[0], DefaultVertexFormat.BLOCK.toString(),
                 PrimitiveTopology.QUADS.toString(), null, 4, 0);
         var vanilla = new MinecraftCompiledGeometryStore.Snapshot(
-                new SectionPos(2, 3, 4), Map.of(ChunkSectionLayer.SOLID, layer), 1L, 1L);
+                SectionPos.of(2, 3, 4), Map.of(ChunkSectionLayer.SOLID, layer), 1L, 1L);
         var mesh = new MinecraftSectionModelMesher().buildResolved(java.util.List.of());
 
         var report = MinecraftSectionParityChecker.compare(mesh, vanilla);
