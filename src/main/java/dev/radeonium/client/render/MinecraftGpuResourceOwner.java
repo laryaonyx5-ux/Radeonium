@@ -23,6 +23,16 @@ public final class MinecraftGpuResourceOwner implements AutoCloseable {
     private final Map<ByteArrayKey, MinecraftMeshGpuUpload> reusableUploads = new HashMap<>();
     private long allocatedBytes;
     private boolean closed;
+    private final Runnable renderThreadCheck;
+
+    public MinecraftGpuResourceOwner() {
+        this(RenderSystem::assertOnRenderThread);
+    }
+
+    MinecraftGpuResourceOwner(Runnable renderThreadCheck) {
+        if (renderThreadCheck == null) throw new IllegalArgumentException("renderThreadCheck cannot be null");
+        this.renderThreadCheck = renderThreadCheck;
+    }
 
     public MinecraftMeshGpuUpload upload(
             MinecraftBlockModelMesh mesh,
@@ -68,7 +78,7 @@ public final class MinecraftGpuResourceOwner implements AutoCloseable {
         return track(MinecraftMeshGpuUpload.uploadQuadData(device, quads), null);
     }
 
-    private MinecraftMeshGpuUpload track(MinecraftMeshGpuUpload upload, ByteArrayKey key) {
+    MinecraftMeshGpuUpload track(MinecraftMeshGpuUpload upload, ByteArrayKey key) {
         if (upload.isEmpty()) return upload;
         if (allocations.containsKey(upload)) {
             upload.close();
