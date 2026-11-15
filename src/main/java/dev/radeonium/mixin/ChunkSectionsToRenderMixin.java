@@ -6,6 +6,7 @@ import com.mojang.renderpearl.api.buffers.GpuBufferSlice;
 import com.mojang.renderpearl.api.commands.RenderPass;
 import com.mojang.renderpearl.api.pipeline.IndexType;
 import com.mojang.renderpearl.api.pipeline.RenderPipeline;
+import dev.radeonium.client.render.RadeoniumTerrainPipelines;
 import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
 import net.minecraft.client.renderer.chunk.ChunkSectionsToRender;
 import org.spongepowered.asm.mixin.Final;
@@ -45,7 +46,7 @@ public abstract class ChunkSectionsToRenderMixin {
             RenderPipeline pipelineOverrideMultidraw,
             CallbackInfo ci
     ) {
-        RenderPipeline pipeline = pipelineOverride != null ? pipelineOverride : layer.pipeline(false);
+        RenderPipeline pipeline = RadeoniumTerrainPipelines.resolve(layer, pipelineOverride);
         renderPass.setPipeline(RenderSystem.getCompiledPipeline(pipeline));
 
         List<RenderPass.Draw<GpuBufferSlice[]>> layerDraws = drawsPerLayer.get(layer);
