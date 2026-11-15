@@ -17,6 +17,9 @@ public final class MinecraftSectionModelCaptureStore {
     private static final LinkedHashMap<SectionPos, Snapshot> SNAPSHOTS =
             new LinkedHashMap<>(32, 0.75f, true);
     private static int retainedQuads;
+    private static long epoch;
+    private static final ThreadLocal<LinkedHashMap<SectionPos, PendingCapture>> PENDING =
+            ThreadLocal.withInitial(() -> new LinkedHashMap<>(16, 0.75f, true));
 
     private MinecraftSectionModelCaptureStore() {}
 
@@ -26,6 +29,31 @@ public final class MinecraftSectionModelCaptureStore {
      */
     public static boolean captureEnabled() {
         return Boolean.getBoolean("radeonium.captureModelMeshes");
+    }
+
+    /** Stage on the compiler worker; publish only after vanilla compile succeeds. */
+    public static void stage(
+            SectionPos position, MinecraftSectionModelMesher.SectionModelMesh mesh
+    ) {
+        if (position == null || mesh == null) return;
+        LinkedHashMap<SectionPos, PendingCapture> pending = PENDING.get();
+        pending.remove(position);
+        pending.put(position, new PendingCapture(mesh, epoch));
+        while (pending.size() > MAX_SECTIONS) {
+            pending.remove(pending.keySet().iterator().next());
+        }
+    }
+
+    /** Commit the worker's staged mesh at SectionCompiler RETURN. */
+    public static synchronized Snapshot complete(SectionPos position) {
+        if (position == null) return null;
+        PendingCapture pending = PENDING.get().remove(position);
+        if (pending == null || pending.epoch() != epoch) return null;
+        return put(position, pending.mesh());
+    }
+
+    public static void abort(SectionPos position) {
+        if (position != null) PENDING.get().remove(position);
     }
 
     public static synchronized Snapshot put(
@@ -62,8 +90,10 @@ public final class MinecraftSectionModelCaptureStore {
     }
 
     public static synchronized void clear() {
+        epoch++;
         SNAPSHOTS.clear();
         retainedQuads = 0;
+        PENDING.remove();
     }
 
     public static synchronized int sectionCount() {
@@ -73,6 +103,10 @@ public final class MinecraftSectionModelCaptureStore {
     public static synchronized int retainedQuadCount() {
         return retainedQuads;
     }
+
+    private record PendingCapture(
+            MinecraftSectionModelMesher.SectionModelMesh mesh, long epoch
+    ) {}
 
     public record Snapshot(
             SectionPos position,
