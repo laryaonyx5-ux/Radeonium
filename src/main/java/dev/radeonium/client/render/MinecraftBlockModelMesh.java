@@ -5,6 +5,7 @@ import net.minecraft.client.resources.model.geometry.BakedQuad;
 import net.minecraft.core.Direction;
 
 import java.util.List;
+import java.util.ArrayList;
 import java.nio.ByteBuffer;
 
 /**
