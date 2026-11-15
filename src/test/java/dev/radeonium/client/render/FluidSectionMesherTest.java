@@ -27,6 +27,16 @@ class FluidSectionMesherTest {
     }
 
     @Test
+    void emitsOnlyTheExposedPartWhenNeighborFluidIsLower() {
+        short[] ids = new short[4096]; byte[] heights = new byte[4096];
+        int[] tints = new int[4096], lights = new int[4096];
+        int a = 1 + 16 * (1 + 16 * 1), b = 2 + 16 * (1 + 16 * 1);
+        ids[a] = ids[b] = 1; heights[a] = 8; heights[b] = 4;
+        var mesh = new FluidSectionMesher().build(new FluidSectionSnapshot(ids, heights, tints, lights));
+        assertEquals(9, mesh.quadCount());
+    }
+
+    @Test
     void copiesCaptureArraysAndRejectsInvalidHeights() {
         short[] ids = new short[4096]; byte[] heights = new byte[4096];
         int[] tints = new int[4096], lights = new int[4096];
