@@ -340,7 +340,6 @@ public final class MinecraftMeshGpuUpload implements AutoCloseable {
 
     @Override
     public void close() {
-        RenderSystem.assertOnRenderThread();
         if (testCloseAction != null) {
             if (!testClosed) {
                 testCloseAction.run();
@@ -348,6 +347,7 @@ public final class MinecraftMeshGpuUpload implements AutoCloseable {
             }
             return;
         }
+        RenderSystem.assertOnRenderThread();
         if (vertexBuffer != null && !vertexBuffer.isClosed()) {
             vertexBuffer.close();
         }
