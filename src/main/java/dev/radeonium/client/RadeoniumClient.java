@@ -71,8 +71,11 @@ public final class RadeoniumClient implements ClientModInitializer {
 
     public static void queueSectionModelUpload(MinecraftSectionModelCaptureStore.Snapshot snapshot) {
         if (snapshot == null) return;
-        while (!PENDING_MODEL_UPLOADS.offer(snapshot)) {
+        if (!PENDING_MODEL_UPLOADS.offer(snapshot)) {
+            // A dropped upload must not leave an older GPU mesh installed.
             PENDING_MODEL_UPLOADS.poll();
+            INVALIDATE_MODEL_GPU_CACHE.set(true);
+            PENDING_MODEL_UPLOADS.offer(snapshot);
         }
     }
 
@@ -97,8 +100,14 @@ public final class RadeoniumClient implements ClientModInitializer {
             MinecraftSectionModelCaptureStore.Snapshot snapshot = PENDING_MODEL_UPLOADS.poll();
             if (snapshot == null) break;
             if (MinecraftSectionModelCaptureStore.get(snapshot.position()) == snapshot) {
-                MINECRAFT_GPU_CACHE.rebuild(new dev.radeonium.client.render.SectionPos(
-                        snapshot.position().x(), snapshot.position().y(), snapshot.position().z()), snapshot.mesh());
+                try {
+                    MINECRAFT_GPU_CACHE.rebuild(new dev.radeonium.client.render.SectionPos(
+                            snapshot.position().x(), snapshot.position().y(), snapshot.position().z()), snapshot.mesh());
+                } catch (RuntimeException uploadFailure) {
+                    LOGGER.warn("Skipping optional Radeonium mesh upload for section {}", snapshot.position(), uploadFailure);
+                    MINECRAFT_GPU_CACHE.remove(new dev.radeonium.client.render.SectionPos(
+                            snapshot.position().x(), snapshot.position().y(), snapshot.position().z()));
+                }
             }
         }
     }
