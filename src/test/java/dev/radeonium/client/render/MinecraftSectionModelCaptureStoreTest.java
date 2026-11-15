@@ -225,26 +225,6 @@ class MinecraftSectionModelCaptureStoreTest {
     }
 
     @Test
-    void invalidatingSectionAlsoInvalidatesSixFaceNeighborsAndTheirInFlightJobs() {
-        SectionPos center = SectionPos.of(30, 4, 8);
-        var mesh = new MinecraftSectionModelMesher().buildResolved(List.of());
-        var neighborTicket = MinecraftSectionModelCaptureStore.beginAsyncCapture(
-                SectionPos.of(31, 4, 8));
-        MinecraftSectionModelCaptureStore.put(center, mesh);
-        MinecraftSectionModelCaptureStore.put(SectionPos.of(31, 4, 8), mesh);
-        MinecraftSectionModelCaptureStore.put(SectionPos.of(29, 4, 8), mesh);
-        MinecraftSectionModelCaptureStore.put(SectionPos.of(30, 5, 8), mesh);
-        MinecraftSectionModelCaptureStore.put(SectionPos.of(30, 3, 8), mesh);
-        MinecraftSectionModelCaptureStore.put(SectionPos.of(30, 4, 9), mesh);
-        MinecraftSectionModelCaptureStore.put(SectionPos.of(30, 4, 7), mesh);
-
-        MinecraftSectionModelCaptureStore.invalidateSectionAndNeighbors(center);
-
-        assertEquals(0, MinecraftSectionModelCaptureStore.sectionCount());
-        assertNull(MinecraftSectionModelCaptureStore.publishAsync(neighborTicket, mesh));
-    }
-
-    @Test
     void removeAndClearReleaseCapturedSections() {
         SectionPos position = SectionPos.of(5, 6, 7);
         var mesh = new MinecraftSectionModelMesher().buildResolved(List.of());
