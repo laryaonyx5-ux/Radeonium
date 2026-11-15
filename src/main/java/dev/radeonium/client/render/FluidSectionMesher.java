@@ -152,10 +152,12 @@ public final class FluidSectionMesher {
                 throw new IllegalArgumentException("Fluid quad needs four finite vertices");
             }
             positions = positions.clone();
+            boolean axisNormal =
+                    (Math.abs(normalX) == 1.0f && normalY == 0.0f && normalZ == 0.0f)
+                    || (normalX == 0.0f && Math.abs(normalY) == 1.0f && normalZ == 0.0f)
+                    || (normalX == 0.0f && normalY == 0.0f && Math.abs(normalZ) == 1.0f);
             if (!Float.isFinite(normalX) || !Float.isFinite(normalY) || !Float.isFinite(normalZ)
-                    || Math.abs(normalX) > 1.0f || Math.abs(normalY) > 1.0f
-                    || Math.abs(normalZ) > 1.0f
-                    || Math.abs(normalX) + Math.abs(normalY) + Math.abs(normalZ) != 1.0f) {
+                    || !axisNormal) {
                 throw new IllegalArgumentException("Fluid normal must be a unit axis vector");
             }
             for (float value : positions) if (!Float.isFinite(value)) {
