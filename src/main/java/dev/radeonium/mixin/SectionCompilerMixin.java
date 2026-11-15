@@ -18,9 +18,10 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
- * Copies Minecraft's completed per-layer section geometry before vanilla
- * consumes/releases the MeshData. The original result and vanilla renderer are
- * left untouched.
+ * Optionally builds Radeonium's model mesh from the immutable section region
+ * before allowing Minecraft's compiler to run unchanged. The default path
+ * still mirrors Minecraft's completed per-layer geometry; vanilla remains
+ * authoritative for uploads, special renderers and terrain submission.
  */
 @Mixin(SectionCompiler.class)
 public abstract class SectionCompilerMixin {
