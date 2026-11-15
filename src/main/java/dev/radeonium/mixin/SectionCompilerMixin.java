@@ -20,6 +20,20 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public abstract class SectionCompilerMixin {
     @Inject(
             method = "compile(Lnet/minecraft/core/SectionPos;Lnet/minecraft/client/renderer/chunk/RenderSectionRegion;Lcom/mojang/blaze3d/vertex/VertexSorting;Lnet/minecraft/client/renderer/SectionBufferBuilderPack;)Lnet/minecraft/client/renderer/chunk/SectionCompiler$Results;",
+            at = @At("HEAD")
+    )
+    private void radeonium$beginCompiledGeometryCapture(
+            SectionPos sectionPos,
+            RenderSectionRegion region,
+            VertexSorting vertexSorting,
+            SectionBufferBuilderPack builders,
+            CallbackInfoReturnable<SectionCompiler.Results> cir
+    ) {
+        MinecraftCompiledGeometryStore.beginCapture(sectionPos);
+    }
+
+    @Inject(
+            method = "compile(Lnet/minecraft/core/SectionPos;Lnet/minecraft/client/renderer/chunk/RenderSectionRegion;Lcom/mojang/blaze3d/vertex/VertexSorting;Lnet/minecraft/client/renderer/SectionBufferBuilderPack;)Lnet/minecraft/client/renderer/chunk/SectionCompiler$Results;",
             at = @At("RETURN")
     )
     private void radeonium$captureCompiledGeometry(
@@ -30,7 +44,7 @@ public abstract class SectionCompilerMixin {
             CallbackInfoReturnable<SectionCompiler.Results> cir
     ) {
         MinecraftCompiledGeometryStore.Snapshot snapshot =
-                MinecraftCompiledGeometryStore.capture(sectionPos, cir.getReturnValue());
+                MinecraftCompiledGeometryStore.captureCurrent(sectionPos, cir.getReturnValue());
         if (snapshot != null) {
             // SectionCompiler runs on workers; the client tick drains this queue on the render thread.
             dev.radeonium.client.RadeoniumClient.queueCompiledGeometryUpload(snapshot);
