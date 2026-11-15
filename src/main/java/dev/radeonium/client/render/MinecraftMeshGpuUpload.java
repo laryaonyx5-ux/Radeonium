@@ -113,6 +113,14 @@ public final class MinecraftMeshGpuUpload implements AutoCloseable {
         return new MinecraftMeshGpuUpload(buffer, vertexCount);
     }
 
+
+    private static void putRgbaBytes(ByteBuffer target, int argb) {
+        target.put((byte) (argb >>> 16));
+        target.put((byte) (argb >>> 8));
+        target.put((byte) argb);
+        target.put((byte) (argb >>> 24));
+    }
+
     private static void writeFluidBlockVertices(
             ByteBuffer target, MinecraftFluidSectionMesher.FluidQuad quad
     ) {
@@ -126,7 +134,7 @@ public final class MinecraftMeshGpuUpload implements AutoCloseable {
             target.putFloat(positions[positionOffset]);
             target.putFloat(positions[positionOffset + 1]);
             target.putFloat(positions[positionOffset + 2]);
-            target.putInt(colors[vertex]);
+            putRgbaBytes(target, colors[vertex]);
             target.putFloat(uv[uvOffset]);
             target.putFloat(uv[uvOffset + 1]);
             target.putShort((short) (light[vertex] & 0xffff));
