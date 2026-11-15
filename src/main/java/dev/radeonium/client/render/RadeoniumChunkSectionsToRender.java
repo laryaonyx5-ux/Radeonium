@@ -34,6 +34,42 @@ import java.util.List;
 public final class RadeoniumChunkSectionsToRender {
     private RadeoniumChunkSectionsToRender() {}
 
+    /**
+     * A copied mesh may replace the live slice only when every draw-critical
+     * property agrees. Any mismatch deliberately takes the vanilla fallback.
+     */
+    private static boolean isCompatibleOwnedGeometry(
+            MinecraftCompiledGeometryGpuCache.LayerBuffers owned,
+            VertexFormat activeFormat,
+            SectionMesh.SectionDraw sectionDraw
+    ) {
+        if (owned == null || owned.vertexBuffer() == null || owned.vertexBuffer().isClosed()
+                || owned.vertexCount() <= 0
+                || !activeFormat.toString().equals(owned.vertexFormat())
+                || PrimitiveTopology.QUADS.toString().equals(owned.topology()) == false) {
+            return false;
+        }
+
+        long requiredVertexBytes = (long) owned.vertexCount() * activeFormat.getVertexSize();
+        if (owned.vertexBuffer().size() < requiredVertexBytes
+                || owned.indexCount() != sectionDraw.indexCount()) {
+            return false;
+        }
+
+        if (sectionDraw.hasCustomIndexBuffer()) {
+            GpuBuffer indices = owned.indexBuffer();
+            IndexType expectedType = sectionDraw.indexType();
+            return indices != null && !indices.isClosed()
+                    && expectedType != null
+                    && expectedType == owned.indexType()
+                    && owned.indexCount() > 0
+                    && indices.size() >= (long) owned.indexCount() * expectedType.bytes;
+        }
+
+        // Non-custom section draws use Minecraft's sequential QUADS index buffer.
+        return owned.indexBuffer() == null && owned.indexCount() == sectionDraw.indexCount();
+    }
+
     public static ChunkSectionsToRender create(
             LevelRenderer renderer,
             Matrix4fc modelViewMatrix,
@@ -94,9 +130,9 @@ public final class RadeoniumChunkSectionsToRender {
                         MinecraftCompiledGeometryGpuCache.LayerBuffers owned =
                                 RadeoniumClient.compiledGeometryGpuCache().layerBuffers(minecraftPosition, layer);
 
-                        boolean compatibleOwnedGeometry = owned != null
-                                && format.toString().equals(owned.vertexFormat())
-                                && PrimitiveTopology.QUADS.toString().equals(owned.topology());
+                        boolean compatibleOwnedGeometry = isCompatibleOwnedGeometry(
+                                owned, format, sectionDraw
+                        );
 
                         if (compatibleOwnedGeometry) {
                             // The copied MeshData is section-local, so its base vertex and first index are zero.
