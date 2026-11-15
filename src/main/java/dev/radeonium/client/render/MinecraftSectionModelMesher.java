@@ -146,6 +146,27 @@ public final class MinecraftSectionModelMesher {
             validateCoordinates(localX, localY, localZ);
         }
 
+        /**
+         * Resolves the model's deterministic variant/weighted/multipart choice
+         * immediately on the caller's thread and freezes the resulting part list.
+         * Call this during Minecraft section capture, never from a meshing worker
+         * when the model implementation may consult thread-confined resources.
+         */
+        public static ResolvedBlockInput capture(
+                BlockStateModel model, long modelSeed,
+                int localX, int localY, int localZ,
+                boolean downOccluded, boolean upOccluded,
+                boolean northOccluded, boolean southOccluded,
+                boolean westOccluded, boolean eastOccluded
+        ) {
+            if (model == null) throw new IllegalArgumentException("model cannot be null");
+            List<BlockStateModelPart> selectedParts = new ArrayList<>();
+            model.collectParts(net.minecraft.util.RandomSource.create(modelSeed), selectedParts);
+            return new ResolvedBlockInput(selectedParts, localX, localY, localZ,
+                    downOccluded, upOccluded, northOccluded, southOccluded,
+                    westOccluded, eastOccluded);
+        }
+
         boolean neighborOccludes(Direction direction) {
             return switch (direction) {
                 case DOWN -> downOccluded;
