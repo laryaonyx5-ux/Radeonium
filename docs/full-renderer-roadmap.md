@@ -155,6 +155,17 @@ The current pipeline objects have Radeonium identities and are used for SOLID/CU
 
 Runtime RenderPearl compilation, visual comparison and backend checks remain pending. If a pipeline cannot compile or render correctly, the corresponding vanilla path must remain available.
 
+### Shader activation follow-up — partial Step 8
+
+**Status: Radeonium shader stages are now assigned to the active SOLID/CUTOUT RenderPearl pipelines; runtime shader compilation and visual parity remain unverified.**
+
+- The SOLID and CUTOUT pipeline builders now select `radeonium:core/terrain` for both vertex and fragment stages instead of inheriting Minecraft's terrain shader stages.
+- The custom shader pair now consumes the Minecraft 26.3 terrain interface: BLOCK vertex attributes, section position/visibility, atlas sampler, lightmap sampler, fog uniforms and the terrain projection.
+- CUTOUT retains its dedicated alpha threshold define; SOLID does not discard alpha.
+- The vanilla terrain snippet remains in place only for compatible bind-group layouts, vertex format, depth/color state and render-pass integration. This is a shader replacement, not yet a fully independent backend/pipeline state or OIT implementation.
+- Focused tests assert the shader resources expose the expected 26.3 inputs, outputs, includes and uniforms. CI compilation, JUnit tests and JAR packaging pass.
+- The active RenderPearl runtime shader compiler and in-game image parity must still be checked. If shader compilation or visuals fail, the vanilla fallback must remain available.
+
 ## Milestone F — translucent terrain ordering and blending
 
 **Status: ordering implementation complete; independent blending/OIT replacement and in-game validation pending.**
