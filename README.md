@@ -188,3 +188,7 @@ This connects the baked-model mesher to the GPU upload owner through a section c
 - Submits the prepared layer draw list through the existing Minecraft frame-graph contract.
 
 **Scope and validation:** Radeonium now owns a connected section capture → GPU upload → per-layer draw-list path. Minecraft still owns the frame graph, layer pipelines/shaders and transparency/OIT scheduling. CI compilation and JAR packaging are validated; launching Minecraft 26.3, testing OpenGL/Vulkan, checking all terrain types and measuring FPS remain required before calling the renderer complete or claiming performance gains.
+
+
+### Full renderer direction
+Radeonium's long-term target is a renderer-owned Minecraft terrain pipeline, including model compilation/meshing, GPU resource ownership, shaders, render pipelines, visibility and correct transparency — while preserving vanilla visual quality. The current Step 7.5 bridge is not that complete renderer yet. See [`docs/full-renderer-roadmap.md`](docs/full-renderer-roadmap.md) for the staged architecture and quality gates.
