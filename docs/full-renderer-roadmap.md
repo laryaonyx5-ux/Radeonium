@@ -155,6 +155,22 @@ The current pipeline objects have Radeonium identities and are used for SOLID/CU
 
 Runtime RenderPearl compilation, visual comparison and backend checks remain pending. If a pipeline cannot compile or render correctly, the corresponding vanilla path must remain available.
 
+## Milestone F — translucent terrain ordering and blending
+
+**Status: ordering implementation complete; independent blending/OIT replacement and in-game validation pending.**
+
+### Implemented foundation
+
+- Keeps translucent terrain on the frame graph's supplied host OIT pipeline when one is provided, with Minecraft's translucent pipeline as the compatibility fallback. Radeonium does not silently replace a working host transparency path with an unverified blend state.
+- Sorts Radeonium-owned model and fluid quads inside each section upload from far to near as the camera moves.
+- Adds a second deterministic far-to-near ordering layer across visible translucent section draws, using section-center distance and stable input-order tie breaking. This replaces the previous unconditional list reversal.
+- Adds focused tests for per-quad ordering, global section ordering, stable ties and invalid inputs.
+- Retains the per-layer parity gate and vanilla buffer fallback: stale, unsupported or incompatible section geometry is never dropped.
+
+### Deliberate compatibility boundary
+
+Section-center ordering is an approximation for ordinary alpha blending; it cannot correctly order intersecting translucent surfaces across section boundaries. Water, glass and modded translucent geometry therefore continue to use the host OIT override when available, or Minecraft's vanilla translucent path otherwise. Radeonium does not yet own a replacement OIT implementation or its backend-specific depth/blend resources. Runtime visual checks for water, glass, ice, intersecting surfaces and camera movement remain required before any host transparency path can be replaced.
+
 ## What "Radeonium owns the renderer" means
 
 Radeonium must eventually own these responsibilities:
