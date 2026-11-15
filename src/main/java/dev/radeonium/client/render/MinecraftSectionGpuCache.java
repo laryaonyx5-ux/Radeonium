@@ -70,7 +70,8 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
                 MinecraftBlockModelMesh layerMesh = sectionMesh.layer(layer);
                 if (layerMesh.quadCount() > 0) {
                     allQuads.addAll(layerMesh.quads());
-                    layerUploads.put(layer, MinecraftMeshGpuUpload.upload(layerMesh));
+                    int[] layerMaterialIndices = materials.register(layerMesh);
+                    layerUploads.put(layer, MinecraftMeshGpuUpload.upload(layerMesh, layerMaterialIndices));
                 }
             }
             MinecraftBlockModelMesh combined = new MinecraftBlockModelMesh(allQuads);
