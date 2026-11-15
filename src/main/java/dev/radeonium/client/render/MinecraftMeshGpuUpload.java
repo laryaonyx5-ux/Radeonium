@@ -208,7 +208,7 @@ public final class MinecraftMeshGpuUpload implements AutoCloseable {
             target.putFloat(positions[p]);
             target.putFloat(positions[p + 1]);
             target.putFloat(positions[p + 2]);
-            target.putInt(colors[vertex]);
+            putRgbaBytes(target, colors[vertex]);
             target.putFloat(uv[t]);
             target.putFloat(uv[t + 1]);
             target.putShort((short) (light[vertex] & 0xffff));
