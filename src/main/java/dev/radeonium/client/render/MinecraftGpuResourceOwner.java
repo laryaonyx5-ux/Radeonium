@@ -56,13 +56,7 @@ public final class MinecraftGpuResourceOwner implements AutoCloseable {
         byte[] payload = MinecraftMeshGpuUpload.encodeLayer(mesh, fluids).vertexBytes();
         ByteArrayKey key = new ByteArrayKey(payload);
         MinecraftMeshGpuUpload reusable = reusableUploads.get(key);
-        if (reusable != null && !reusable.isClosed()) {
-            Allocation allocation = allocations.get(reusable);
-            if (allocation != null) {
-                allocation.retain();
-                return reusable;
-            }
-        }
+        if (reusable != null && retain(reusable)) return reusable;
 
         MinecraftMeshGpuUpload created =
                 MinecraftMeshGpuUpload.upload(device, mesh, materialIndices, fluids);
@@ -105,6 +99,15 @@ public final class MinecraftGpuResourceOwner implements AutoCloseable {
         if (key != null) reusableUploads.put(key, upload);
         allocatedBytes = nextAllocatedBytes;
         return upload;
+    }
+
+    /** Adds one section reference to an already tracked live upload. */
+    boolean retain(MinecraftMeshGpuUpload upload) {
+        if (upload == null || upload.isClosed()) return false;
+        Allocation allocation = allocations.get(upload);
+        if (allocation == null) return false;
+        allocation.retain();
+        return true;
     }
 
     /**
