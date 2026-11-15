@@ -74,6 +74,7 @@ public final class MinecraftMeshGpuUpload implements AutoCloseable {
     public static MinecraftMeshGpuUpload upload(
             GpuDevice device, MinecraftBlockModelMesh mesh, int[] materialIndices
     ) {
+        RenderSystem.assertOnRenderThread();
         if (device == null) throw new IllegalArgumentException("device cannot be null");
         if (mesh == null || materialIndices == null || materialIndices.length != mesh.quadCount()) {
             throw new IllegalArgumentException("mesh and one material index per quad are required");
@@ -118,6 +119,7 @@ public final class MinecraftMeshGpuUpload implements AutoCloseable {
      * render target and draw ordering. This method never opens or submits a pass.
      */
     public void drawInto(RenderPass pass) {
+        RenderSystem.assertOnRenderThread();
         if (pass == null) throw new IllegalArgumentException("pass cannot be null");
         if (isEmpty()) return;
         pass.setVertexBuffer(0, vertexBufferSlice());
@@ -140,6 +142,7 @@ public final class MinecraftMeshGpuUpload implements AutoCloseable {
 
     @Override
     public void close() {
+        RenderSystem.assertOnRenderThread();
         if (vertexBuffer != null && !vertexBuffer.isClosed()) {
             vertexBuffer.close();
         }
