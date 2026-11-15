@@ -96,7 +96,13 @@ public abstract class SectionCompilerMixin {
                     .buildMinecraftAsync(capture.input())
                     .whenComplete((mesh, error) -> {
                         if (error != null) MinecraftSectionModelCaptureStore.abortAsync(capture.ticket());
-                        else MinecraftSectionModelCaptureStore.publishAsync(capture.ticket(), mesh);
+                        else {
+                            MinecraftSectionModelCaptureStore.Snapshot published =
+                                    MinecraftSectionModelCaptureStore.publishAsync(capture.ticket(), mesh);
+                            if (published != null) {
+                                dev.radeonium.client.RadeoniumClient.queueSectionModelUpload(published);
+                            }
+                        }
                     });
         }
         MinecraftCompiledGeometryStore.Snapshot snapshot =
