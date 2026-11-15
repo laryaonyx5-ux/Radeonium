@@ -54,6 +54,26 @@ class FluidSectionMesherTest {
     }
 
     @Test
+    void fluidAboveAnyCellSharingCornerForcesFullCornerHeight() {
+        short[] ids = new short[4096]; byte[] heights = new byte[4096];
+        int[] tints = new int[4096], lights = new int[4096];
+        int lower = 1 + 16 * (1 + 16 * 1);
+        int neighbor = 2 + 16 * (1 + 16 * 1);
+        int aboveNeighbor = 2 + 16 * (1 + 16 * 2);
+        ids[lower] = ids[neighbor] = ids[aboveNeighbor] = 7;
+        heights[lower] = heights[neighbor] = 4;
+        heights[aboveNeighbor] = 8;
+
+        var mesh = new FluidSectionMesher().build(new FluidSectionSnapshot(ids, heights, tints, lights));
+        var lowerTop = mesh.quads().stream()
+                .filter(q -> q.normalY() == 1.0f)
+                .filter(q -> q.positions()[0] == 1.0f && q.positions()[2] == 1.0f)
+                .findFirst().orElseThrow();
+        assertEquals(2.0f, lowerTop.positions()[4],
+                "a same-fluid block above any cell sharing the corner makes it full height");
+    }
+
+    @Test
     void copiesCaptureArraysAndRejectsInvalidHeights() {
         short[] ids = new short[4096]; byte[] heights = new byte[4096];
         int[] tints = new int[4096], lights = new int[4096];
