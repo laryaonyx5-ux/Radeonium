@@ -82,29 +82,50 @@ public final class RadeoniumChunkSectionsToRender {
                         }
 
                         VertexFormat format = layer.pipeline(false).getVertexFormatBinding(0);
-                        int baseVertex = (int) (slice.vertexBufferOffset() / format.getVertexSize());
+                        int baseVertex;
                         int firstIndex = 0;
+                        GpuBuffer vertexBuffer;
                         GpuBuffer indexBuffer = null;
                         IndexType indexType = null;
+                        int indexCount = sectionDraw.indexCount();
 
-                        if (sectionDraw.hasCustomIndexBuffer()) {
-                            indexBuffer = slice.indexBuffer();
-                            indexType = sectionDraw.indexType();
-                            firstIndex = (int) (slice.indexBufferOffset() / indexType.bytes);
+                        SectionPos minecraftPosition = SectionPos.of(section.getSectionNode());
+                        MinecraftCompiledGeometryGpuCache.LayerBuffers owned =
+                                RadeoniumClient.compiledGeometryGpuCache().layerBuffers(minecraftPosition, layer);
+
+                        if (owned != null) {
+                            // The copied MeshData is section-local, so its base vertex and first index are zero.
+                            vertexBuffer = owned.vertexBuffer();
+                            baseVertex = 0;
+                            indexBuffer = owned.indexBuffer();
+                            indexType = indexBuffer == null ? null : owned.indexType();
+                            if (owned.indexCount() > 0) indexCount = owned.indexCount();
+                            if (indexBuffer == null) {
+                                largestDefaultIndexCount = Math.max(largestDefaultIndexCount, indexCount);
+                            }
                         } else {
-                            largestDefaultIndexCount = Math.max(
-                                    largestDefaultIndexCount, sectionDraw.indexCount()
-                            );
+                            // A missing/stale upload never removes terrain: use the live vanilla slice.
+                            baseVertex = (int) (slice.vertexBufferOffset() / format.getVertexSize());
+                            vertexBuffer = slice.vertexBuffer();
+                            if (sectionDraw.hasCustomIndexBuffer()) {
+                                indexBuffer = slice.indexBuffer();
+                                indexType = sectionDraw.indexType();
+                                firstIndex = (int) (slice.indexBufferOffset() / indexType.bytes);
+                            } else {
+                                largestDefaultIndexCount = Math.max(
+                                        largestDefaultIndexCount, sectionDraw.indexCount()
+                                );
+                            }
                         }
 
                         final int uniformIndex = sectionInfoIndex;
                         draws.get(layer).add(new RenderPass.Draw<>(
                                 0,
-                                slice.vertexBuffer(),
+                                vertexBuffer,
                                 indexBuffer,
                                 indexType,
                                 firstIndex,
-                                sectionDraw.indexCount(),
+                                indexCount,
                                 baseVertex,
                                 (uniformSlices, uploader) ->
                                         uploader.setUniform("ChunkSection", uniformSlices[uniformIndex])
