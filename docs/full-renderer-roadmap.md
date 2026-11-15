@@ -71,8 +71,6 @@ Milestone B must not begin until the final CI item is green. This milestone does
 
 - `MinecraftBlockModelMesher` extracts baked quad positions, packed UVs, face directions and Minecraft render-layer/material references from supplied model parts.
 - `MinecraftBlockModelMesh` stores copied quad geometry and can filter by vanilla render layer; each copied quad retains its immutable source `BakedQuad`, effective model-part/material AO, tint index and light-emission metadata.
-- `FabricBlockStateModelMesher` invokes Fabric's context-aware `emitQuads` hook against a `RenderSectionRegion` snapshot and copies per-vertex position, UV, normal, color and lightmap data plus atlas, layer, cull face, tint, AO, emissive and animated flags.
-- `FabricSectionModelMesher` assembles contextual block inputs into a section mesh while preserving independent quad attributes. It refuses to silently proceed if no Fabric renderer is registered.
 - `MinecraftMaterialTable` assigns renderer-side material indices while retaining the source Minecraft material metadata for later translation.
 - `SectionMeshBuilder` contains a greedy opaque-voxel mesher for immutable 16×16×16 material snapshots; it merges coplanar faces of equal material and culls faces against any non-air opaque neighbor.
 - `SectionMeshingExecutor` uses a bounded worker queue and reports rejected work instead of running expensive builds on the caller thread.
@@ -82,11 +80,11 @@ Milestone B must not begin until the final CI item is green. This milestone does
 
 ### Remaining acceptance blockers
 
-- Wire section capture from `SectionCompiler.compile` so every block input is populated from the actual `RenderSectionRegion`, block position, block state and neighbor occlusion results; the new context-aware mesher API exists but is not yet connected to the live compile path.
-- Resolve block-state variants and multipart model selection for each actual block position through the context-aware Fabric model hook; the legacy baked-part adapter remains available as a conservative fallback.
+- Wire section capture from `SectionCompiler.compile` so every block input is populated from the actual `RenderSectionRegion`, block position, block state and neighbor occlusion results; current capture still copies vanilla's completed mesh rather than generating the section from block models.
+- Resolve context-sensitive block-state variants and multipart model selection for each actual block position, including model hooks that need block entities or neighboring world data.
 - Feed the halo from the six actual neighboring sections and invalidate/rebuild both sides when a boundary block changes; the snapshot API supports the halo, but world capture and invalidation are not yet wired.
 - Complete renderer-side consumption of captured tint values, packed block/sky light, ambient occlusion, emissive behavior, atlas UVs and animated texture references. The current CPU capture retains source metadata/attributes but does not yet evaluate the complete Minecraft lighting and tint pipeline into Radeonium's final vertex format.
-- Integrate fluid surfaces and block-entity/special geometry with explicit unsupported-content fallback. Fabric block-model hooks are captured by the new context-aware path, but non-model special renderers and fluids still require separate integration.
+- Integrate fluid surfaces and block-entity/special geometry with explicit unsupported-content fallback.
 - Produce independent per-layer meshes and prove parity against vanilla before switching any terrain layer away from vanilla.
 - Add tests and visual comparison fixtures for model variants, culling, lighting, tint, fluids, resource reloads and all render layers.
 
