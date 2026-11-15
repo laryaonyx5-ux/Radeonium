@@ -49,7 +49,7 @@ public final class MinecraftGpuResourceOwner implements AutoCloseable {
         if (reusable != null && !reusable.isClosed()) {
             Allocation allocation = allocations.get(reusable);
             if (allocation != null) {
-                allocation.references = Math.addExact(allocation.references, 1);
+                allocation.retain();
                 return reusable;
             }
         }
@@ -92,10 +92,7 @@ public final class MinecraftGpuResourceOwner implements AutoCloseable {
             if (upload.isClosed()) return false;
             throw new IllegalArgumentException("GPU upload is not owned by this resource owner");
         }
-        if (allocation.references > 1) {
-            allocation.references--;
-            return true;
-        }
+        if (!allocation.releaseReference()) return true;
 
         allocations.remove(upload);
         if (allocation.key != null) reusableUploads.remove(allocation.key, upload);
@@ -149,14 +146,30 @@ public final class MinecraftGpuResourceOwner implements AutoCloseable {
         closed = true;
     }
 
-    private static final class Allocation {
+    static final class Allocation {
         private final long bytes;
         private final ByteArrayKey key;
         private int references = 1;
 
-        private Allocation(long bytes, ByteArrayKey key) {
+        Allocation(long bytes, ByteArrayKey key) {
+            if (bytes < 0) throw new IllegalArgumentException("bytes cannot be negative");
             this.bytes = bytes;
             this.key = key;
+        }
+
+        void retain() {
+            if (references <= 0) throw new IllegalStateException("GPU allocation is already released");
+            references = Math.addExact(references, 1);
+        }
+
+        boolean releaseReference() {
+            if (references <= 0) throw new IllegalStateException("GPU allocation reference underflow");
+            references--;
+            return references == 0;
+        }
+
+        int referenceCount() {
+            return references;
         }
     }
 
