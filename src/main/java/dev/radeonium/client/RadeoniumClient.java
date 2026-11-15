@@ -7,9 +7,11 @@ import dev.radeonium.client.gpu.GpuDetector;
 import dev.radeonium.client.memory.MemoryPressureMonitor;
 import dev.radeonium.client.render.ChunkRenderPipeline;
 import dev.radeonium.client.render.MinecraftSectionGpuCache;
+import dev.radeonium.client.render.RendererSectionTracker;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientWorldEvents;
 import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.network.chat.Component;
@@ -55,7 +57,16 @@ public final class RadeoniumClient implements ClientModInitializer {
                 CpuWorkProfile.maxSynchronousChunkBuilds());
 
         ClientLifecycleEvents.CLIENT_STARTED.register(client -> GpuDetector.detectAndLog());
-        ClientLifecycleEvents.CLIENT_STOPPING.register(client -> MINECRAFT_GPU_CACHE.close());
+        ClientLifecycleEvents.CLIENT_STOPPING.register(client -> {
+            MINECRAFT_GPU_CACHE.close();
+            RendererSectionTracker.reset();
+        });
+        ClientWorldEvents.UNLOAD.register((client, world) -> {
+            // World-owned CPU snapshots and GPU uploads must not leak into the
+            // next dimension, server, or single-player world.
+            RendererSectionTracker.reset();
+            MINECRAFT_GPU_CACHE.clear();
+        });
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             if (MemoryPressureMonitor.tickAndSample()) {
