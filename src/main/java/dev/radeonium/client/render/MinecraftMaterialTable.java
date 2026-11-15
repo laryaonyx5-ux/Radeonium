@@ -91,6 +91,19 @@ public final class MinecraftMaterialTable {
         return result;
     }
 
+
+    /** Recycles newly registered materials that never made it into a section entry. */
+    public synchronized void discardUnreferenced() {
+        for (int index = 0; index < materials.size(); index++) {
+            Material material = materials.get(index);
+            if (material != null && referenceCounts.get(index) == 0) {
+                indices.remove(material.minecraftInfo());
+                materials.set(index, null);
+                freeIndices.addLast(index);
+            }
+        }
+    }
+
     public synchronized int activeSize() {
         int count = 0;
         for (Material material : materials) if (material != null) count++;
