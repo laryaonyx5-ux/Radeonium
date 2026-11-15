@@ -1,72 +1,72 @@
 package dev.radeonium.client.render;
 
 import net.minecraft.client.renderer.block.dispatch.BlockStateModelPart;
+import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
 import com.mojang.renderpearl.api.commands.RenderPass;
 import com.mojang.renderpearl.api.pipeline.CompiledRenderPipeline;
 
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
- * Owns GPU uploads and material indices produced from Minecraft baked models.
+ * Owns layer-separated GPU uploads and material indices produced from baked models.
  *
- * All methods that create or close uploads must be called on Minecraft's
- * render thread. Model extraction can be prepared elsewhere, but RenderPearl
- * buffer creation and destruction belong to the active GPU device thread.
- *
- * This cache is an integration boundary for section compilation. It does not
- * discover model parts from a LevelChunkSection or replace vanilla rendering.
+ * GPU creation and destruction must run on Minecraft's render thread. This
+ * cache remains an integration boundary: it does not yet discover live
+ * LevelChunkSection model parts or replace vanilla frame-graph submission.
  */
 public final class MinecraftSectionGpuCache implements AutoCloseable {
     private final MinecraftBlockModelMesher mesher = new MinecraftBlockModelMesher();
     private final MinecraftMaterialTable materials = new MinecraftMaterialTable();
     private final Map<SectionPos, Entry> sections = new HashMap<>();
 
-    /**
-     * Builds baked-model geometry, uploads it and assigns a material index to
-     * each quad. The previous upload is released only after the new upload
-     * succeeds.
-     */
-    public synchronized void rebuild(
-            SectionPos position,
-            List<BlockStateModelPart> modelParts
-    ) {
+    /** Builds one GPU upload per vanilla render layer, then atomically replaces the old entry. */
+    public synchronized void rebuild(SectionPos position, List<BlockStateModelPart> modelParts) {
         if (position == null) throw new IllegalArgumentException("position cannot be null");
         if (modelParts == null) throw new IllegalArgumentException("modelParts cannot be null");
 
         MinecraftBlockModelMesh mesh = mesher.build(modelParts);
-        MinecraftMeshGpuUpload upload = MinecraftMeshGpuUpload.upload(mesh);
-        int[] materialIndices = materials.register(mesh);
-        Entry previous = sections.put(position, new Entry(mesh, upload, materialIndices));
-        if (previous != null) previous.close();
+        EnumMap<ChunkSectionLayer, MinecraftMeshGpuUpload> layerUploads =
+                new EnumMap<>(ChunkSectionLayer.class);
+        try {
+            for (ChunkSectionLayer layer : ChunkSectionLayer.values()) {
+                MinecraftBlockModelMesh layerMesh = mesh.forLayer(layer);
+                if (layerMesh.quadCount() > 0) {
+                    layerUploads.put(layer, MinecraftMeshGpuUpload.upload(layerMesh));
+                }
+            }
+            int[] materialIndices = materials.register(mesh);
+            Entry replacement = new Entry(mesh, layerUploads, materialIndices);
+            Entry previous = sections.put(position, replacement);
+            if (previous != null) previous.close();
+        } catch (RuntimeException | Error failure) {
+            for (MinecraftMeshGpuUpload upload : layerUploads.values()) upload.close();
+            throw failure;
+        }
     }
 
-    /** Releases the GPU buffer associated with a section, if present. */
     public synchronized void remove(SectionPos position) {
         Entry removed = sections.remove(position);
         if (removed != null) removed.close();
     }
 
-    /** Releases every cached section upload and resets material indexing. */
     public synchronized void clear() {
         for (Entry entry : sections.values()) entry.close();
         sections.clear();
         materials.clear();
     }
 
-    public synchronized int sectionCount() {
-        return sections.size();
-    }
-
-    public synchronized int materialCount() {
-        return materials.size();
-    }
+    public synchronized int sectionCount() { return sections.size(); }
+    public synchronized int materialCount() { return materials.size(); }
 
     public synchronized int uploadedVertexCount() {
         int total = 0;
         for (Entry entry : sections.values()) {
-            total = Math.addExact(total, entry.upload.vertexCount());
+            for (MinecraftMeshGpuUpload upload : entry.layerUploads.values()) {
+                total = Math.addExact(total, upload.vertexCount());
+            }
         }
         return total;
     }
@@ -74,36 +74,63 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
     public synchronized long uploadedBytes() {
         long total = 0L;
         for (Entry entry : sections.values()) {
-            total = Math.addExact(total, entry.upload.byteSize());
+            for (MinecraftMeshGpuUpload upload : entry.layerUploads.values()) {
+                total = Math.addExact(total, upload.byteSize());
+            }
         }
         return total;
     }
 
-    /**
-     * Submits every non-empty cached section into a caller-owned RenderPearl
-     * pass. The pass must already target the intended terrain attachments and
-     * the supplied pipeline must match the 20-byte Radeonium vertex layout.
-     *
-     * This is the draw-submission bridge; it deliberately does not create a
-     * nested pass or take ownership of Minecraft's frame graph.
-     */
-    public synchronized int drawAll(RenderPass pass, CompiledRenderPipeline pipeline) {
-        if (pass == null) throw new IllegalArgumentException("pass cannot be null");
-        if (pipeline == null) throw new IllegalArgumentException("pipeline cannot be null");
-
+    /** Draws only the selected layer into a caller-owned RenderPearl pass. */
+    public synchronized int drawLayer(
+            RenderPass pass, CompiledRenderPipeline pipeline, ChunkSectionLayer layer
+    ) {
+        if (pass == null || pipeline == null || layer == null) {
+            throw new IllegalArgumentException("pass, pipeline and layer are required");
+        }
         int submitted = 0;
         for (Entry entry : sections.values()) {
-            if (entry.upload.isEmpty()) continue;
+            MinecraftMeshGpuUpload upload = entry.layerUploads.get(layer);
+            if (upload == null || upload.isEmpty()) continue;
             if (submitted == 0) pass.setPipeline(pipeline);
-            entry.upload.drawInto(pass);
+            upload.drawInto(pass);
             submitted++;
         }
         return submitted;
     }
 
+    /**
+     * Compatibility bridge: submits all cached layers using one caller-supplied
+     * pipeline. Production integration must prefer drawLayer with a pipeline
+     * matching the selected layer's blend/depth state.
+     */
+    public synchronized int drawAll(RenderPass pass, CompiledRenderPipeline pipeline) {
+        if (pass == null || pipeline == null) throw new IllegalArgumentException("pass and pipeline are required");
+        int submitted = 0;
+        for (Entry entry : sections.values()) {
+            for (MinecraftMeshGpuUpload upload : entry.layerUploads.values()) {
+                if (upload.isEmpty()) continue;
+                if (submitted == 0) pass.setPipeline(pipeline);
+                upload.drawInto(pass);
+                submitted++;
+            }
+        }
+        return submitted;
+    }
+
+    /** Returns the upload for one layer, or null when the section has no such geometry. */
+    public synchronized MinecraftMeshGpuUpload upload(
+            SectionPos position, ChunkSectionLayer layer
+    ) {
+        Entry entry = sections.get(position);
+        return entry == null ? null : entry.layerUploads.get(layer);
+    }
+
+    /** Legacy accessor: returns the first available layer upload. Prefer the layer-aware overload. */
     public synchronized MinecraftMeshGpuUpload upload(SectionPos position) {
         Entry entry = sections.get(position);
-        return entry == null ? null : entry.upload;
+        if (entry == null || entry.layerUploads.isEmpty()) return null;
+        return entry.layerUploads.values().iterator().next();
     }
 
     public synchronized MinecraftBlockModelMesh mesh(SectionPos position) {
@@ -111,32 +138,28 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
         return entry == null ? null : entry.mesh;
     }
 
-    /** Returns one material-table index per quad, in mesh order. */
     public synchronized int[] materialIndices(SectionPos position) {
         Entry entry = sections.get(position);
         return entry == null ? new int[0] : entry.materialIndices.clone();
     }
 
-    public synchronized MinecraftMaterialTable materialTable() {
-        return materials;
-    }
+    public synchronized MinecraftMaterialTable materialTable() { return materials; }
 
     @Override
-    public void close() {
-        clear();
-    }
+    public void close() { clear(); }
 
     private record Entry(
             MinecraftBlockModelMesh mesh,
-            MinecraftMeshGpuUpload upload,
+            EnumMap<ChunkSectionLayer, MinecraftMeshGpuUpload> layerUploads,
             int[] materialIndices
     ) {
         private Entry {
+            layerUploads = new EnumMap<>(layerUploads);
             materialIndices = materialIndices.clone();
         }
 
         private void close() {
-            upload.close();
+            for (MinecraftMeshGpuUpload upload : layerUploads.values()) upload.close();
         }
     }
 }
