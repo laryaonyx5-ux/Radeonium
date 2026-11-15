@@ -59,14 +59,15 @@ public final class MinecraftSectionModelMesher {
             List<BlockStateModelPart> parts, int packedLightCoords, boolean ambientOcclusionEnabled
     ) {
         Map<BakedQuad, CapturedQuadLighting> lighting = new java.util.IdentityHashMap<>();
+        BlockModelLighter lighter = new BlockModelLighter();
         for (BlockStateModelPart part : parts) {
             if (part == null) continue;
             captureQuadLighting(lighting, part.getQuads(null), part.useAmbientOcclusion() && ambientOcclusionEnabled,
-                    state, position, region, packedLightCoords);
+                    state, position, region, packedLightCoords, lighter);
             for (Direction direction : Direction.values()) {
                 captureQuadLighting(lighting, part.getQuads(direction),
                         part.useAmbientOcclusion() && ambientOcclusionEnabled,
-                        state, position, region, packedLightCoords);
+                        state, position, region, packedLightCoords, lighter);
             }
         }
         return java.util.Collections.unmodifiableMap(lighting);
@@ -75,11 +76,11 @@ public final class MinecraftSectionModelMesher {
     private static void captureQuadLighting(
             Map<BakedQuad, CapturedQuadLighting> lighting, List<BakedQuad> quads,
             boolean useAmbientOcclusion, BlockState state, BlockPos position,
-            RenderSectionRegion region, int packedLightCoords
+            RenderSectionRegion region, int packedLightCoords, BlockModelLighter lighter
     ) {
         if (quads == null) return;
-        BlockModelLighter lighter = new BlockModelLighter();
         for (BakedQuad quad : quads) {
+            lighter.reset();
             QuadInstance instance = new QuadInstance();
             if (useAmbientOcclusion) {
                 lighter.prepareQuadAmbientOcclusion(region, state, position, quad, instance);
