@@ -104,9 +104,22 @@ public final class RadeoniumClient implements ClientModInitializer {
                         new dev.radeonium.client.render.SectionPos(
                                 snapshot.position().x(), snapshot.position().y(), snapshot.position().z());
                 try {
-                    MINECRAFT_GPU_CACHE.rebuild(position, snapshot);
+                    MinecraftCompiledGeometryStore.Snapshot vanillaSnapshot =
+                            MinecraftCompiledGeometryStore.get(snapshot.position());
+                    dev.radeonium.client.render.MinecraftSectionParityChecker.ParityReport parity =
+                            dev.radeonium.client.render.MinecraftSectionParityChecker.compare(
+                                    snapshot.mesh(), vanillaSnapshot);
+                    if (!parity.matchesAllLayers()) {
+                        LOGGER.debug("Radeonium kept vanilla fallback for section {}: {}",
+                                snapshot.position(), parity.layers().values());
+                    }
+                    if (parity.verifiedLayers().isEmpty()) {
+                        MINECRAFT_GPU_CACHE.remove(position);
+                    } else {
+                        MINECRAFT_GPU_CACHE.rebuild(position, snapshot, parity.verifiedLayers());
+                    }
                     // Compilation can invalidate this snapshot from another worker
-                    // while the render thread is allocating its replacement buffers.
+                    // while the render thread is comparing or allocating its buffers.
                     if (MinecraftSectionModelCaptureStore.get(snapshot.position()) != snapshot) {
                         MINECRAFT_GPU_CACHE.remove(position);
                     }
