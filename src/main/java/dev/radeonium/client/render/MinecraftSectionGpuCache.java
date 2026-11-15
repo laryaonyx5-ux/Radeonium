@@ -157,6 +157,11 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
         if (position == null || replacement == null) {
             throw new IllegalArgumentException("position and replacement are required");
         }
+        for (MinecraftMeshGpuUpload upload : replacement.layerUploads().values()) {
+            if (!gpuResources.owns(upload)) {
+                throw new IllegalArgumentException("cache entries may contain only live uploads owned by Radeonium");
+            }
+        }
         Entry previous = sections.get(position);
         if (previous != null) {
             try {
