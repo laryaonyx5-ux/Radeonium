@@ -5,7 +5,7 @@ import dev.radeonium.client.render.MinecraftCompiledGeometryStore;
 import dev.radeonium.client.render.MinecraftSectionModelCaptureStore;
 import dev.radeonium.client.render.MinecraftSectionModelMesher;
 import dev.radeonium.client.chunk.ChunkBuildBudget;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import net.minecraft.client.renderer.block.BlockStateModelSet;
 import org.spongepowered.asm.mixin.Final;
@@ -29,10 +29,30 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public abstract class SectionCompilerMixin {
     @Shadow @Final private BlockStateModelSet blockModelSet;
 
-    private static final ThreadLocal<Map<SectionPos, AsyncCapture>> RADEONIUM_CAPTURE =
-            ThreadLocal.withInitial(HashMap::new);
+    private static final int MAX_PENDING_THREAD_CAPTURES = 32;
+    private static final ThreadLocal<LinkedHashMap<SectionPos, AsyncCapture>> RADEONIUM_CAPTURE =
+            ThreadLocal.withInitial(() -> new LinkedHashMap<>(16, 0.75f, true));
     private record AsyncCapture(MinecraftSectionModelCaptureStore.CaptureTicket ticket,
                                 MinecraftSectionModelMesher.CapturedSectionInput input) {}
+
+
+    /**
+     * Keep the compiler-thread hand-off bounded without abandoning generation
+     * tickets for captures that are evicted under a burst of section builds.
+     * LinkedHashMap's access order makes the oldest pending capture the first
+     * one discarded.
+     */
+    private static void rememberCapture(SectionPos position, AsyncCapture capture) {
+        LinkedHashMap<SectionPos, AsyncCapture> pending = RADEONIUM_CAPTURE.get();
+        AsyncCapture replaced = pending.put(position, capture);
+        if (replaced != null) MinecraftSectionModelCaptureStore.abortAsync(replaced.ticket());
+        while (pending.size() > MAX_PENDING_THREAD_CAPTURES) {
+            Map.Entry<SectionPos, AsyncCapture> eldest =
+                    pending.entrySet().iterator().next();
+            pending.remove(eldest.getKey());
+            MinecraftSectionModelCaptureStore.abortAsync(eldest.getValue().ticket());
+        }
+    }
 
     @Inject(
             method = "compile(Lnet/minecraft/core/SectionPos;Lnet/minecraft/client/renderer/chunk/RenderSectionRegion;Lcom/mojang/blaze3d/vertex/VertexSorting;Lnet/minecraft/client/renderer/SectionBufferBuilderPack;)Lnet/minecraft/client/renderer/chunk/SectionCompiler$Results;",
@@ -52,8 +72,7 @@ public abstract class SectionCompilerMixin {
             var ticket = MinecraftSectionModelCaptureStore.beginAsyncCapture(sectionPos);
             try {
                 var input = new MinecraftSectionModelMesher().captureInputs(sectionPos, region, blockModelSet);
-                RADEONIUM_CAPTURE.get().put(sectionPos, new AsyncCapture(ticket, input));
-                if (RADEONIUM_CAPTURE.get().size() > 32) RADEONIUM_CAPTURE.get().clear();
+                rememberCapture(sectionPos, new AsyncCapture(ticket, input));
             } catch (RuntimeException exception) {
                 MinecraftSectionModelCaptureStore.abortAsync(ticket);
             }
