@@ -93,6 +93,43 @@ class FluidSectionMesherTest {
     }
 
     @Test
+    void usesNeighborHaloToInterpolateSurfaceAtSectionEdge() {
+        short[] ids = new short[18 * 18 * 18]; byte[] heights = new byte[18 * 18 * 18];
+        int[] tints = new int[18 * 18 * 18], lights = new int[18 * 18 * 18];
+        int edgeCell = haloIndex(-1, 1, 1);
+        int localCell = haloIndex(0, 1, 1);
+        ids[edgeCell] = ids[localCell] = 3;
+        heights[edgeCell] = 8;
+        heights[localCell] = 4;
+
+        var snapshot = FluidSectionSnapshot.withHalo(ids, heights, tints, lights);
+        var mesh = new FluidSectionMesher().build(snapshot);
+        var top = mesh.quads().stream()
+                .filter(q -> q.normalY() == 1.0f && q.positions()[0] == 0.0f
+                        && q.positions()[2] == 1.0f)
+                .findFirst().orElseThrow();
+        assertTrue(top.positions()[1] > 1.5f,
+                "the neighboring section's high fluid should raise the shared corner");
+    }
+
+    @Test
+    void cullsSameFluidSideAcrossSectionBoundaryWhenHaloIsPresent() {
+        short[] ids = new short[18 * 18 * 18]; byte[] heights = new byte[18 * 18 * 18];
+        int[] tints = new int[18 * 18 * 18], lights = new int[18 * 18 * 18];
+        ids[haloIndex(-1, 1, 1)] = 5;
+        heights[haloIndex(-1, 1, 1)] = 8;
+        ids[haloIndex(0, 1, 1)] = 5;
+        heights[haloIndex(0, 1, 1)] = 8;
+
+        var mesh = new FluidSectionMesher().build(FluidSectionSnapshot.withHalo(ids, heights, tints, lights));
+        assertEquals(0, mesh.quads().stream().filter(q -> q.normalX() == -1.0f).count());
+    }
+
+    private static int haloIndex(int x, int y, int z) {
+        return (x + 1) + 18 * ((z + 1) + 18 * (y + 1));
+    }
+
+    @Test
     void copiesCaptureArraysAndRejectsInvalidHeights() {
         short[] ids = new short[4096]; byte[] heights = new byte[4096];
         int[] tints = new int[4096], lights = new int[4096];
