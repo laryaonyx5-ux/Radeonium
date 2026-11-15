@@ -26,7 +26,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public abstract class SectionCompilerMixin {
     @Shadow @Final private BlockStateModelSet blockModelSet;
 
-    @Shadow @Final private boolean ambientOcclusion;
     @Inject(
             method = "compile(Lnet/minecraft/core/SectionPos;Lnet/minecraft/client/renderer/chunk/RenderSectionRegion;Lcom/mojang/blaze3d/vertex/VertexSorting;Lnet/minecraft/client/renderer/SectionBufferBuilderPack;)Lnet/minecraft/client/renderer/chunk/SectionCompiler$Results;",
             at = @At("HEAD")
@@ -39,7 +38,7 @@ public abstract class SectionCompilerMixin {
             CallbackInfoReturnable<SectionCompiler.Results> cir
     ) {
         MinecraftCompiledGeometryStore.beginCapture(sectionPos);
-        if (ChunkBuildBudget.isEnabled()) {
+        if (ChunkBuildBudget.isEnabled() && MinecraftSectionModelCaptureStore.captureEnabled()) {
             try {
                 var mesh = new MinecraftSectionModelMesher()
                         .captureAndBuild(sectionPos, region, blockModelSet);
@@ -48,6 +47,8 @@ public abstract class SectionCompilerMixin {
                 // Unsupported modded model behavior must never break vanilla compilation.
                 MinecraftSectionModelCaptureStore.remove(sectionPos);
             }
+        } else {
+            MinecraftSectionModelCaptureStore.remove(sectionPos);
         }
     }
 
