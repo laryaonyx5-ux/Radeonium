@@ -13,7 +13,6 @@ class SectionMeshBuilderTest {
     @Test
     void emptySectionProducesEmptyMesh() {
         SectionMesh mesh = builder.build(new VoxelSectionSnapshot(new short[4096]));
-
         assertTrue(mesh.isEmpty());
         assertEquals(0, mesh.vertexCount());
         assertEquals(0, mesh.byteSize());
@@ -23,9 +22,7 @@ class SectionMeshBuilderTest {
     void oneSolidVoxelProducesSixFaces() {
         short[] blocks = new short[4096];
         blocks[index(4, 5, 6)] = 1;
-
         SectionMesh mesh = builder.build(new VoxelSectionSnapshot(blocks));
-
         assertEquals(36, mesh.vertexCount());
         assertEquals(36 * SectionMesh.VERTEX_STRIDE_BYTES, mesh.byteSize());
         assertEquals(SectionMesh.VERTEX_STRIDE_BYTES, mesh.vertexStrideBytes());
@@ -36,24 +33,44 @@ class SectionMeshBuilderTest {
         short[] blocks = new short[4096];
         blocks[index(4, 5, 6)] = 7;
         blocks[index(5, 5, 6)] = 7;
-
-        SectionMesh mesh = builder.build(new VoxelSectionSnapshot(blocks));
-
-        // The pair is one rectangular prism: six exterior quads, not ten.
-        assertEquals(36, mesh.vertexCount());
+        assertEquals(36, builder.build(new VoxelSectionSnapshot(blocks)).vertexCount());
     }
 
     @Test
-    void differentMaterialsAreNotMergedAcrossTheirBoundary() {
+    void adjacentOpaqueDifferentMaterialsCullTheirSharedFace() {
         short[] blocks = new short[4096];
         blocks[index(4, 5, 6)] = 7;
         blocks[index(5, 5, 6)] = 8;
+        // Each material keeps its own exterior faces; the internal face is hidden.
+        assertEquals(36, builder.build(new VoxelSectionSnapshot(blocks)).vertexCount());
+    }
 
-        SectionMesh mesh = builder.build(new VoxelSectionSnapshot(blocks));
+    @Test
+    void neighborHaloCullsFacesAtSectionBoundary() {
+        short[] halo = new short[VoxelSectionSnapshot.HALO_VOLUME];
+        halo[haloIndex(15, 8, 8)] = 3; // target section x=15
+        halo[haloIndex(16, 8, 8)] = 9; // adjacent section x=16
+        VoxelSectionSnapshot snapshot = VoxelSectionSnapshot.withNeighborHalo(halo);
 
-        // The internal shared face is hidden, but material boundaries remain
-        // separate on the exterior surfaces.
-        assertEquals(60, mesh.vertexCount());
+        SectionMesh mesh = builder.build(snapshot);
+        // The adjacent block hides the +X face, leaving five faces.
+        assertEquals(30, mesh.vertexCount());
+    }
+
+    @Test
+    void missingNeighborHaloLeavesBoundaryFaceVisible() {
+        short[] blocks = new short[4096];
+        blocks[index(15, 8, 8)] = 3;
+        assertEquals(36, builder.build(new VoxelSectionSnapshot(blocks)).vertexCount());
+    }
+
+    @Test
+    void haloInputIsDefensivelyCopied() {
+        short[] halo = new short[VoxelSectionSnapshot.HALO_VOLUME];
+        halo[haloIndex(8, 8, 8)] = 5;
+        VoxelSectionSnapshot snapshot = VoxelSectionSnapshot.withNeighborHalo(halo);
+        halo[haloIndex(8, 8, 8)] = 99;
+        assertEquals(5, snapshot.materialAt(7, 7, 7));
     }
 
     @Test
@@ -67,11 +84,9 @@ class SectionMeshBuilderTest {
         byte[] source = new byte[SectionMesh.VERTEX_STRIDE_BYTES];
         source[0] = 12;
         SectionMesh mesh = new SectionMesh(source, 1);
-
         source[0] = 99;
         byte[] copy = mesh.copyVertexData();
         copy[0] = 88;
-
         assertEquals(12, mesh.copyVertexData()[0]);
     }
 
@@ -90,7 +105,6 @@ class SectionMeshBuilderTest {
             float ny = data.getFloat();
             float nz = data.getFloat();
             float material = data.getFloat();
-
             assertTrue(Float.isFinite(x) && Float.isFinite(y) && Float.isFinite(z));
             assertTrue(Float.isFinite(material));
             assertEquals(1.0f, Math.abs(nx) + Math.abs(ny) + Math.abs(nz));
@@ -99,5 +113,10 @@ class SectionMeshBuilderTest {
 
     private static int index(int x, int y, int z) {
         return x | (y << 4) | (z << 8);
+    }
+
+    private static int haloIndex(int x, int y, int z) {
+        return x + z * VoxelSectionSnapshot.HALO_SIZE
+                + y * VoxelSectionSnapshot.HALO_SIZE * VoxelSectionSnapshot.HALO_SIZE;
     }
 }
