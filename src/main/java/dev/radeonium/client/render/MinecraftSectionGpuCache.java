@@ -11,6 +11,7 @@ import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.ArrayList;
 import java.util.List;
+import net.minecraft.world.phys.Vec3;
 import java.util.Map;
 
 /**
@@ -26,6 +27,7 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
     private static final int MAX_CACHED_SECTIONS = 64;
     private static final long MAX_CACHED_BYTES = 64L * 1024L * 1024L;
     private final Map<SectionPos, Entry> sections = new LinkedHashMap<>(16, 0.75f, true);
+    private final Map<SectionPos, Vec3> translucentSortCameras = new java.util.HashMap<>();
 
     /** Builds one GPU upload per vanilla render layer, then atomically replaces the old entry. */
     public synchronized void rebuild(SectionPos position, List<BlockStateModelPart> modelParts) {
@@ -49,6 +51,7 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
             Entry replacement = new Entry(mesh, MinecraftFluidSectionMesher.SectionFluidMesh.empty(), null, layerUploads, materialIndices);
             Entry previous = sections.put(position, replacement);
             if (previous != null) previous.close(materials);
+            translucentSortCameras.remove(position);
             evictExcessSections();
         } catch (RuntimeException | Error failure) {
             for (MinecraftMeshGpuUpload upload : layerUploads.values()) upload.close();
@@ -120,12 +123,14 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
             SectionPos oldest = sections.keySet().iterator().next();
             Entry removed = sections.remove(oldest);
             if (removed != null) removed.close(materials);
+            translucentSortCameras.remove(oldest);
         }
     }
 
     public synchronized void remove(SectionPos position) {
         RenderSystem.assertOnRenderThread();
         Entry removed = sections.remove(position);
+        translucentSortCameras.remove(position);
         if (removed != null) removed.close(materials);
     }
 
@@ -133,6 +138,7 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
         RenderSystem.assertOnRenderThread();
         for (Entry entry : sections.values()) entry.close(materials);
         sections.clear();
+        translucentSortCameras.clear();
         materials.clear();
     }
 
@@ -162,12 +168,50 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
 
     /** GPU buffers in the exact native terrain layout, or null for stale/empty sections. */
     public synchronized LayerBuffers layerBuffers(SectionPos position, ChunkSectionLayer layer) {
+        return layerBuffers(position, layer, null);
+    }
+
+    /**
+     * Returns the active layer buffer. Translucent quads are re-sorted by
+     * camera distance when the camera has moved enough to change their order.
+     */
+    public synchronized LayerBuffers layerBuffers(
+            SectionPos position, ChunkSectionLayer layer, Vec3 cameraPosition
+    ) {
         if (position == null || layer == null) return null;
         Entry entry = sections.get(position);
         if (entry == null || entry.sourceSnapshot == null
                 || MinecraftSectionModelCaptureStore.get(entry.sourceSnapshot.position()) != entry.sourceSnapshot) {
             return null;
         }
+
+        if (layer == ChunkSectionLayer.TRANSLUCENT && cameraPosition != null) {
+            Vec3 previousCamera = translucentSortCameras.get(position);
+            if (previousCamera == null || previousCamera.distanceToSqr(cameraPosition) > 0.25) {
+                List<SortableQuad> sorted = new ArrayList<>();
+                for (MinecraftBlockModelMesh.Quad quad : entry.mesh.layer(layer).quads()) {
+                    MinecraftMeshGpuUpload.QuadData data = MinecraftMeshGpuUpload.fromModelQuad(quad);
+                    sorted.add(new SortableQuad(data, distanceSquared(position, data, cameraPosition)));
+                }
+                for (MinecraftFluidSectionMesher.FluidQuad quad : entry.fluids.layer(layer).quads()) {
+                    MinecraftMeshGpuUpload.QuadData data = MinecraftMeshGpuUpload.fromFluidQuad(quad);
+                    sorted.add(new SortableQuad(data, distanceSquared(position, data, cameraPosition)));
+                }
+                sorted.sort(java.util.Comparator.comparingDouble(SortableQuad::distanceSquared).reversed());
+                List<MinecraftMeshGpuUpload.QuadData> ordered =
+                        sorted.stream().map(SortableQuad::quad).toList();
+                MinecraftMeshGpuUpload replacement =
+                        MinecraftMeshGpuUpload.uploadQuadData(RenderSystem.getDevice(), ordered);
+                MinecraftMeshGpuUpload previous = entry.layerUploads.put(layer, replacement);
+                if (previous != null) previous.close();
+                translucentSortCameras.put(position, cameraPosition);
+                if (MinecraftSectionModelCaptureStore.get(entry.sourceSnapshot.position()) != entry.sourceSnapshot) {
+                    remove(position);
+                    return null;
+                }
+            }
+        }
+
         MinecraftMeshGpuUpload upload = entry.layerUploads.get(layer);
         if (upload == null || upload.isEmpty()) return null;
         return new LayerBuffers(
@@ -175,6 +219,27 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
                 upload.vertexFormat(), upload.topology()
         );
     }
+
+    private static double distanceSquared(
+            SectionPos section, MinecraftMeshGpuUpload.QuadData quad, Vec3 camera
+    ) {
+        float[] positions = quad.positions();
+        double x = 0.0, y = 0.0, z = 0.0;
+        for (int vertex = 0; vertex < 4; vertex++) {
+            x += positions[vertex * 3];
+            y += positions[vertex * 3 + 1];
+            z += positions[vertex * 3 + 2];
+        }
+        x = section.x() * 16.0 + x * 0.25;
+        y = section.y() * 16.0 + y * 0.25;
+        z = section.z() * 16.0 + z * 0.25;
+        double dx = x - camera.x;
+        double dy = y - camera.y;
+        double dz = z - camera.z;
+        return dx * dx + dy * dy + dz * dz;
+    }
+
+    private record SortableQuad(MinecraftMeshGpuUpload.QuadData quad, double distanceSquared) {}
 
     public record LayerBuffers(
             GpuBuffer vertexBuffer,
