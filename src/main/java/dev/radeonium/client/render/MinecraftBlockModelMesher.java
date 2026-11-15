@@ -35,7 +35,7 @@ public final class MinecraftBlockModelMesher {
 
         List<BlockStateModelPart> parts = new ArrayList<>();
         model.collectParts(RandomSource.create(seed), parts);
-        return build(parts);
+        return build(parts, java.util.Map.of());
     }
 
     /**
@@ -44,7 +44,14 @@ public final class MinecraftBlockModelMesher {
      * level/position/state snapshot to select their parts.
      */
     public MinecraftBlockModelMesh build(List<BlockStateModelPart> modelParts) {
-        if (modelParts == null) {
+        return build(modelParts, java.util.Map.of());
+    }
+
+    /** Copies resolved parts with per-tint-index colors captured on the compiler thread. */
+    public MinecraftBlockModelMesh build(
+            List<BlockStateModelPart> modelParts, java.util.Map<Integer, Integer> tintColors
+    ) {
+        if (modelParts == null || tintColors == null) {
             throw new IllegalArgumentException("modelParts cannot be null");
         }
 
@@ -52,9 +59,9 @@ public final class MinecraftBlockModelMesher {
         for (BlockStateModelPart part : modelParts) {
             if (part == null) continue;
 
-            appendQuads(quads, part.getQuads(null), part.useAmbientOcclusion());
+            appendQuads(quads, part.getQuads(null), part.useAmbientOcclusion(), tintColors);
             for (Direction direction : Direction.values()) {
-                appendQuads(quads, part.getQuads(direction), part.useAmbientOcclusion());
+                appendQuads(quads, part.getQuads(direction), part.useAmbientOcclusion(), tintColors);
             }
         }
 
@@ -64,7 +71,8 @@ public final class MinecraftBlockModelMesher {
     private static void appendQuads(
             List<MinecraftBlockModelMesh.Quad> output,
             List<BakedQuad> source,
-            boolean partAmbientOcclusion
+            boolean partAmbientOcclusion,
+            java.util.Map<Integer, Integer> tintColors
     ) {
         if (source == null || source.isEmpty()) return;
 
@@ -96,7 +104,8 @@ public final class MinecraftBlockModelMesher {
                     layer,
                     material,
                     quad,
-                    partAmbientOcclusion
+                    partAmbientOcclusion,
+                    tintColors.getOrDefault(material.tintIndex(), -1)
             ));
         }
     }
