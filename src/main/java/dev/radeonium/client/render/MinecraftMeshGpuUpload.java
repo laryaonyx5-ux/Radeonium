@@ -16,7 +16,7 @@ import java.util.Arrays;
  * buffer. Call upload on Minecraft's render thread: GPU resources are owned by
  * the active RenderPearl device and must not be created by meshing workers.
  *
- * Vertex format (36-byte stride): float3 model position, packed UV (two words),
+ * Vertex format (40-byte stride): float3 model position, packed UV (two words),
  * captured ARGB tint, packed block/sky light, per-vertex AO color and lightmap.
  * Material/shader binding and
  * terrain draw submission are intentionally separate later stages.
