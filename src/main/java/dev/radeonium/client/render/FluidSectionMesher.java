@@ -26,7 +26,7 @@ public final class FluidSectionMesher {
                     int tint = snapshot.tint(x, y, z);
                     int light = snapshot.packedLight(x, y, z);
 
-                    if (y == 15 || snapshot.fluidId(x, y + 1, z) != id) {
+                    if (snapshot.fluidIdWithHalo(x, y + 1, z) != id) {
                         float northWest = cornerHeight(snapshot, id, x, y, z);
                         float northEast = cornerHeight(snapshot, id, x + 1, y, z);
                         float southEast = cornerHeight(snapshot, id, x + 1, y, z + 1);
@@ -39,14 +39,14 @@ public final class FluidSectionMesher {
                                         x, y + southWest, z + 1
                                 });
                     }
-                    int westHeight = x == 0 || snapshot.fluidId(x - 1, y, z) != id
-                            ? 0 : snapshot.heightEighths(x - 1, y, z);
-                    int eastHeight = x == 15 || snapshot.fluidId(x + 1, y, z) != id
-                            ? 0 : snapshot.heightEighths(x + 1, y, z);
-                    int northHeight = z == 0 || snapshot.fluidId(x, y, z - 1) != id
-                            ? 0 : snapshot.heightEighths(x, y, z - 1);
-                    int southHeight = z == 15 || snapshot.fluidId(x, y, z + 1) != id
-                            ? 0 : snapshot.heightEighths(x, y, z + 1);
+                    int westHeight = snapshot.fluidIdWithHalo(x - 1, y, z) != id
+                            ? 0 : snapshot.heightEighthsWithHalo(x - 1, y, z);
+                    int eastHeight = snapshot.fluidIdWithHalo(x + 1, y, z) != id
+                            ? 0 : snapshot.heightEighthsWithHalo(x + 1, y, z);
+                    int northHeight = snapshot.fluidIdWithHalo(x, y, z - 1) != id
+                            ? 0 : snapshot.heightEighthsWithHalo(x, y, z - 1);
+                    int southHeight = snapshot.fluidIdWithHalo(x, y, z + 1) != id
+                            ? 0 : snapshot.heightEighthsWithHalo(x, y, z + 1);
 
                     if (snapshot.heightEighths(x, y, z) > westHeight) {
                         add(quads, id, tint, light, -1, 0, 0,
@@ -84,8 +84,7 @@ public final class FluidSectionMesher {
                 for (int dz = -1; dz <= 0; dz++) {
                     int x = cornerX + dx;
                     int z = cornerZ + dz;
-                    if (x >= 0 && x < 16 && z >= 0 && z < 16
-                            && snapshot.fluidId(x, y + 1, z) == id) {
+                    if (snapshot.fluidIdWithHalo(x, y + 1, z) == id) {
                         return 1.0f;
                     }
                 }
@@ -97,9 +96,8 @@ public final class FluidSectionMesher {
             for (int dz = -1; dz <= 0; dz++) {
                 int x = cornerX + dx;
                 int z = cornerZ + dz;
-                if (x < 0 || x >= 16 || z < 0 || z >= 16
-                        || snapshot.fluidId(x, y, z) != id) continue;
-                float height = snapshot.heightEighths(x, y, z) / 8.0f;
+                if (snapshot.fluidIdWithHalo(x, y, z) != id) continue;
+                float height = snapshot.heightEighthsWithHalo(x, y, z) / 8.0f;
                 int weight = height >= 0.8f ? 10 : 1;
                 weightedHeight += height * weight;
                 totalWeight += weight;
