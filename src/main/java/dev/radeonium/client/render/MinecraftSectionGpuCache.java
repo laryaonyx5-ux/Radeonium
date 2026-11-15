@@ -189,18 +189,15 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
         if (layer == ChunkSectionLayer.TRANSLUCENT && cameraPosition != null) {
             Vec3 previousCamera = translucentSortCameras.get(position);
             if (previousCamera == null || previousCamera.distanceToSqr(cameraPosition) > 0.25) {
-                List<SortableQuad> sorted = new ArrayList<>();
+                List<MinecraftMeshGpuUpload.QuadData> quads = new ArrayList<>();
                 for (MinecraftBlockModelMesh.Quad quad : entry.mesh.layer(layer).quads()) {
-                    MinecraftMeshGpuUpload.QuadData data = MinecraftMeshGpuUpload.fromModelQuad(quad);
-                    sorted.add(new SortableQuad(data, distanceSquared(position, data, cameraPosition)));
+                    quads.add(MinecraftMeshGpuUpload.fromModelQuad(quad));
                 }
                 for (MinecraftFluidSectionMesher.FluidQuad quad : entry.fluids.layer(layer).quads()) {
-                    MinecraftMeshGpuUpload.QuadData data = MinecraftMeshGpuUpload.fromFluidQuad(quad);
-                    sorted.add(new SortableQuad(data, distanceSquared(position, data, cameraPosition)));
+                    quads.add(MinecraftMeshGpuUpload.fromFluidQuad(quad));
                 }
                 List<MinecraftMeshGpuUpload.QuadData> ordered =
-                        sortTranslucentQuads(position,
-                                sorted.stream().map(SortableQuad::quad).toList(), cameraPosition);
+                        sortTranslucentQuads(position, quads, cameraPosition);
                 MinecraftMeshGpuUpload replacement =
                         MinecraftMeshGpuUpload.uploadQuadData(RenderSystem.getDevice(), ordered);
                 MinecraftMeshGpuUpload previous = entry.layerUploads.put(layer, replacement);
