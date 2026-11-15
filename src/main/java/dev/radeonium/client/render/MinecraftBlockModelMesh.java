@@ -62,6 +62,7 @@ public final class MinecraftBlockModelMesh {
         private final BakedQuad sourceQuad;
         private final boolean partAmbientOcclusion;
         private final int tintColor;
+        private final int packedLightCoords;
 
         Quad(
                 float[] positions,
@@ -71,7 +72,8 @@ public final class MinecraftBlockModelMesh {
                 BakedQuad.MaterialInfo material,
                 BakedQuad sourceQuad,
                 boolean partAmbientOcclusion,
-                int tintColor
+                int tintColor,
+                int packedLightCoords
         ) {
             if (positions == null || packedUv == null || positions.length != 12 || packedUv.length != 4) {
                 throw new IllegalArgumentException("A baked quad needs four positions and four UV pairs");
@@ -92,6 +94,7 @@ public final class MinecraftBlockModelMesh {
             this.sourceQuad = sourceQuad;
             this.partAmbientOcclusion = partAmbientOcclusion;
             this.tintColor = tintColor;
+            this.packedLightCoords = packedLightCoords;
         }
 
         public float[] copyPositions() {
@@ -139,6 +142,9 @@ public final class MinecraftBlockModelMesh {
         /** Captured ARGB tint; -1 when this quad has no resolved tint source. */
         public int tintColor() { return tintColor; }
 
+        /** Packed block/sky light sampled from Minecraft's section region. */
+        public int packedLightCoords() { return packedLightCoords; }
+
         /**
          * Writes two triangles in the vertex format used by
          * MinecraftMeshGpuUpload: float3 position + packed UV split into ints.
@@ -153,6 +159,7 @@ public final class MinecraftBlockModelMesh {
                 target.putInt((int) packedUv[vertex]);
                 target.putInt((int) (packedUv[vertex] >>> 32));
                 target.putInt(tintColor);
+                target.putInt(packedLightCoords);
             }
         }
     }
