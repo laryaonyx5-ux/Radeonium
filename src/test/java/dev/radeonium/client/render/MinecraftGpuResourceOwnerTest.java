@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class MinecraftGpuResourceOwnerTest {
     @Test
     void startsWithNoOwnedGpuAllocations() {
-        MinecraftGpuResourceOwner owner = new MinecraftGpuResourceOwner();
+        MinecraftGpuResourceOwner owner = new MinecraftGpuResourceOwner(() -> {});
 
         assertEquals(0, owner.allocationCount());
         assertEquals(0L, owner.allocatedBytes());
