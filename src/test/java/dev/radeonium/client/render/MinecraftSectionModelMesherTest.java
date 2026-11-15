@@ -47,7 +47,7 @@ class MinecraftSectionModelMesherTest {
     void resolvedInputsRejectCoordinatesOutsideTheirSection() {
         assertThrows(IllegalArgumentException.class, () ->
                 new MinecraftSectionModelMesher.ResolvedBlockInput(
-                        List.of(), 16, 0, 0, false, false, false, false, false, false, java.util.Map.of(), -1));
+                        List.of(), 16, 0, 0, false, false, false, false, false, false, java.util.Map.of(), -1, java.util.Map.of()));
     }
 
 
@@ -63,6 +63,22 @@ class MinecraftSectionModelMesherTest {
         assertEquals(0x00F000F0, input.packedLightCoords());
         assertThrows(UnsupportedOperationException.class,
                 () -> input.tintColors().put(1, 0xFFFFFFFF));
+    }
+
+
+    @Test
+    void capturedQuadLightingDefensivelyCopiesPerVertexArrays() {
+        int[] colors = {1, 2, 3, 4};
+        int[] light = {5, 6, 7, 8};
+        var captured = new MinecraftSectionModelMesher.CapturedQuadLighting(colors, light);
+
+        colors[0] = 99;
+        light[0] = 99;
+        assertEquals(1, captured.colors()[0]);
+        assertEquals(5, captured.lightCoords()[0]);
+        assertThrows(UnsupportedOperationException.class, () -> {
+            captured.colors()[0] = 100;
+        });
     }
 
     @Test
