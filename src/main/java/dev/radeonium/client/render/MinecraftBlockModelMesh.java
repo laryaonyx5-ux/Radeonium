@@ -79,6 +79,25 @@ public final class MinecraftBlockModelMesh {
                 int[] vertexColors,
                 int[] vertexLightCoords
         ) {
+            this(positions, packedUv, direction, layer, material, sourceQuad,
+                    partAmbientOcclusion, tintColor, packedLightCoords,
+                    vertexColors, vertexLightCoords, false);
+        }
+
+        private Quad(
+                float[] positions,
+                long[] packedUv,
+                Direction direction,
+                ChunkSectionLayer layer,
+                BakedQuad.MaterialInfo material,
+                BakedQuad sourceQuad,
+                boolean partAmbientOcclusion,
+                int tintColor,
+                int packedLightCoords,
+                int[] vertexColors,
+                int[] vertexLightCoords,
+                boolean takeOwnership
+        ) {
             if (positions == null || packedUv == null || positions.length != 12 || packedUv.length != 4) {
                 throw new IllegalArgumentException("A baked quad needs four positions and four UV pairs");
             }
@@ -92,8 +111,8 @@ public final class MinecraftBlockModelMesh {
                     throw new IllegalArgumentException("Baked quad positions must be finite");
                 }
             }
-            this.positions = positions.clone();
-            this.packedUv = packedUv.clone();
+            this.positions = takeOwnership ? positions : positions.clone();
+            this.packedUv = takeOwnership ? packedUv : packedUv.clone();
             this.direction = direction;
             this.layer = layer;
             this.material = material;
@@ -101,8 +120,55 @@ public final class MinecraftBlockModelMesh {
             this.partAmbientOcclusion = partAmbientOcclusion;
             this.tintColor = tintColor;
             this.packedLightCoords = packedLightCoords;
-            this.vertexColors = vertexColors.clone();
-            this.vertexLightCoords = vertexLightCoords.clone();
+            this.vertexColors = takeOwnership ? vertexColors : vertexColors.clone();
+            this.vertexLightCoords = takeOwnership ? vertexLightCoords : vertexLightCoords.clone();
+        }
+
+        /** Internal factory for arrays freshly allocated by the mesher. */
+        static Quad takeOwnership(
+                float[] positions, long[] packedUv, Direction direction,
+                ChunkSectionLayer layer, BakedQuad.MaterialInfo material, BakedQuad sourceQuad,
+                boolean partAmbientOcclusion, int tintColor, int packedLightCoords,
+                int[] vertexColors, int[] vertexLightCoords
+        ) {
+            return new Quad(positions, packedUv, direction, layer, material, sourceQuad,
+                    partAmbientOcclusion, tintColor, packedLightCoords,
+                    vertexColors, vertexLightCoords, true);
+        }
+
+        /** Tests the stored coordinates without allocating a defensive copy. */
+        boolean liesOnBlockBoundary(Direction face, float epsilon) {
+            if (face == null) return false;
+            int axis = switch (face.getAxis()) {
+                case X -> 0;
+                case Y -> 1;
+                case Z -> 2;
+            };
+            float expected = switch (face) {
+                case EAST, UP, SOUTH -> 1.0f;
+                case WEST, DOWN, NORTH -> 0.0f;
+            };
+            for (int vertex = 0; vertex < 4; vertex++) {
+                float coordinate = positions[vertex * 3 + axis];
+                if (!Float.isFinite(coordinate) || Math.abs(coordinate - expected) > epsilon) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        /** Creates a translated quad, sharing immutable UV/material/light arrays. */
+        Quad translated(int x, int y, int z) {
+            float[] translated = positions.clone();
+            for (int vertex = 0; vertex < 4; vertex++) {
+                int offset = vertex * 3;
+                translated[offset] += x;
+                translated[offset + 1] += y;
+                translated[offset + 2] += z;
+            }
+            return new Quad(translated, packedUv, direction, layer, material, sourceQuad,
+                    partAmbientOcclusion, tintColor, packedLightCoords,
+                    vertexColors, vertexLightCoords, true);
         }
 
         public float[] copyPositions() {
