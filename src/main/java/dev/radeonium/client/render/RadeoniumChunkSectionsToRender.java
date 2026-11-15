@@ -115,7 +115,10 @@ public final class RadeoniumChunkSectionsToRender {
             try {
                 for (SectionRenderDispatcher.RenderSection section : access.radeonium$getVisibleSections()) {
                     SectionMesh mesh = section.getSectionMesh();
-                    if (mesh == null) continue;
+                    if (mesh == null) {
+                        RadeoniumClient.terrainRenderDiagnostics().recordSectionWithoutMesh();
+                        continue;
+                    }
 
                     int sectionInfoIndex = -1;
                     for (ChunkSectionLayer layer : ChunkSectionLayer.values()) {
@@ -157,8 +160,10 @@ public final class RadeoniumChunkSectionsToRender {
                         boolean compatibleModelGeometry = isCompatibleModelGeometry(modelOwned, format);
                         boolean compatibleOwnedGeometry = !compatibleModelGeometry
                                 && isCompatibleOwnedGeometry(owned, format, sectionDraw);
+                        TerrainRenderDiagnostics.Source drawSource;
 
                         if (compatibleModelGeometry) {
+                            drawSource = TerrainRenderDiagnostics.Source.RADEONIUM_MODEL;
                             // Native BLOCK vertices use Minecraft's sequential QUADS index buffer.
                             vertexBuffer = modelOwned.vertexBuffer();
                             baseVertex = 0;
@@ -167,6 +172,7 @@ public final class RadeoniumChunkSectionsToRender {
                             indexCount = modelOwned.indexCount();
                             largestDefaultIndexCount = Math.max(largestDefaultIndexCount, indexCount);
                         } else if (compatibleOwnedGeometry) {
+                            drawSource = TerrainRenderDiagnostics.Source.RADEONIUM_COMPILED_GEOMETRY;
                             // The copied MeshData is section-local, so its base vertex and first index are zero.
                             vertexBuffer = owned.vertexBuffer();
                             baseVertex = 0;
@@ -177,6 +183,7 @@ public final class RadeoniumChunkSectionsToRender {
                                 largestDefaultIndexCount = Math.max(largestDefaultIndexCount, indexCount);
                             }
                         } else {
+                            drawSource = TerrainRenderDiagnostics.Source.VANILLA_FALLBACK;
                             // A missing/stale upload never removes terrain: use the live vanilla slice.
                             baseVertex = (int) (slice.vertexBufferOffset() / format.getVertexSize());
                             vertexBuffer = slice.vertexBuffer();
@@ -191,6 +198,7 @@ public final class RadeoniumChunkSectionsToRender {
                             }
                         }
 
+                        RadeoniumClient.terrainRenderDiagnostics().recordDraw(layer, drawSource);
                         final int uniformIndex = sectionInfoIndex;
                         RenderPass.Draw<GpuBufferSlice[]> draw = new RenderPass.Draw<>(
                                 0,
