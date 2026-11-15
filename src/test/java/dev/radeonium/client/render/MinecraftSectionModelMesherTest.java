@@ -76,9 +76,9 @@ class MinecraftSectionModelMesherTest {
         light[0] = 99;
         assertEquals(1, captured.colors()[0]);
         assertEquals(5, captured.lightCoords()[0]);
-        assertThrows(UnsupportedOperationException.class, () -> {
-            captured.colors()[0] = 100;
-        });
+        int[] colorCopy = captured.colors();
+        colorCopy[0] = 100;
+        assertEquals(1, captured.colors()[0]);
     }
 
     @Test
