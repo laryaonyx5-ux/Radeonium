@@ -196,7 +196,7 @@ public final class MinecraftCompiledGeometryGpuCache implements AutoCloseable {
                 );
 
                 byte[] indexBytes = source.indexBytes();
-                IndexType type = IndexType.valueOf(source.indexType());
+                IndexType type = source.indexType();
                 if (indexBytes.length > 0 && source.indexCount() > 0) {
                     indexBuffer = device.createBuffer(
                             () -> "Radeonium compiled section " + layer + " indices",
