@@ -225,6 +225,7 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
 
     private void evictExcessSections() {
         while (sections.size() > MAX_CACHED_SECTIONS || uploadedBytes() > MAX_CACHED_BYTES) {
+            if (sections.isEmpty()) break;
             Map.Entry<SectionPos, Entry> oldest = sections.entrySet().iterator().next();
             // Keep the entry reachable until all of its references have been released.
             oldest.getValue().close(materials, gpuResources);
@@ -232,6 +233,11 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
             sections.remove(position);
             translucentSortCameras.remove(position);
             translucentSortOrders.remove(position);
+        }
+        if (sections.isEmpty() && gpuResources.allocationCount() > 0) {
+            // Any remaining allocation is no longer reachable from a section entry.
+            gpuResources.releaseAll();
+            materials.clear();
         }
     }
 
