@@ -120,7 +120,7 @@ The greedy voxel prototype is deliberately not used as a substitute for Minecraf
 
 ## Milestone D — terrain shader and material system
 
-**Status: shader/material implementation complete; runtime visual parity validation pending.**
+**Status: shader/material implementation complete; active pipeline integration is covered by partial Step 8; runtime visual parity validation pending.**
 
 ### Implemented foundation
 
@@ -134,15 +134,15 @@ The greedy voxel prototype is deliberately not used as a substitute for Minecraf
 
 ### Deliberate boundary
 
-This milestone supplies shader sources and material-binding contracts. It does not yet register or bind a live RenderPearl terrain pipeline, descriptor sets, atlas/lightmap textures or per-frame fog uniforms; those are integrated by Milestone E. Shader files have not yet been compiled by the active runtime shader compiler or visually compared in a Minecraft client. Until that validation passes, vanilla remains the authoritative terrain path.
+This milestone supplies shader sources and material-binding contracts. Active SOLID/CUTOUT pipeline selection is now implemented in the Step 8 shader-activation follow-up. The live RenderPearl shader compiler and in-game visual parity still require validation; until that validation passes, vanilla remains the authoritative fallback.
 
 ## Milestone E — independent terrain pipelines
 
-**Status: pipeline definitions and draw routing implemented; runtime pipeline compilation and visual validation pending.**
+**Status: Radeonium SOLID/CUTOUT pipelines and custom shader selection implemented; runtime pipeline compilation and visual validation pending.**
 
 ### Implemented foundation
 
-- Adds two distinct Radeonium-owned RenderPearl pipeline identities for SOLID and CUTOUT terrain layers, each with a Radeonium pipeline location and the public terrain shader/bind-group snippet.
+- Adds two distinct Radeonium-owned RenderPearl pipeline identities for SOLID and CUTOUT terrain layers, each with a Radeonium pipeline location and Minecraft's terrain bind-group/vertex-format/render-state snippet.
 - Uses a dedicated alpha-cutout shader define for CUTOUT while retaining the same native terrain vertex contract.
 - Routes opaque and cutout terrain submissions through Radeonium's pipeline identities in the existing per-layer draw hook.
 - Keeps TRANSLUCENT on the host-provided OIT override or Minecraft's vanilla translucent pipeline. Radeonium's full translucent replacement remains Milestone F.
@@ -151,7 +151,7 @@ This milestone supplies shader sources and material-binding contracts. It does n
 
 ### Deliberate compatibility boundary
 
-The current pipeline objects have Radeonium identities and are used for SOLID/CUTOUT submissions, but their shader stages and descriptor layouts come from Minecraft's public terrain snippet. The custom GLSL files from Milestone D are not yet bound because their uniform/sampler contract still needs to be reconciled with RenderPearl's live terrain bind groups. This avoids activating a shader with incompatible descriptors. Translucent OIT remains host-owned until Milestone F.
+The current pipeline objects have Radeonium identities and are used for SOLID/CUTOUT submissions. The Step 8 follow-up now selects Radeonium's own vertex and fragment stages while retaining Minecraft's compatible terrain bind-group layout, vertex format and fixed render state. Translucent OIT remains host-owned; no independent transparency replacement is claimed.
 
 Runtime RenderPearl compilation, visual comparison and backend checks remain pending. If a pipeline cannot compile or render correctly, the corresponding vanilla path must remain available.
 
@@ -160,7 +160,8 @@ Runtime RenderPearl compilation, visual comparison and backend checks remain pen
 **Status: Radeonium shader stages are now assigned to the active SOLID/CUTOUT RenderPearl pipelines; runtime shader compilation and visual parity remain unverified.**
 
 - The SOLID and CUTOUT pipeline builders now select `radeonium:core/terrain` for both vertex and fragment stages instead of inheriting Minecraft's terrain shader stages.
-- The custom shader pair now consumes the Minecraft 26.3 terrain interface: BLOCK vertex attributes, section position/visibility, atlas sampler, lightmap sampler, fog uniforms and the terrain projection.
+- The custom shader pair now consumes the Minecraft 26.3 multi-draw terrain interface: BLOCK vertex attributes, conditional per-draw section position/visibility, atlas/lightmap samplers, fog and projection uniforms.
+- The fragment stage preserves Minecraft's RGSS/nearest texture filtering, cutout discard, section visibility fade and OIT alpha-only/accumulation hooks. OIT remains a host-owned frame-graph feature for translucent draws; these hooks preserve interface compatibility rather than claiming a new Radeonium OIT implementation.
 - CUTOUT retains its dedicated alpha threshold define; SOLID does not discard alpha.
 - The vanilla terrain snippet remains in place only for compatible bind-group layouts, vertex format, depth/color state and render-pass integration. This is a shader replacement, not yet a fully independent backend/pipeline state or OIT implementation.
 - Focused tests assert the shader resources expose the expected 26.3 inputs, outputs, includes and uniforms. CI compilation, JUnit tests and JAR packaging pass.
@@ -285,6 +286,6 @@ The order may be adjusted when implementation dependencies require it, but visua
 
 ## Current status (important)
 
-The existing Step 7.5 bridge still captures Minecraft-compiled geometry as a safe fallback. The opt-in Milestone B path separately captures and meshes Minecraft model/fluid inputs, compares its encoded per-layer quads against Minecraft's compiled bytes, and submits only verified Radeonium-owned buffers through the existing terrain hook. It does **not** yet own Minecraft block compilation, the frame graph or the complete transparency system. Milestone E now gives opaque/cutout draws Radeonium-owned pipeline identities, while the compatibility shader stages remain inherited from Minecraft and translucent OIT may still use a host override. Therefore it is not yet a fully independent renderer.
+The existing Step 7.5 bridge still captures Minecraft-compiled geometry as a safe fallback. The opt-in Milestone B path separately captures and meshes Minecraft model/fluid inputs, compares its encoded per-layer quads against Minecraft's compiled bytes, and submits only verified Radeonium-owned buffers through the existing terrain hook. Step 8 now binds Radeonium-owned shader stages to the SOLID/CUTOUT pipeline identities while retaining Minecraft's compatible terrain bind groups and fixed state. It does **not** yet own Minecraft block compilation, the frame graph or the complete transparency system; translucent OIT may still use a host override. Therefore it is not yet a fully independent renderer.
 
 The in-game validation matrix remains required before enabling the opt-in path by default. The roadmap above describes the larger renderer project that follows; Milestone B completion does not mark those future milestones complete.
