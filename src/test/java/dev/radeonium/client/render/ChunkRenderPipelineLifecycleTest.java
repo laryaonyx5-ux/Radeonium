@@ -63,6 +63,9 @@ class ChunkRenderPipelineLifecycleTest {
         SectionPos second = new SectionPos(1, 0, 0);
 
         pipeline.syncVisibleSections(List.of(first, second));
+        long fullyConnected = (1L << 36) - 1L;
+        pipeline.updateVisibilityConnections(first, fullyConnected);
+        pipeline.updateVisibilityConnections(second, fullyConnected);
         assertEquals(2, pipeline.visibleSectionCount());
         assertEquals(2, pipeline.sectionCount());
 
