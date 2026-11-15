@@ -2,8 +2,10 @@ package dev.radeonium.client.render;
 
 import net.minecraft.core.SectionPos;
 
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * Bounded CPU cache of Radeonium meshes built from actual Minecraft section
@@ -17,10 +19,12 @@ public final class MinecraftSectionModelCaptureStore {
     private static final LinkedHashMap<SectionPos, Snapshot> SNAPSHOTS =
             new LinkedHashMap<>(32, 0.75f, true);
     private static int retainedQuads;
-    private static volatile long epoch;
+    private static long epoch;
+    private static long nextGeneration;
+    private static final Map<SectionPos, Long> CAPTURE_GENERATIONS = new HashMap<>();
     private static final ThreadLocal<LinkedHashMap<SectionPos, PendingCapture>> PENDING =
             ThreadLocal.withInitial(() -> new LinkedHashMap<>(16, 0.75f, true));
-    private static final ThreadLocal<LinkedHashMap<SectionPos, Long>> ACTIVE_CAPTURES =
+    private static final ThreadLocal<LinkedHashMap<SectionPos, CaptureToken>> ACTIVE_CAPTURES =
             ThreadLocal.withInitial(() -> new LinkedHashMap<>(16, 0.75f, true));
 
     private MinecraftSectionModelCaptureStore() {}
@@ -33,46 +37,64 @@ public final class MinecraftSectionModelCaptureStore {
         return Boolean.getBoolean("radeonium.captureModelMeshes");
     }
 
-    /** Capture the reload epoch before reading models from the compile region. */
-    public static long beginCapture(SectionPos position) {
+    /**
+     * Starts a generation before reading models. A newer compile for the same
+     * section invalidates older workers even if they finish later.
+     */
+    public static synchronized long beginCapture(SectionPos position) {
         if (position == null) return -1L;
-        long captureEpoch = epoch;
-        LinkedHashMap<SectionPos, Long> active = ACTIVE_CAPTURES.get();
+        long generation = ++nextGeneration;
+        CAPTURE_GENERATIONS.put(position, generation);
+
+        LinkedHashMap<SectionPos, CaptureToken> active = ACTIVE_CAPTURES.get();
         active.remove(position);
-        active.put(position, captureEpoch);
+        active.put(position, new CaptureToken(epoch, generation));
         while (active.size() > MAX_SECTIONS) {
             active.remove(active.keySet().iterator().next());
         }
-        return captureEpoch;
+        return generation;
     }
 
     /** Stage on the compiler worker; publish only after vanilla compile succeeds. */
-    public static void stage(
+    public static synchronized void stage(
             SectionPos position, MinecraftSectionModelMesher.SectionModelMesh mesh
     ) {
         if (position == null || mesh == null) return;
-        Long captureEpoch = ACTIVE_CAPTURES.get().remove(position);
-        if (captureEpoch == null || captureEpoch != epoch) return;
+        CaptureToken token = ACTIVE_CAPTURES.get().remove(position);
+        if (token == null || token.epoch() != epoch
+                || !Objects.equals(CAPTURE_GENERATIONS.get(position), token.generation())) {
+            return;
+        }
+
         LinkedHashMap<SectionPos, PendingCapture> pending = PENDING.get();
         pending.remove(position);
-        pending.put(position, new PendingCapture(mesh, captureEpoch));
+        pending.put(position, new PendingCapture(mesh, token.epoch(), token.generation()));
         while (pending.size() > MAX_SECTIONS) {
             pending.remove(pending.keySet().iterator().next());
         }
     }
 
-    /** Commit the worker's staged mesh at SectionCompiler RETURN. */
+    /** Commit only the newest staged mesh at SectionCompiler RETURN. */
     public static synchronized Snapshot complete(SectionPos position) {
         if (position == null) return null;
         PendingCapture pending = PENDING.get().remove(position);
-        if (pending == null || pending.epoch() != epoch) return null;
+        if (pending == null || pending.epoch() != epoch
+                || !Objects.equals(CAPTURE_GENERATIONS.get(position), pending.generation())) {
+            return null;
+        }
+        CAPTURE_GENERATIONS.remove(position);
         return put(position, pending.mesh());
     }
 
-    public static void abort(SectionPos position) {
+    public static synchronized void abort(SectionPos position) {
         if (position == null) return;
-        ACTIVE_CAPTURES.get().remove(position);
-        PENDING.get().remove(position);
+        CaptureToken active = ACTIVE_CAPTURES.get().remove(position);
+        PendingCapture pending = PENDING.get().remove(position);
+        long generation = active != null ? active.generation()
+                : pending != null ? pending.generation() : -1L;
+        if (generation >= 0 && Objects.equals(CAPTURE_GENERATIONS.get(position), generation)) {
+            CAPTURE_GENERATIONS.remove(position);
+        }
     }
 
     public static synchronized Snapshot put(
@@ -104,12 +126,15 @@ public final class MinecraftSectionModelCaptureStore {
     }
 
     public static synchronized void remove(SectionPos position) {
+        if (position == null) return;
+        CAPTURE_GENERATIONS.remove(position);
         Snapshot removed = SNAPSHOTS.remove(position);
         if (removed != null) retainedQuads -= removed.quadCount();
     }
 
     public static synchronized void clear() {
         epoch++;
+        CAPTURE_GENERATIONS.clear();
         SNAPSHOTS.clear();
         retainedQuads = 0;
         PENDING.remove();
@@ -124,8 +149,10 @@ public final class MinecraftSectionModelCaptureStore {
         return retainedQuads;
     }
 
+    private record CaptureToken(long epoch, long generation) {}
+
     private record PendingCapture(
-            MinecraftSectionModelMesher.SectionModelMesh mesh, long epoch
+            MinecraftSectionModelMesher.SectionModelMesh mesh, long epoch, long generation
     ) {}
 
     public record Snapshot(
