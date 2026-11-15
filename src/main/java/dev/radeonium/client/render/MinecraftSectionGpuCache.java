@@ -90,6 +90,7 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
             evictExcessSections();
         } catch (RuntimeException | Error failure) {
             for (MinecraftMeshGpuUpload upload : layerUploads.values()) upload.close();
+            materials.discardUnreferenced();
             throw failure;
         }
     }
