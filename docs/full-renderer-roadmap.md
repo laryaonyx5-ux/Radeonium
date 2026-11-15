@@ -73,6 +73,8 @@ Milestone B must not begin until the final CI item is green. This milestone does
 - `MinecraftBlockModelMesh` stores copied quad geometry and can filter by vanilla render layer; each copied quad retains its immutable source `BakedQuad`, effective model-part/material AO, tint index and light-emission metadata.
 - `MinecraftMaterialTable` assigns renderer-side material indices while retaining the source Minecraft material metadata for later translation.
 - `SectionMeshBuilder` contains a greedy opaque-voxel mesher for immutable 16×16×16 material snapshots; it merges coplanar faces of equal material and culls faces against any non-air opaque neighbor.
+- `FluidSectionSnapshot` is an immutable 16³ fluid capture with fluid IDs, quantized heights, tint and packed light.
+- `FluidSectionMesher` emits top and side surfaces from the capture, removes shared same-fluid sides and emits only the exposed portion where adjacent fluid heights differ. Tests cover isolated cells, shared sides, stepped fluid heights and defensive copies.
 - `SectionMeshingExecutor` uses a bounded worker queue and reports rejected work instead of running expensive builds on the caller thread.
 - `VoxelSectionSnapshot` supports an immutable 18×18×18 one-cell neighbor halo, allowing correct culling at section borders when the caller supplies all six neighboring edge samples.
 - `SectionMesh` validates the prototype's fixed 28-byte vertex stride and defensively copies its payload.
@@ -84,7 +86,7 @@ Milestone B must not begin until the final CI item is green. This milestone does
 - Resolve context-sensitive block-state variants and multipart model selection for each actual block position, including model hooks that need block entities or neighboring world data.
 - Feed the halo from the six actual neighboring sections and invalidate/rebuild both sides when a boundary block changes; the snapshot API supports the halo, but world capture and invalidation are not yet wired.
 - Complete renderer-side consumption of captured tint values, packed block/sky light, ambient occlusion, emissive behavior, atlas UVs and animated texture references. The current CPU capture retains source metadata/attributes but does not yet evaluate the complete Minecraft lighting and tint pipeline into Radeonium's final vertex format.
-- Integrate fluid surfaces and block-entity/special geometry with explicit unsupported-content fallback.
+- Replace the fluid surface prototype with Minecraft-exact fluid corner-height interpolation, flow direction, overlay, underwater shading, neighbor-section sampling and translucent pipeline integration; current prototype does not implement these semantics. Integrate block-entity/special geometry with explicit unsupported-content fallback.
 - Produce independent per-layer meshes and prove parity against vanilla before switching any terrain layer away from vanilla.
 - Add tests and visual comparison fixtures for model variants, culling, lighting, tint, fluids, resource reloads and all render layers.
 
