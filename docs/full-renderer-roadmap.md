@@ -234,14 +234,14 @@ These counters do not measure frame time, GPU execution, bytes transferred or FP
 
 ## Step 12 — advanced section culling
 
-**Status: Radeonium portal traversal is connected to Minecraft 26.3's compiled section visibility data and filters Radeonium's terrain draw list; automated validation pending in CI and live-client visual/performance validation pending.**
+**Status: implementation, automated tests and GitHub Actions build/test/JAR packaging complete; live-client visual and performance validation pending.**
 
 - `SectionVisibilityGraph` stores the full 6×6 entry-face/exit-face connectivity matrix rather than reducing visibility to a lossy six-bit open-face mask.
 - `RendererSectionTracker` reads the actual `SectionMesh.facesCanSeeEachother` results for each visible compiled section and updates the graph after extraction. Unknown or unavailable mesh visibility is treated as fully connected, which fails open instead of hiding terrain.
 - `RadeoniumChunkSectionsToRender` derives the camera section and filters its draw-list input through the portal graph. It first verifies that every current Minecraft-visible section has a graph entry; if the camera section or any section's visibility data is missing, it keeps the entire Minecraft list unchanged.
 - The source list remains Minecraft's frustum-filtered visible set. Radeonium now applies its own face-connectivity traversal on that set; it does not claim an independent frustum-plane extraction or replace Minecraft's octree/frustum stage.
 - The standalone six-plane positive-vertex AABB culler and in-place filtering tests remain available for a future Radeonium-owned frustum feed.
-- Tests cover plane validation, boundary behavior, face-pair connectivity, graph coverage and fail-open fallback. No FPS improvement is claimed until measured in a live client.
+- Tests cover plane validation, boundary behavior, face-pair connectivity, graph coverage and fail-open fallback. GitHub Actions run 43761837413 passed compilation, all 133 JUnit tests and mod JAR packaging. No FPS improvement is claimed until measured in a live client.
 
 ## What "Radeonium owns the renderer" means
 
