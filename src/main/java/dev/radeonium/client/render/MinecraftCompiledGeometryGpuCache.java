@@ -133,7 +133,7 @@ public final class MinecraftCompiledGeometryGpuCache implements AutoCloseable {
         SectionUpload section = sections.get(position);
         if (section == null) return false;
         LayerUpload upload = section.layers.get(layer);
-        if (upload == null || upload.isEmpty()) return false;
+        if (upload == null || upload.isEmpty() || (upload.indexCount > 0 && upload.indices == null)) return false;
         upload.drawInto(pass);
         return true;
     }
@@ -224,7 +224,7 @@ public final class MinecraftCompiledGeometryGpuCache implements AutoCloseable {
 
         private boolean isEmpty() {
             return vertices == null || vertices.isClosed()
-                    || (indexCount > 0 && (indices == null || indices.isClosed()));
+                    || (indices != null && indices.isClosed());
         }
 
         private long byteSize() {
