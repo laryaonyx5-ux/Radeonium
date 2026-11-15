@@ -6,26 +6,23 @@ import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import net.minecraft.client.renderer.chunk.SectionRenderDispatcher;
 import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
 import net.minecraft.client.renderer.chunk.SectionMesh;
+import net.minecraft.core.Direction;
 import net.minecraft.core.SectionPos;
 
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Bridges Minecraft's live visible-section set into Radeonium's CPU pipeline.
- *
- * The primitive packed-node sets are reused between frames. SectionPos objects
- * are materialized only when the visible set changes, not for every section on
- * every frame.
+ * Bridges Minecraft's visible-section lifecycle and the exact compiled
+ * section face-connectivity matrix into Radeonium's CPU visibility graph.
  */
 public final class RendererSectionTracker {
     private static LongOpenHashSet previous = new LongOpenHashSet();
     private static LongOpenHashSet working = new LongOpenHashSet();
+    private static final long ALL_CONNECTIONS = (1L << 36) - 1L;
 
-    private RendererSectionTracker() {
-    }
+    private RendererSectionTracker() {}
 
-    /** Drops cached section identities when Minecraft unloads the current world. */
     public static void reset() {
         previous.clear();
         working.clear();
@@ -36,35 +33,57 @@ public final class RendererSectionTracker {
             Iterable<SectionRenderDispatcher.RenderSection> sections
     ) {
         working.clear();
-        for (SectionRenderDispatcher.RenderSection section : sections) {
-            working.add(section.getSectionNode());
-        }
+        for (SectionRenderDispatcher.RenderSection section : sections) working.add(section.getSectionNode());
 
         if (!working.equals(previous)) {
-            List<dev.radeonium.client.render.SectionPos> snapshot =
-                    new ArrayList<>(working.size());
+            List<dev.radeonium.client.render.SectionPos> snapshot = new ArrayList<>(working.size());
             LongIterator iterator = working.iterator();
             while (iterator.hasNext()) {
                 SectionPos position = SectionPos.of(iterator.nextLong());
                 snapshot.add(new dev.radeonium.client.render.SectionPos(
-                        position.x(), position.y(), position.z()
-                ));
+                        position.x(), position.y(), position.z()));
             }
-
             RadeoniumClient.rendererPipeline().syncVisibleSections(snapshot);
-
             LongOpenHashSet oldPrevious = previous;
             previous = working;
             working = oldPrevious;
         }
-
         working.clear();
     }
 
+    private static Direction direction(SectionFace face) {
+        return switch (face) {
+            case DOWN -> Direction.DOWN;
+            case UP -> Direction.UP;
+            case NORTH -> Direction.NORTH;
+            case SOUTH -> Direction.SOUTH;
+            case WEST -> Direction.WEST;
+            case EAST -> Direction.EAST;
+        };
+    }
+
     /**
-     * Copies stable metadata from Minecraft's compiled mesh after extraction.
-     * The SectionMesh and its GPU resources remain owned by vanilla.
+     * Minecraft exposes the compiled VisibilitySet through SectionMesh.
+     * Unknown/uncompiled meshes are treated as fully connected so missing
+     * metadata can never hide terrain.
      */
+    private static long visibilityConnections(SectionMesh mesh) {
+        if (mesh == null) return ALL_CONNECTIONS;
+        long mask = 0L;
+        try {
+            for (SectionFace entry : SectionFace.values()) {
+                for (SectionFace exit : SectionFace.values()) {
+                    if (mesh.facesCanSeeEachother(direction(entry), direction(exit))) {
+                        mask |= 1L << (entry.ordinal() * 6 + exit.ordinal());
+                    }
+                }
+            }
+            return mask;
+        } catch (RuntimeException unavailableVisibility) {
+            return ALL_CONNECTIONS;
+        }
+    }
+
     public static void captureCompiledMeshes(
             Iterable<SectionRenderDispatcher.RenderSection> sections
     ) {
@@ -74,6 +93,10 @@ public final class RendererSectionTracker {
             SectionPos position = SectionPos.of(packed);
             dev.radeonium.client.render.SectionPos radeoniumPosition =
                     new dev.radeonium.client.render.SectionPos(position.x(), position.y(), position.z());
+
+            RadeoniumClient.rendererPipeline().updateVisibilityConnections(
+                    radeoniumPosition, visibilityConnections(mesh));
+
             if (mesh == null) {
                 RadeoniumClient.rendererPipeline().forgetVanillaMesh(radeoniumPosition);
                 continue;
@@ -97,7 +120,6 @@ public final class RendererSectionTracker {
         }
     }
 
-
     static List<dev.radeonium.client.render.SectionPos> affectedSectionsForDirty(
             int sectionX, int sectionY, int sectionZ
     ) {
@@ -110,9 +132,6 @@ public final class RendererSectionTracker {
     }
 
     public static void markSectionDirty(int sectionX, int sectionY, int sectionZ) {
-        // A changed section may alter face occlusion in any neighboring section.
-        // Invalidate the CPU snapshot as well as its queued GPU upload: otherwise
-        // the removal drain would see a still-current snapshot and keep stale GPU data.
         for (dev.radeonium.client.render.SectionPos affected :
                 affectedSectionsForDirty(sectionX, sectionY, sectionZ)) {
             RadeoniumClient.rendererPipeline().markDirty(affected);
