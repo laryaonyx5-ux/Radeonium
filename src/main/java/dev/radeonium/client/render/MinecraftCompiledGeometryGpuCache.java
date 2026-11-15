@@ -108,7 +108,7 @@ public final class MinecraftCompiledGeometryGpuCache implements AutoCloseable {
         if (upload == null || upload.isEmpty()) return null;
         return new LayerBuffers(
                 upload.vertices, upload.indices, upload.indexType,
-                upload.vertexCount, upload.indexCount
+                upload.vertexCount, upload.indexCount, upload.vertexFormat, upload.topology
         );
     }
 
@@ -117,7 +117,9 @@ public final class MinecraftCompiledGeometryGpuCache implements AutoCloseable {
             GpuBuffer indexBuffer,
             IndexType indexType,
             int vertexCount,
-            int indexCount
+            int indexCount,
+            String vertexFormat,
+            String topology
     ) {}
 
     public synchronized int sectionCount() { return sections.size(); }
