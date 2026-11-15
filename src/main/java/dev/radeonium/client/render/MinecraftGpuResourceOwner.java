@@ -182,7 +182,7 @@ public final class MinecraftGpuResourceOwner implements AutoCloseable {
         private final byte[] bytes;
         private final int hash;
 
-        private ByteArrayKey(byte[] bytes) {
+        ByteArrayKey(byte[] bytes) {
             this.bytes = bytes.clone();
             this.hash = Arrays.hashCode(this.bytes);
         }
