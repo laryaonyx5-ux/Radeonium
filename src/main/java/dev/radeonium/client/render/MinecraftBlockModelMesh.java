@@ -61,6 +61,7 @@ public final class MinecraftBlockModelMesh {
         private final BakedQuad.MaterialInfo material;
         private final BakedQuad sourceQuad;
         private final boolean partAmbientOcclusion;
+        private final int tintColor;
 
         Quad(
                 float[] positions,
@@ -69,7 +70,8 @@ public final class MinecraftBlockModelMesh {
                 ChunkSectionLayer layer,
                 BakedQuad.MaterialInfo material,
                 BakedQuad sourceQuad,
-                boolean partAmbientOcclusion
+                boolean partAmbientOcclusion,
+                int tintColor
         ) {
             if (positions == null || packedUv == null || positions.length != 12 || packedUv.length != 4) {
                 throw new IllegalArgumentException("A baked quad needs four positions and four UV pairs");
@@ -89,6 +91,7 @@ public final class MinecraftBlockModelMesh {
             this.material = material;
             this.sourceQuad = sourceQuad;
             this.partAmbientOcclusion = partAmbientOcclusion;
+            this.tintColor = tintColor;
         }
 
         public float[] copyPositions() {
@@ -132,6 +135,9 @@ public final class MinecraftBlockModelMesh {
         public boolean isTinted() {
             return material.isTinted();
         }
+
+        /** Captured ARGB tint; -1 when this quad has no resolved tint source. */
+        public int tintColor() { return tintColor; }
 
         /**
          * Writes two triangles in the vertex format used by
