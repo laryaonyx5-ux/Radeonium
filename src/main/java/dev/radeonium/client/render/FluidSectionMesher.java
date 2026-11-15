@@ -79,9 +79,17 @@ public final class FluidSectionMesher {
      */
     private static float cornerHeight(FluidSectionSnapshot snapshot, short id,
                                       int cornerX, int y, int cornerZ) {
-        if (y < 15 && snapshot.fluidId(
-                clamp(cornerX, 0, 15), y + 1, clamp(cornerZ, 0, 15)) == id) {
-            return 1.0f;
+        if (y < 15) {
+            for (int dx = -1; dx <= 0; dx++) {
+                for (int dz = -1; dz <= 0; dz++) {
+                    int x = cornerX + dx;
+                    int z = cornerZ + dz;
+                    if (x >= 0 && x < 16 && z >= 0 && z < 16
+                            && snapshot.fluidId(x, y + 1, z) == id) {
+                        return 1.0f;
+                    }
+                }
+            }
         }
         float weightedHeight = 0.0f;
         int totalWeight = 0;
@@ -100,9 +108,6 @@ public final class FluidSectionMesher {
         return totalWeight == 0 ? 0.0f : weightedHeight / totalWeight;
     }
 
-    private static int clamp(int value, int min, int max) {
-        return Math.max(min, Math.min(max, value));
-    }
 
     private static void add(List<FluidQuad> out, short id, int tint, int light,
                             float nx, float ny, float nz,
