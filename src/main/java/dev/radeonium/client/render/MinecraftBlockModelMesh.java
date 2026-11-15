@@ -4,8 +4,6 @@ import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
 import net.minecraft.client.resources.model.geometry.BakedQuad;
 import net.minecraft.core.Direction;
 
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.nio.ByteBuffer;
 
@@ -20,7 +18,8 @@ public final class MinecraftBlockModelMesh {
     private final List<Quad> quads;
 
     MinecraftBlockModelMesh(List<Quad> quads) {
-        this.quads = Collections.unmodifiableList(new ArrayList<>(quads));
+        if (quads == null) throw new IllegalArgumentException("quads cannot be null");
+        this.quads = List.copyOf(quads);
     }
 
     public List<Quad> quads() {
@@ -71,8 +70,16 @@ public final class MinecraftBlockModelMesh {
                 BakedQuad sourceQuad,
                 boolean partAmbientOcclusion
         ) {
-            if (positions.length != 12 || packedUv.length != 4) {
+            if (positions == null || packedUv == null || positions.length != 12 || packedUv.length != 4) {
                 throw new IllegalArgumentException("A baked quad needs four positions and four UV pairs");
+            }
+            if (layer == null || material == null || sourceQuad == null) {
+                throw new IllegalArgumentException("A baked quad needs layer, material and source data");
+            }
+            for (float coordinate : positions) {
+                if (!Float.isFinite(coordinate)) {
+                    throw new IllegalArgumentException("Baked quad positions must be finite");
+                }
             }
             this.positions = positions.clone();
             this.packedUv = packedUv.clone();
