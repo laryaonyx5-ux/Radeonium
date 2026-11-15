@@ -277,6 +277,14 @@ public final class MinecraftFluidSectionMesher {
     public static final class SectionFluidMesh {
         private final Map<ChunkSectionLayer, FluidLayerMesh> layers;
 
+        public static SectionFluidMesh empty() {
+            EnumMap<ChunkSectionLayer, FluidLayerMesh> empty = new EnumMap<>(ChunkSectionLayer.class);
+            for (ChunkSectionLayer layer : ChunkSectionLayer.values()) {
+                empty.put(layer, new FluidLayerMesh(layer, List.of()));
+            }
+            return new SectionFluidMesh(empty);
+        }
+
         private SectionFluidMesh(Map<ChunkSectionLayer, FluidLayerMesh> layers) {
             this.layers = Map.copyOf(layers);
         }
