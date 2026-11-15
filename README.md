@@ -177,3 +177,14 @@ This connects the baked-model mesher to the GPU upload owner through a section c
 - Adds a section-cache batch entry point that binds the supplied compiled pipeline once and submits each non-empty cached section.
 - The caller remains responsible for creating the correct pass, binding uniforms/atlas resources, supplying the camera transform, and preserving SOLID/CUTOUT/TRANSLUCENT ordering.
 - This is a real RenderPearl draw-command path, but it is not yet injected into Minecraft's live terrain frame graph and does not replace vanilla terrain rendering. No FPS gain is claimed.
+
+
+### Live terrain path — 2026-11-15 implementation update
+- Registers the `SectionCompilerMixin` that captures real compiled Minecraft section layers.
+- Guards worker captures with per-section generations so late results cannot replace newer geometry.
+- Copies full compiled vertex/index streams and their draw metadata into a bounded CPU snapshot store.
+- Uploads current snapshots into Radeonium-owned RenderPearl buffers on the render thread.
+- Builds Radeonium's own per-layer `ChunkSectionsToRender` draw list and uses the Radeonium buffers when available; missing, stale or sequential-index-incompatible uploads fall back to the live vanilla section slice.
+- Submits the prepared layer draw list through the existing Minecraft frame-graph contract.
+
+**Scope and validation:** Radeonium now owns a connected section capture → GPU upload → per-layer draw-list path. Minecraft still owns the frame graph, layer pipelines/shaders and transparency/OIT scheduling. CI compilation and JAR packaging are validated; launching Minecraft 26.3, testing OpenGL/Vulkan, checking all terrain types and measuring FPS remain required before calling the renderer complete or claiming performance gains.
