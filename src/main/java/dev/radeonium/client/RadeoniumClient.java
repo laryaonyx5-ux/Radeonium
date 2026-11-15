@@ -18,7 +18,7 @@ import net.minecraft.client.KeyMapping;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
-import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ArrayBlockingQueue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,11 +31,17 @@ public final class RadeoniumClient implements ClientModInitializer {
     private static final MinecraftCompiledGeometryGpuCache COMPILED_GEOMETRY_GPU_CACHE =
             new MinecraftCompiledGeometryGpuCache();
     private static ClientLevel trackedWorld;
-    private static final ConcurrentLinkedQueue<MinecraftCompiledGeometryStore.Snapshot> PENDING_GEOMETRY_UPLOADS =
-            new ConcurrentLinkedQueue<>();
+    // Match the CPU/GPU section-cache bound: worker bursts must never create an unbounded backlog.
+    private static final int MAX_PENDING_GEOMETRY_UPLOADS = 128;
+    private static final ArrayBlockingQueue<MinecraftCompiledGeometryStore.Snapshot> PENDING_GEOMETRY_UPLOADS =
+            new ArrayBlockingQueue<>(MAX_PENDING_GEOMETRY_UPLOADS);
 
     public static void queueCompiledGeometryUpload(MinecraftCompiledGeometryStore.Snapshot snapshot) {
-        if (snapshot != null) PENDING_GEOMETRY_UPLOADS.add(snapshot);
+        if (snapshot == null) return;
+        // Keep the newest compiled sections when workers outpace the render-thread upload budget.
+        while (!PENDING_GEOMETRY_UPLOADS.offer(snapshot)) {
+            PENDING_GEOMETRY_UPLOADS.poll();
+        }
     }
 
     private static void drainCompiledGeometryUploads() {
