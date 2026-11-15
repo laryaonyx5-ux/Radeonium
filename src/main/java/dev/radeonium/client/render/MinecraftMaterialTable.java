@@ -134,6 +134,14 @@ public final class MinecraftMaterialTable {
         return materials.stream().filter(java.util.Objects::nonNull).toList();
     }
 
+    /** Immutable shader-facing binding plans for every currently live material. */
+    public synchronized List<TerrainMaterialBinding> shaderBindings() {
+        return materials.stream()
+                .filter(java.util.Objects::nonNull)
+                .map(TerrainMaterialBinding::from)
+                .toList();
+    }
+
     public synchronized void clear() {
         indices.clear();
         materials.clear();
