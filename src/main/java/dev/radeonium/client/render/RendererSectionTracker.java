@@ -112,14 +112,16 @@ public final class RendererSectionTracker {
     public static void markSectionDirty(int sectionX, int sectionY, int sectionZ) {
         dev.radeonium.client.render.SectionPos dirty =
                 new dev.radeonium.client.render.SectionPos(sectionX, sectionY, sectionZ);
-        RadeoniumClient.rendererPipeline().markDirty(dirty);
         // A changed section may alter face occlusion in any neighboring section.
-        // Remove those optional meshes immediately; vanilla remains the fallback
-        // until Minecraft naturally rebuilds and Radeonium captures them again.
+        // Invalidate the CPU snapshot as well as its queued GPU upload: otherwise
+        // the removal drain would see a still-current snapshot and keep stale GPU data.
         for (dev.radeonium.client.render.SectionPos affected :
                 affectedSectionsForDirty(sectionX, sectionY, sectionZ)) {
-            RadeoniumClient.queueSectionModelRemoval(
-                    net.minecraft.core.SectionPos.of(affected.x(), affected.y(), affected.z()));
+            RadeoniumClient.rendererPipeline().markDirty(affected);
+            net.minecraft.core.SectionPos minecraftPosition =
+                    net.minecraft.core.SectionPos.of(affected.x(), affected.y(), affected.z());
+            MinecraftSectionModelCaptureStore.remove(minecraftPosition);
+            RadeoniumClient.queueSectionModelRemoval(minecraftPosition);
         }
     }
 }
