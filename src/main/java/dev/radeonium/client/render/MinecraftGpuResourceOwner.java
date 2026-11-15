@@ -191,6 +191,10 @@ public final class MinecraftGpuResourceOwner implements AutoCloseable {
             return references == 0;
         }
 
+        long bytes() {
+            return bytes;
+        }
+
         int referenceCount() {
             return references;
         }
