@@ -234,13 +234,14 @@ These counters do not measure frame time, GPU execution, bytes transferred or FP
 
 ## Step 12 — advanced section culling
 
-**Status: conservative culling core and automated tests implemented; live renderer integration and occlusion data feed pending.**
+**Status: Radeonium portal traversal is connected to Minecraft 26.3's compiled section visibility data and filters Radeonium's terrain draw list; automated validation pending in CI and live-client visual/performance validation pending.**
 
-- Adds a six-plane positive-vertex AABB test for 16×16×16 sections; rejects only sections wholly outside a plane.
-- Adds in-place list filtering and a pipeline API combining portal-graph reachability with frustum intersection.
-- Tests cover plane validation, inside/boundary/outside sections, list filtering, portal connectivity and combined visibility.
-- The active draw-list builder still uses Minecraft's already-frustum/occlusion-filtered visible-section list. Radeonium does not yet extract its own runtime frustum planes or derive trusted open-face masks from compiled section occlusion data. Its graph masks default to closed until a reliable feed is connected.
-- No runtime draw-count or FPS improvement is claimed. In-game checks are required before replacing Minecraft's visibility decisions.
+- `SectionVisibilityGraph` stores the full 6×6 entry-face/exit-face connectivity matrix rather than reducing visibility to a lossy six-bit open-face mask.
+- `RendererSectionTracker` reads the actual `SectionMesh.facesCanSeeEachother` results for each visible compiled section and updates the graph after extraction. Unknown or unavailable mesh visibility is treated as fully connected, which fails open instead of hiding terrain.
+- `RadeoniumChunkSectionsToRender` derives the camera section and filters its draw-list input through the portal graph. It first verifies that every current Minecraft-visible section has a graph entry; if the camera section or any section's visibility data is missing, it keeps the entire Minecraft list unchanged.
+- The source list remains Minecraft's frustum-filtered visible set. Radeonium now applies its own face-connectivity traversal on that set; it does not claim an independent frustum-plane extraction or replace Minecraft's octree/frustum stage.
+- The standalone six-plane positive-vertex AABB culler and in-place filtering tests remain available for a future Radeonium-owned frustum feed.
+- Tests cover plane validation, boundary behavior, face-pair connectivity, graph coverage and fail-open fallback. No FPS improvement is claimed until measured in a live client.
 
 ## What "Radeonium owns the renderer" means
 
