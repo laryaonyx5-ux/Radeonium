@@ -40,6 +40,19 @@ class MinecraftGpuResourceOwnerTest {
                 () -> new MinecraftGpuResourceOwner.ByteArrayKey(null));
     }
 
+
+    @Test
+    void ownerRejectsLiveUploadsCreatedElsewhere() {
+        MinecraftGpuResourceOwner owner = new MinecraftGpuResourceOwner(() -> {});
+        MinecraftMeshGpuUpload foreign =
+                MinecraftMeshGpuUpload.forTesting(4, 32L, () -> {});
+
+        assertThrows(IllegalArgumentException.class, () -> owner.release(foreign));
+        assertFalse(foreign.isClosed());
+        assertEquals(0, owner.allocationCount());
+        assertEquals(0L, owner.allocatedBytes());
+    }
+
     @Test
     void ownerTracksAndReleasesOnlyItsOwnUpload() {
         AtomicInteger closeCalls = new AtomicInteger();
