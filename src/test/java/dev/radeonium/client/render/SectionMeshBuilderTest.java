@@ -48,8 +48,8 @@ class SectionMeshBuilderTest {
     @Test
     void neighborHaloCullsFacesAtSectionBoundary() {
         short[] halo = new short[VoxelSectionSnapshot.HALO_VOLUME];
-        halo[haloIndex(15, 8, 8)] = 3; // target section x=15
-        halo[haloIndex(16, 8, 8)] = 9; // adjacent section x=16
+        halo[haloIndex(16, 9, 9)] = 3; // target section x=15
+        halo[haloIndex(17, 9, 9)] = 9; // adjacent section x=16
         VoxelSectionSnapshot snapshot = VoxelSectionSnapshot.withNeighborHalo(halo);
 
         SectionMesh mesh = builder.build(snapshot);
