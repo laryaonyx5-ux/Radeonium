@@ -159,7 +159,7 @@ public final class MinecraftBlockModelMesh {
          * Writes two triangles in the vertex format used by
          * MinecraftMeshGpuUpload: float3 position + packed UV split into ints.
          */
-        void writeTriangleVertices(ByteBuffer target) {
+        void writeTriangleVertices(ByteBuffer target, int materialIndex) {
             int[] order = {0, 1, 2, 0, 2, 3};
             for (int vertex : order) {
                 int offset = vertex * 3;
@@ -172,6 +172,7 @@ public final class MinecraftBlockModelMesh {
                 target.putInt(packedLightCoords);
                 target.putInt(vertexColors[vertex]);
                 target.putInt(vertexLightCoords[vertex]);
+                target.putInt(materialIndex);
             }
         }
     }
