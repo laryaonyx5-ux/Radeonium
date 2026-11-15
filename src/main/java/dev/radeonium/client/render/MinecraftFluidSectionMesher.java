@@ -49,11 +49,14 @@ public final class MinecraftFluidSectionMesher {
                     FluidState fluidState = blockState.getFluidState();
                     if (fluidState.isEmpty()) continue;
 
+                    final int blockX = x;
+                    final int blockY = y;
+                    final int blockZ = z;
                     EnumMap<ChunkSectionLayer, FluidVertexCollector> collectors =
                             new EnumMap<>(ChunkSectionLayer.class);
                     FluidRenderer.Output output = layer -> collectors.computeIfAbsent(
                             layer, ignored -> new FluidVertexCollector(
-                                    layer, x, y, z, originX, originY, originZ
+                                    layer, blockX, blockY, blockZ, originX, originY, originZ
                             )
                     );
                     renderer.tesselate(region, position, output, blockState, fluidState);
