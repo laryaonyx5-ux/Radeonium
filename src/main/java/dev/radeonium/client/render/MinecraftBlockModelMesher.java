@@ -10,80 +10,60 @@ import org.joml.Vector3fc;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
- * Resolves Minecraft's baked block-state model into Radeonium-owned CPU
- * geometry. The model's collectParts implementation is responsible for
- * selecting variants, weighted alternatives and multipart pieces.
- *
- * This adapter uses the vanilla RandomSource-only contract. Models whose
- * geometry depends on live level/block-entity context must be resolved by a
- * game-thread adapter with an immutable context snapshot before calling
- * build(List); Radeonium workers must never receive a live world object.
+ * Copies already-selected Minecraft baked model parts into immutable
+ * Radeonium geometry. World-dependent tint and lighting are captured before
+ * this class runs on the meshing worker.
  */
 public final class MinecraftBlockModelMesher {
-    /**
-     * Resolves the selected baked parts for a stable per-block seed and then
-     * copies their quads into Radeonium-owned storage. Call once per block
-     * state/position; use a position-derived seed to match Minecraft's
-     * deterministic chunk-model selection.
-     */
     public MinecraftBlockModelMesh build(BlockStateModel model, long seed) {
-        if (model == null) {
-            throw new IllegalArgumentException("model cannot be null");
-        }
-
+        if (model == null) throw new IllegalArgumentException("model cannot be null");
         List<BlockStateModelPart> parts = new ArrayList<>();
         model.collectParts(RandomSource.create(seed), parts);
-        return build(parts, java.util.Map.of(), -1, java.util.Map.of());
+        return build(parts);
     }
 
-    /**
-     * Copies already-resolved parts. This overload is also the integration
-     * point for context-aware Fabric model adapters that need a captured
-     * level/position/state snapshot to select their parts.
-     */
     public MinecraftBlockModelMesh build(List<BlockStateModelPart> modelParts) {
-        return build(modelParts, java.util.Map.of(), -1, java.util.Map.of());
+        return build(modelParts, Map.of(), -1, Map.of());
     }
 
-    /** Copies resolved parts with per-tint-index colors captured on the compiler thread. */
     public MinecraftBlockModelMesh build(
-            List<BlockStateModelPart> modelParts, java.util.Map<Integer, Integer> tintColors,
-            int packedLightCoords,
-            java.util.Map<BakedQuad, MinecraftSectionModelMesher.CapturedQuadLighting> quadLighting
+            List<BlockStateModelPart> modelParts, Map<Integer, Integer> tintColors
     ) {
-        return build(modelParts, tintColors, packedLightCoords, java.util.Map.of());
+        return build(modelParts, tintColors, -1, Map.of());
     }
 
-    /** Copies precomputed Minecraft per-vertex lighting without retaining the live region. */
     public MinecraftBlockModelMesh build(
-            List<BlockStateModelPart> modelParts, java.util.Map<Integer, Integer> tintColors,
-            int packedLightCoords,
-            java.util.Map<BakedQuad, MinecraftSectionModelMesher.CapturedQuadLighting> quadLighting
-    ) {
-        return build(modelParts, tintColors, -1, java.util.Map.of());
-    }
-
-    /** Copies resolved geometry with captured tint and packed light inputs. */
-    public MinecraftBlockModelMesh build(
-            List<BlockStateModelPart> modelParts, java.util.Map<Integer, Integer> tintColors,
+            List<BlockStateModelPart> modelParts,
+            Map<Integer, Integer> tintColors,
             int packedLightCoords
     ) {
+        return build(modelParts, tintColors, packedLightCoords, Map.of());
+    }
+
+    /** Copies baked geometry with tint, lightmap and per-vertex AO already resolved. */
+    public MinecraftBlockModelMesh build(
+            List<BlockStateModelPart> modelParts,
+            Map<Integer, Integer> tintColors,
+            int packedLightCoords,
+            Map<BakedQuad, MinecraftSectionModelMesher.CapturedQuadLighting> quadLighting
+    ) {
         if (modelParts == null || tintColors == null || quadLighting == null) {
-            throw new IllegalArgumentException("modelParts cannot be null");
+            throw new IllegalArgumentException("modelParts, tintColors and quadLighting are required");
         }
 
         List<MinecraftBlockModelMesh.Quad> quads = new ArrayList<>();
         for (BlockStateModelPart part : modelParts) {
             if (part == null) continue;
-
-            appendQuads(quads, part.getQuads(null), part.useAmbientOcclusion(), tintColors, packedLightCoords, quadLighting);
+            appendQuads(quads, part.getQuads(null), part.useAmbientOcclusion(),
+                    tintColors, packedLightCoords, quadLighting);
             for (Direction direction : Direction.values()) {
-                appendQuads(quads, part.getQuads(direction), part.useAmbientOcclusion(), tintColors);
+                appendQuads(quads, part.getQuads(direction), part.useAmbientOcclusion(),
+                        tintColors, packedLightCoords, quadLighting);
             }
         }
-
         return new MinecraftBlockModelMesh(quads);
     }
 
@@ -91,7 +71,9 @@ public final class MinecraftBlockModelMesher {
             List<MinecraftBlockModelMesh.Quad> output,
             List<BakedQuad> source,
             boolean partAmbientOcclusion,
-            java.util.Map<Integer, Integer> tintColors
+            Map<Integer, Integer> tintColors,
+            int packedLightCoords,
+            Map<BakedQuad, MinecraftSectionModelMesher.CapturedQuadLighting> quadLighting
     ) {
         if (source == null || source.isEmpty()) return;
 
@@ -100,7 +82,6 @@ public final class MinecraftBlockModelMesher {
             Vector3fc p1 = quad.position(1);
             Vector3fc p2 = quad.position(2);
             Vector3fc p3 = quad.position(3);
-
             float[] positions = {
                     p0.x(), p0.y(), p0.z(),
                     p1.x(), p1.y(), p1.z(),
@@ -108,26 +89,23 @@ public final class MinecraftBlockModelMesher {
                     p3.x(), p3.y(), p3.z()
             };
             long[] packedUv = {
-                    quad.packedUV(0),
-                    quad.packedUV(1),
-                    quad.packedUV(2),
-                    quad.packedUV(3)
+                    quad.packedUV(0), quad.packedUV(1),
+                    quad.packedUV(2), quad.packedUV(3)
             };
 
             BakedQuad.MaterialInfo material = quad.materialInfo();
-            ChunkSectionLayer layer = material.layer();
+            MinecraftSectionModelMesher.CapturedQuadLighting captured = quadLighting.get(quad);
+            int[] colors = captured == null
+                    ? new int[]{-1, -1, -1, -1} : captured.colors();
+            int[] lightCoords = captured == null
+                    ? new int[]{packedLightCoords, packedLightCoords, packedLightCoords, packedLightCoords}
+                    : captured.lightCoords();
+
             output.add(new MinecraftBlockModelMesh.Quad(
-                    positions,
-                    packedUv,
-                    quad.direction(),
-                    layer,
-                    material,
-                    quad,
+                    positions, packedUv, quad.direction(), material.layer(), material, quad,
                     partAmbientOcclusion,
                     tintColors.getOrDefault(material.tintIndex(), -1),
-                    packedLightCoords,
-                    quadLighting.containsKey(quad) ? quadLighting.get(quad).colors() : new int[]{-1, -1, -1, -1},
-                    quadLighting.containsKey(quad) ? quadLighting.get(quad).lightCoords() : new int[]{packedLightCoords, packedLightCoords, packedLightCoords, packedLightCoords}
+                    packedLightCoords, colors, lightCoords
             ));
         }
     }
