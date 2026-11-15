@@ -71,6 +71,7 @@ public final class MinecraftGpuResourceOwner implements AutoCloseable {
 
     MinecraftMeshGpuUpload track(MinecraftMeshGpuUpload upload, ByteArrayKey key) {
         renderThreadCheck.run();
+        ensureOpen();
         if (upload == null) throw new IllegalArgumentException("upload cannot be null");
         if (upload.isEmpty()) return upload;
         if (upload.isClosed()) throw new IllegalArgumentException("cannot track a closed GPU upload");
