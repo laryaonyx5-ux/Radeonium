@@ -10,6 +10,7 @@ import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.client.renderer.block.dispatch.BlockStateModel;
 import net.minecraft.client.renderer.block.dispatch.BlockStateModelPart;
 import net.minecraft.client.renderer.block.BlockModelLighter;
+import com.mojang.blaze3d.vertex.QuadInstance;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.color.block.BlockTintSource;
 import net.minecraft.client.resources.model.geometry.BakedQuad;
@@ -51,6 +52,49 @@ public final class MinecraftSectionModelMesher {
     ) {
         CapturedSectionInput captured = captureInputs(sectionPos, region, modelSet);
         return buildResolved(captured.blocks()).withUnsupportedBlockEntityCount(captured.unsupportedBlockEntityCount());
+    }
+
+    private static Map<BakedQuad, CapturedQuadLighting> captureQuadLighting(
+            BlockState state, BlockPos position, RenderSectionRegion region,
+            List<BlockStateModelPart> parts, int packedLightCoords, boolean ambientOcclusionEnabled
+    ) {
+        Map<BakedQuad, CapturedQuadLighting> lighting = new java.util.IdentityHashMap<>();
+        for (BlockStateModelPart part : parts) {
+            if (part == null) continue;
+            captureQuadLighting(lighting, part.getQuads(null), part.useAmbientOcclusion() && ambientOcclusionEnabled,
+                    state, position, region, packedLightCoords);
+            for (Direction direction : Direction.values()) {
+                captureQuadLighting(lighting, part.getQuads(direction),
+                        part.useAmbientOcclusion() && ambientOcclusionEnabled,
+                        state, position, region, packedLightCoords);
+            }
+        }
+        return java.util.Collections.unmodifiableMap(lighting);
+    }
+
+    private static void captureQuadLighting(
+            Map<BakedQuad, CapturedQuadLighting> lighting, List<BakedQuad> quads,
+            boolean useAmbientOcclusion, BlockState state, BlockPos position,
+            RenderSectionRegion region, int packedLightCoords
+    ) {
+        if (quads == null) return;
+        BlockModelLighter lighter = new BlockModelLighter();
+        for (BakedQuad quad : quads) {
+            QuadInstance instance = new QuadInstance();
+            if (useAmbientOcclusion) {
+                lighter.prepareQuadAmbientOcclusion(region, state, position, quad, instance);
+            } else {
+                lighter.prepareQuadFlat(region, state, position, packedLightCoords, quad, instance);
+            }
+            int[] colors = new int[4];
+            int[] lightCoords = new int[4];
+            for (int vertex = 0; vertex < 4; vertex++) {
+                colors[vertex] = instance.getColor(vertex);
+                lightCoords[vertex] = instance.getLightCoordsWithEmission(
+                        vertex, quad.materialInfo().lightEmission());
+            }
+            lighting.put(quad, new CapturedQuadLighting(colors, lightCoords));
+        }
     }
 
     private static Map<Integer, Integer> captureTintColors(
@@ -108,6 +152,9 @@ public final class MinecraftSectionModelMesher {
             blockModel.collectParts(net.minecraft.util.RandomSource.create(state.getSeed(pos)), selectedParts);
             Map<Integer, Integer> tintColors = captureTintColors(state, pos, region, selectedParts);
             int packedLightCoords = blockLighter.getLightCoords(state, region, pos);
+            Map<BakedQuad, CapturedQuadLighting> quadLighting = captureQuadLighting(
+                    state, pos, region, selectedParts, packedLightCoords,
+                    Minecraft.getInstance().options.ambientOcclusion().get());
             resolved.add(new ResolvedBlockInput(selectedParts, x, y, z,
                     state.skipRendering(states[haloIndex(x, y - 1, z)], Direction.DOWN),
                     state.skipRendering(states[haloIndex(x, y + 1, z)], Direction.UP),
@@ -115,7 +162,7 @@ public final class MinecraftSectionModelMesher {
                     state.skipRendering(states[haloIndex(x, y, z + 1)], Direction.SOUTH),
                     state.skipRendering(states[haloIndex(x - 1, y, z)], Direction.WEST),
                     state.skipRendering(states[haloIndex(x + 1, y, z)], Direction.EAST),
-                    tintColors, packedLightCoords));
+                    tintColors, packedLightCoords, quadLighting));
         }
         return new CapturedSectionInput(resolved, blockEntities);
     }
@@ -154,7 +201,7 @@ public final class MinecraftSectionModelMesher {
 
         for (ResolvedBlockInput input : blocks) {
             if (input == null) continue;
-            MinecraftBlockModelMesh blockMesh = blockMesher.build(input.parts(), input.tintColors(), input.packedLightCoords());
+            MinecraftBlockModelMesh blockMesh = blockMesher.build(input.parts(), input.tintColors(), input.packedLightCoords(), input.quadLighting());
             for (MinecraftBlockModelMesh.Quad quad : blockMesh.quads()) {
                 Direction face = quad.direction();
                 if (face != null && input.neighborOccludes(face)
@@ -174,7 +221,8 @@ public final class MinecraftSectionModelMesher {
                         .add(new MinecraftBlockModelMesh.Quad(
                                 positions, quad.copyPackedUv(), quad.direction(),
                                 quad.layer(), quad.material(), quad.sourceQuad(),
-                                quad.ambientOcclusion(), quad.tintColor(), quad.packedLightCoords()));
+                                quad.ambientOcclusion(), quad.tintColor(), quad.packedLightCoords(),
+                                quad.copyVertexColors(), quad.copyVertexLightCoords()));
             }
         }
 
@@ -204,6 +252,19 @@ public final class MinecraftSectionModelMesher {
             }
         }
         return true;
+    }
+
+    /** Immutable per-vertex lighting result from Minecraft's BlockModelLighter. */
+    public record CapturedQuadLighting(int[] colors, int[] lightCoords) {
+        public CapturedQuadLighting {
+            if (colors == null || lightCoords == null || colors.length != 4 || lightCoords.length != 4) {
+                throw new IllegalArgumentException("quad lighting needs four colors and four light values");
+            }
+            colors = colors.clone();
+            lightCoords = lightCoords.clone();
+        }
+        @Override public int[] colors() { return colors.clone(); }
+        @Override public int[] lightCoords() { return lightCoords.clone(); }
     }
 
     /** Immutable, worker-safe result of section input capture. */
@@ -243,12 +304,14 @@ public final class MinecraftSectionModelMesher {
             boolean northOccluded, boolean southOccluded,
             boolean westOccluded, boolean eastOccluded,
             Map<Integer, Integer> tintColors,
-            int packedLightCoords
+            int packedLightCoords,
+            Map<BakedQuad, CapturedQuadLighting> quadLighting
     ) {
         public ResolvedBlockInput {
-            if (parts == null || tintColors == null) throw new IllegalArgumentException("parts and tintColors cannot be null");
+            if (parts == null || tintColors == null || quadLighting == null) throw new IllegalArgumentException("captured block inputs cannot be null");
             parts = List.copyOf(parts);
             tintColors = Map.copyOf(tintColors);
+            quadLighting = Map.copyOf(quadLighting);
             validateCoordinates(localX, localY, localZ);
         }
 
@@ -270,7 +333,7 @@ public final class MinecraftSectionModelMesher {
             model.collectParts(net.minecraft.util.RandomSource.create(modelSeed), selectedParts);
             return new ResolvedBlockInput(selectedParts, localX, localY, localZ,
                     downOccluded, upOccluded, northOccluded, southOccluded,
-                    westOccluded, eastOccluded, Map.of(), -1);
+                    westOccluded, eastOccluded, Map.of(), -1, Map.of());
         }
 
         boolean neighborOccludes(Direction direction) {
