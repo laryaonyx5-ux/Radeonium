@@ -15,13 +15,15 @@ import java.util.Objects;
 public final class MinecraftSectionModelCaptureStore {
     private static final int MAX_SECTIONS = 64;
     private static final int MAX_RETAINED_QUADS = 250_000;
+    private static final int MAX_ACTIVE_CAPTURES = 256;
 
     private static final LinkedHashMap<SectionPos, Snapshot> SNAPSHOTS =
             new LinkedHashMap<>(32, 0.75f, true);
     private static int retainedQuads;
     private static long epoch;
     private static long nextGeneration;
-    private static final Map<SectionPos, Long> CAPTURE_GENERATIONS = new HashMap<>();
+    private static final LinkedHashMap<SectionPos, Long> CAPTURE_GENERATIONS =
+            new LinkedHashMap<>(32, 0.75f, true);
     private static final ThreadLocal<LinkedHashMap<SectionPos, PendingCapture>> PENDING =
             ThreadLocal.withInitial(() -> new LinkedHashMap<>(16, 0.75f, true));
     private static final ThreadLocal<LinkedHashMap<SectionPos, CaptureToken>> ACTIVE_CAPTURES =
@@ -45,6 +47,9 @@ public final class MinecraftSectionModelCaptureStore {
         if (position == null) return -1L;
         long generation = ++nextGeneration;
         CAPTURE_GENERATIONS.put(position, generation);
+        while (CAPTURE_GENERATIONS.size() > MAX_ACTIVE_CAPTURES) {
+            CAPTURE_GENERATIONS.remove(CAPTURE_GENERATIONS.keySet().iterator().next());
+        }
 
         LinkedHashMap<SectionPos, CaptureToken> active = ACTIVE_CAPTURES.get();
         active.remove(position);
