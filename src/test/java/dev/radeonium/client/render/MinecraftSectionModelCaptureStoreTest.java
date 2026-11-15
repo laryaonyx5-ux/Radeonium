@@ -50,6 +50,7 @@ class MinecraftSectionModelCaptureStoreTest {
         SectionPos position = SectionPos.of(8, 2, 1);
         var mesh = new MinecraftSectionModelMesher().buildResolved(List.of());
 
+        MinecraftSectionModelCaptureStore.beginCapture(position);
         MinecraftSectionModelCaptureStore.stage(position, mesh);
         assertNull(MinecraftSectionModelCaptureStore.get(position));
 
@@ -63,6 +64,7 @@ class MinecraftSectionModelCaptureStoreTest {
         SectionPos position = SectionPos.of(9, 2, 1);
         var mesh = new MinecraftSectionModelMesher().buildResolved(List.of());
 
+        MinecraftSectionModelCaptureStore.beginCapture(position);
         MinecraftSectionModelCaptureStore.stage(position, mesh);
         MinecraftSectionModelCaptureStore.clear();
 
@@ -80,6 +82,7 @@ class MinecraftSectionModelCaptureStoreTest {
                 new AtomicReference<>();
 
         Thread worker = new Thread(() -> {
+            MinecraftSectionModelCaptureStore.beginCapture(position);
             MinecraftSectionModelCaptureStore.stage(position, mesh);
             staged.countDown();
             try {
