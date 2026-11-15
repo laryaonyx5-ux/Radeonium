@@ -24,6 +24,23 @@ import java.util.Map;
  * valid. Only immutable primitive vertex records leave this class.
  */
 public final class MinecraftFluidSectionMesher {
+    private static final ThreadLocal<FluidRendererCache> FLUID_RENDERERS =
+            ThreadLocal.withInitial(FluidRendererCache::new);
+
+    private static FluidRenderer rendererForCurrentResources() {
+        var models = Minecraft.getInstance().getModelManager().getFluidStateModelSet();
+        FluidRendererCache cache = FLUID_RENDERERS.get();
+        if (cache.models != models) {
+            cache.models = models;
+            cache.renderer = new FluidRenderer(models);
+        }
+        return cache.renderer;
+    }
+
+    private static final class FluidRendererCache {
+        private Object models;
+        private FluidRenderer renderer;
+    }
     public SectionFluidMesh capture(
             SectionPos sectionPos, RenderSectionRegion region
     ) {
@@ -31,9 +48,7 @@ public final class MinecraftFluidSectionMesher {
             throw new IllegalArgumentException("sectionPos and region are required");
         }
 
-        FluidRenderer renderer = new FluidRenderer(
-                Minecraft.getInstance().getModelManager().getFluidStateModelSet()
-        );
+        FluidRenderer renderer = rendererForCurrentResources();
         EnumMap<ChunkSectionLayer, List<FluidQuad>> byLayer =
                 new EnumMap<>(ChunkSectionLayer.class);
         for (ChunkSectionLayer layer : ChunkSectionLayer.values()) byLayer.put(layer, new ArrayList<>());
