@@ -37,6 +37,23 @@ class FluidSectionMesherTest {
     }
 
     @Test
+    void interpolatesTopSurfaceAcrossUnequalSameFluidNeighbors() {
+        short[] ids = new short[4096]; byte[] heights = new byte[4096];
+        int[] tints = new int[4096], lights = new int[4096];
+        int low = 1 + 16 * (1 + 16 * 1);
+        int high = 2 + 16 * (1 + 16 * 1);
+        ids[low] = ids[high] = 4;
+        heights[low] = 4;
+        heights[high] = 8;
+
+        var mesh = new FluidSectionMesher().build(new FluidSectionSnapshot(ids, heights, tints, lights));
+        var top = mesh.quads().stream().filter(q -> q.normalY() == 1.0f).findFirst().orElseThrow();
+        float[] positions = top.positions();
+        assertNotEquals(positions[1], positions[4],
+                "the top surface should slope between unequal neighboring fluid heights");
+    }
+
+    @Test
     void copiesCaptureArraysAndRejectsInvalidHeights() {
         short[] ids = new short[4096]; byte[] heights = new byte[4096];
         int[] tints = new int[4096], lights = new int[4096];
