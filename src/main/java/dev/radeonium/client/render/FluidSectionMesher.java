@@ -30,21 +30,30 @@ public final class FluidSectionMesher {
                         add(quads, id, tint, light, 0, 1, 0,
                                 x, top, z, x + 1, top, z + 1);
                     }
-                    if (x == 0 || snapshot.fluidId(x - 1, y, z) != id) {
+                    int westHeight = x == 0 || snapshot.fluidId(x - 1, y, z) != id
+                            ? 0 : snapshot.heightEighths(x - 1, y, z);
+                    int eastHeight = x == 15 || snapshot.fluidId(x + 1, y, z) != id
+                            ? 0 : snapshot.heightEighths(x + 1, y, z);
+                    int northHeight = z == 0 || snapshot.fluidId(x, y, z - 1) != id
+                            ? 0 : snapshot.heightEighths(x, y, z - 1);
+                    int southHeight = z == 15 || snapshot.fluidId(x, y, z + 1) != id
+                            ? 0 : snapshot.heightEighths(x, y, z + 1);
+
+                    if (snapshot.heightEighths(x, y, z) > westHeight) {
                         add(quads, id, tint, light, -1, 0, 0,
-                                x, y, z, x, top, z + 1);
+                                x, y + westHeight / 8.0f, z, x, top, z + 1);
                     }
-                    if (x == 15 || snapshot.fluidId(x + 1, y, z) != id) {
+                    if (snapshot.heightEighths(x, y, z) > eastHeight) {
                         add(quads, id, tint, light, 1, 0, 0,
-                                x + 1, y, z + 1, x + 1, top, z);
+                                x + 1, y + eastHeight / 8.0f, z + 1, x + 1, top, z);
                     }
-                    if (z == 0 || snapshot.fluidId(x, y, z - 1) != id) {
+                    if (snapshot.heightEighths(x, y, z) > northHeight) {
                         add(quads, id, tint, light, 0, 0, -1,
-                                x + 1, y, z, x, top, z);
+                                x + 1, y + northHeight / 8.0f, z, x, top, z);
                     }
-                    if (z == 15 || snapshot.fluidId(x, y, z + 1) != id) {
+                    if (snapshot.heightEighths(x, y, z) > southHeight) {
                         add(quads, id, tint, light, 0, 0, 1,
-                                x, y, z + 1, x + 1, top, z + 1);
+                                x, y + southHeight / 8.0f, z + 1, x + 1, top, z + 1);
                     }
                 }
             }
