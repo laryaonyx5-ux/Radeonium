@@ -97,6 +97,18 @@ public final class RendererSectionTracker {
         }
     }
 
+
+    static List<dev.radeonium.client.render.SectionPos> affectedSectionsForDirty(
+            int sectionX, int sectionY, int sectionZ
+    ) {
+        dev.radeonium.client.render.SectionPos dirty =
+                new dev.radeonium.client.render.SectionPos(sectionX, sectionY, sectionZ);
+        List<dev.radeonium.client.render.SectionPos> affected = new ArrayList<>(7);
+        affected.add(dirty);
+        for (SectionFace face : SectionFace.values()) affected.add(dirty.offset(face));
+        return List.copyOf(affected);
+    }
+
     public static void markSectionDirty(int sectionX, int sectionY, int sectionZ) {
         dev.radeonium.client.render.SectionPos dirty =
                 new dev.radeonium.client.render.SectionPos(sectionX, sectionY, sectionZ);
@@ -104,11 +116,10 @@ public final class RendererSectionTracker {
         // A changed section may alter face occlusion in any neighboring section.
         // Remove those optional meshes immediately; vanilla remains the fallback
         // until Minecraft naturally rebuilds and Radeonium captures them again.
-        RadeoniumClient.queueSectionModelRemoval(net.minecraft.core.SectionPos.of(sectionX, sectionY, sectionZ));
-        for (SectionFace face : SectionFace.values()) {
-            dev.radeonium.client.render.SectionPos neighbor = dirty.offset(face);
+        for (dev.radeonium.client.render.SectionPos affected :
+                affectedSectionsForDirty(sectionX, sectionY, sectionZ)) {
             RadeoniumClient.queueSectionModelRemoval(
-                    net.minecraft.core.SectionPos.of(neighbor.x(), neighbor.y(), neighbor.z()));
+                    net.minecraft.core.SectionPos.of(affected.x(), affected.y(), affected.z()));
         }
     }
 }
