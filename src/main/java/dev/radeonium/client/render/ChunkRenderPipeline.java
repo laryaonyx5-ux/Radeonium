@@ -22,6 +22,15 @@ public final class ChunkRenderPipeline {
     private final SectionVisibilityGraph visibility = new SectionVisibilityGraph();
     private final Set<SectionPos> visibleSections = new HashSet<>();
     private final Map<SectionPos, VanillaSectionMeshSnapshot> vanillaMeshes = new HashMap<>();
+    // Never reset this counter: a clear/remove/re-add must not let an old worker token match a new section.
+    private long nextGeneration = 1L;
+
+    private long allocateGeneration() {
+        if (nextGeneration == Long.MAX_VALUE) {
+            throw new IllegalStateException("Section generation space exhausted");
+        }
+        return nextGeneration++;
+    }
 
     /** Clears all world-owned section state during a world unload or swap. */
     public synchronized void clear() {
@@ -49,7 +58,7 @@ public final class ChunkRenderPipeline {
 
         for (SectionPos position : next) {
             if (visibleSections.add(position)) {
-                sections.putIfAbsent(position, new SectionState());
+                sections.putIfAbsent(position, new SectionState(allocateGeneration()));
                 visibility.put(position, 0);
                 markDirtyInternal(position);
             }
@@ -84,7 +93,7 @@ public final class ChunkRenderPipeline {
     }
 
     public synchronized void addSection(SectionPos position, int openFaceMask) {
-        SectionState previous = sections.putIfAbsent(position, new SectionState());
+        SectionState previous = sections.putIfAbsent(position, new SectionState(allocateGeneration()));
         visibility.put(position, openFaceMask);
         if (previous == null) markDirtyInternal(position);
     }
@@ -115,7 +124,7 @@ public final class ChunkRenderPipeline {
     private void markDirtyInternal(SectionPos position) {
         SectionState state = sections.get(position);
         if (state != null) {
-            state.generation++;
+            state.generation = allocateGeneration();
             state.dirty = true;
             if (queuedDirty.add(position)) dirtyQueue.addLast(position);
         }
@@ -194,6 +203,10 @@ public final class ChunkRenderPipeline {
     private static final class SectionState {
         private boolean dirty = true;
         private boolean hasMesh;
-        private long generation = 1L;
+        private long generation;
+
+        private SectionState(long generation) {
+            this.generation = generation;
+        }
     }
 }
