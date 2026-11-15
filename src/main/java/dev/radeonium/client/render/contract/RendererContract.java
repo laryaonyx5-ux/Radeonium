@@ -147,7 +147,30 @@ public final class RendererContract {
     /** Submits Radeonium-owned draws into a caller-provided terrain pass. */
     @FunctionalInterface
     public interface TerrainPassSubmitter {
+        /** Must be called on the render thread inside the host-provided terrain pass. */
         void submit(FrameContext frame, TerrainLayer layer, List<TerrainDraw> draws);
+    }
+
+    /**
+     * Explicit per-section/per-layer hand-off to Minecraft when Radeonium
+     * cannot safely draw its own mesh. The adapter must avoid duplicate draws.
+     */
+    @FunctionalInterface
+    public interface VanillaFallback {
+        void renderVanilla(SectionPos section, TerrainLayer layer, FallbackReason reason);
+    }
+
+    /**
+     * Validates that a worker result belongs to the exact immutable input
+     * snapshot that initiated the build; stale generations must be discarded.
+     */
+    public static MeshPayload requireMatchingResult(SectionSnapshot snapshot, MeshPayload result) {
+        Objects.requireNonNull(snapshot, "snapshot");
+        Objects.requireNonNull(result, "result");
+        if (!snapshot.ticket().equals(result.ticket())) {
+            throw new IllegalArgumentException("Mesh result does not match its source section build ticket");
+        }
+        return result;
     }
 
     /** Top-level lifecycle contract; Minecraft integration remains an adapter. */
