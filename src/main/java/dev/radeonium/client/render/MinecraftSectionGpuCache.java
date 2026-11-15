@@ -198,9 +198,9 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
                     MinecraftMeshGpuUpload.QuadData data = MinecraftMeshGpuUpload.fromFluidQuad(quad);
                     sorted.add(new SortableQuad(data, distanceSquared(position, data, cameraPosition)));
                 }
-                sorted.sort(java.util.Comparator.comparingDouble(SortableQuad::distanceSquared).reversed());
                 List<MinecraftMeshGpuUpload.QuadData> ordered =
-                        sorted.stream().map(SortableQuad::quad).toList();
+                        sortTranslucentQuads(position,
+                                sorted.stream().map(SortableQuad::quad).toList(), cameraPosition);
                 MinecraftMeshGpuUpload replacement =
                         MinecraftMeshGpuUpload.uploadQuadData(RenderSystem.getDevice(), ordered);
                 MinecraftMeshGpuUpload previous = entry.layerUploads.put(layer, replacement);
@@ -219,6 +219,21 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
                 upload.vertexBuffer(), upload.vertexCount(), upload.indexCount(),
                 upload.vertexFormat(), upload.topology()
         );
+    }
+
+
+    static List<MinecraftMeshGpuUpload.QuadData> sortTranslucentQuads(
+            SectionPos section, List<MinecraftMeshGpuUpload.QuadData> quads, Vec3 camera
+    ) {
+        if (section == null || quads == null || camera == null) {
+            throw new IllegalArgumentException("section, quads and camera are required");
+        }
+        List<SortableQuad> sorted = new ArrayList<>(quads.size());
+        for (MinecraftMeshGpuUpload.QuadData quad : quads) {
+            sorted.add(new SortableQuad(quad, distanceSquared(section, quad, camera)));
+        }
+        sorted.sort(java.util.Comparator.comparingDouble(SortableQuad::distanceSquared).reversed());
+        return sorted.stream().map(SortableQuad::quad).toList();
     }
 
     private static double distanceSquared(
