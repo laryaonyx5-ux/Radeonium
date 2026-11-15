@@ -94,10 +94,10 @@ public final class MinecraftGpuResourceOwner implements AutoCloseable {
         }
         if (!allocation.releaseReference()) return true;
 
+        upload.close();
         allocations.remove(upload);
         if (allocation.key != null) reusableUploads.remove(allocation.key, upload);
         allocatedBytes -= allocation.bytes;
-        upload.close();
         return true;
     }
 
@@ -108,17 +108,18 @@ public final class MinecraftGpuResourceOwner implements AutoCloseable {
         RuntimeException failure = null;
         for (MinecraftMeshGpuUpload upload : pending) {
             try {
-                Allocation allocation = allocations.remove(upload);
+                Allocation allocation = allocations.get(upload);
                 if (allocation == null) continue;
+                upload.close();
+                allocations.remove(upload);
                 if (allocation.key != null) reusableUploads.remove(allocation.key, upload);
                 allocatedBytes -= allocation.bytes;
-                upload.close();
             } catch (RuntimeException exception) {
                 if (failure == null) failure = exception;
                 else failure.addSuppressed(exception);
             }
         }
-        reusableUploads.clear();
+        if (allocations.isEmpty()) reusableUploads.clear();
         if (failure != null) throw failure;
     }
 
@@ -143,7 +144,7 @@ public final class MinecraftGpuResourceOwner implements AutoCloseable {
         RenderSystem.assertOnRenderThread();
         if (closed) return;
         releaseAll();
-        closed = true;
+        closed = allocations.isEmpty();
     }
 
     static final class Allocation {
