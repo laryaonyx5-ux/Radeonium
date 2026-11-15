@@ -11,6 +11,7 @@ import dev.radeonium.client.render.MinecraftCompiledGeometryStore;
 import dev.radeonium.client.render.MinecraftCompiledGeometryGpuCache;
 import dev.radeonium.client.render.MinecraftSectionModelCaptureStore;
 import dev.radeonium.client.render.RendererSectionTracker;
+import dev.radeonium.client.render.TerrainRenderDiagnostics;
 import dev.radeonium.client.render.SectionMeshingExecutor;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
@@ -34,6 +35,8 @@ public final class RadeoniumClient implements ClientModInitializer {
     public static final String MOD_ID = "radeonium";
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
     private static final ChunkRenderPipeline RENDERER_PIPELINE = new ChunkRenderPipeline();
+    private static final TerrainRenderDiagnostics TERRAIN_RENDER_DIAGNOSTICS =
+            new TerrainRenderDiagnostics();
     private static final MinecraftSectionGpuCache MINECRAFT_GPU_CACHE = new MinecraftSectionGpuCache();
     private static final SectionMeshingExecutor SECTION_MESHING_EXECUTOR = new SectionMeshingExecutor();
     private static final MinecraftCompiledGeometryGpuCache COMPILED_GEOMETRY_GPU_CACHE =
@@ -141,6 +144,11 @@ public final class RadeoniumClient implements ClientModInitializer {
         return RENDERER_PIPELINE;
     }
 
+    /** Cumulative per-layer counters for Radeonium draws and vanilla fallbacks. */
+    public static TerrainRenderDiagnostics terrainRenderDiagnostics() {
+        return TERRAIN_RENDER_DIAGNOSTICS;
+    }
+
     /** Section-model uploads are owned here and must be changed on the render thread. */
     public static MinecraftSectionGpuCache minecraftGpuCache() {
         return MINECRAFT_GPU_CACHE;
@@ -196,6 +204,7 @@ public final class RadeoniumClient implements ClientModInitializer {
             MinecraftCompiledGeometryStore.clear();
             MinecraftSectionModelCaptureStore.clear();
             RendererSectionTracker.reset();
+            TERRAIN_RENDER_DIAGNOSTICS.reset();
         });
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             if (INVALIDATE_MODEL_GPU_CACHE.getAndSet(false)) MINECRAFT_GPU_CACHE.clear();
