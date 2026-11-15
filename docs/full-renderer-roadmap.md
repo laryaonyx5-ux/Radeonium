@@ -110,9 +110,9 @@ The greedy voxel prototype is deliberately not used as a substitute for Minecraf
 
 ### Remaining acceptance work
 
-- Add and run focused lifecycle/accounting tests for successful allocation, replacement, release, repeated release and shutdown.
-- Implement and verify safe reuse of compatible allocations where the RenderPearl API permits it; do not assume a buffer can be rewritten unless the active API explicitly supports it.
-- Confirm cache eviction and failed rebuilds leave no leaked Radeonium allocations.
+- Unit tests now cover empty-owner accounting, immutable content-key equality, and reference-count transitions/underflow.
+- Run the Gradle build and JUnit suite, then add integration coverage for successful GPU allocation, cache replacement, eviction, repeated release and shutdown.
+- Verify failed rebuilds and disposal errors leave no leaked or untracked Radeonium allocations.
 - Confirm CI compilation, JUnit tests and JAR packaging are green after this milestone's final changes.
 
 ## What "Radeonium owns the renderer" means
