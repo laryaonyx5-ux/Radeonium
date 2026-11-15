@@ -114,6 +114,25 @@ class FluidSectionMesherTest {
     }
 
     @Test
+    void usesFluidAboveVerticalHaloToRaiseSharedTopCorner() {
+        short[] ids = new short[18 * 18 * 18]; byte[] heights = new byte[18 * 18 * 18];
+        int[] tints = new int[18 * 18 * 18], lights = new int[18 * 18 * 18];
+        ids[haloIndex(0, 15, 0)] = 6;
+        heights[haloIndex(0, 15, 0)] = 4;
+        ids[haloIndex(1, 15, 0)] = 6;
+        heights[haloIndex(1, 15, 0)] = 4;
+        ids[haloIndex(1, 16, 0)] = 6;
+        heights[haloIndex(1, 16, 0)] = 8;
+
+        var mesh = new FluidSectionMesher().build(FluidSectionSnapshot.withHalo(ids, heights, tints, lights));
+        var top = mesh.quads().stream()
+                .filter(q -> q.normalY() == 1.0f && q.positions()[0] == 0.0f
+                        && q.positions()[2] == 0.0f)
+                .findFirst().orElseThrow();
+        assertEquals(16.0f, top.positions()[4], 1.0e-6f);
+    }
+
+    @Test
     void cullsSameFluidSideAcrossSectionBoundaryWhenHaloIsPresent() {
         short[] ids = new short[18 * 18 * 18]; byte[] heights = new byte[18 * 18 * 18];
         int[] tints = new int[18 * 18 * 18], lights = new int[18 * 18 * 18];
