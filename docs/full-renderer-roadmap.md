@@ -73,6 +73,7 @@ Milestone B must not begin until the final CI item is green. This milestone does
 - `MinecraftBlockModelMesh` stores copied quad geometry and can filter by vanilla render layer; each copied quad retains its immutable source `BakedQuad`, effective model-part/material AO, tint index and light-emission metadata.
 - `MinecraftMaterialTable` assigns renderer-side material indices while retaining the source Minecraft material metadata for later translation.
 - `MinecraftCompiledGeometryStore` now bounds both completed snapshots and in-flight capture tokens; abandoned compiler invocations cannot leave an unbounded capture registry. Copied layer metadata is validated and byte arrays remain defensive copies. Focused tests cover snapshot immutability and invalid metadata.
+- The compiled-geometry GPU cache now rejects stale snapshots in both buffer lookup and direct layer-draw entry points, so an invalidated section cannot be drawn through a less common API path.
 - `MinecraftSectionModelMesher` now accepts immutable `ResolvedBlockInput` records: variant/weighted/multipart parts can be selected on the Minecraft build thread, copied into an immutable list, then meshed independently by a worker; this path is not yet wired to `SectionCompiler.compile`.
 - `SectionMeshBuilder` contains a greedy opaque-voxel mesher for immutable 16×16×16 material snapshots; it merges coplanar faces of equal material and culls faces against any non-air opaque neighbor.
 - `FluidSectionSnapshot` is an immutable 16³ fluid capture with fluid IDs, quantized heights, tint and packed light.
