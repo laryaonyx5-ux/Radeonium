@@ -5,6 +5,7 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
 import com.mojang.renderpearl.api.commands.RenderPass;
 import com.mojang.renderpearl.api.pipeline.CompiledRenderPipeline;
+import com.mojang.renderpearl.api.buffers.GpuBuffer;
 
 import java.util.EnumMap;
 import java.util.LinkedHashMap;
@@ -45,7 +46,7 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
             }
             int[] materialIndices = materials.register(mesh);
             materials.retain(materialIndices);
-            Entry replacement = new Entry(mesh, MinecraftFluidSectionMesher.SectionFluidMesh.empty(), layerUploads, materialIndices);
+            Entry replacement = new Entry(mesh, MinecraftFluidSectionMesher.SectionFluidMesh.empty(), null, layerUploads, materialIndices);
             Entry previous = sections.put(position, replacement);
             if (previous != null) previous.close(materials);
             evictExcessSections();
@@ -63,6 +64,22 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
      */
     public synchronized void rebuild(
             SectionPos position, MinecraftSectionModelMesher.SectionModelMesh sectionMesh
+    ) {
+        rebuild(position, sectionMesh, null);
+    }
+
+    /** Installs a mesh while retaining its generation token for stale-draw rejection. */
+    public synchronized void rebuild(
+            SectionPos position, MinecraftSectionModelCaptureStore.Snapshot snapshot
+    ) {
+        if (snapshot == null) throw new IllegalArgumentException("snapshot cannot be null");
+        rebuild(position, snapshot.mesh(), snapshot);
+    }
+
+    private synchronized void rebuild(
+            SectionPos position,
+            MinecraftSectionModelMesher.SectionModelMesh sectionMesh,
+            MinecraftSectionModelCaptureStore.Snapshot sourceSnapshot
     ) {
         RenderSystem.assertOnRenderThread();
         if (position == null || sectionMesh == null) {
@@ -87,7 +104,7 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
             MinecraftBlockModelMesh combined = new MinecraftBlockModelMesh(allQuads);
             int[] materialIndices = materials.register(combined);
             materials.retain(materialIndices);
-            Entry replacement = new Entry(combined, sectionMesh.fluidMesh(), layerUploads, materialIndices);
+            Entry replacement = new Entry(combined, sectionMesh.fluidMesh(), sourceSnapshot, layerUploads, materialIndices);
             Entry previous = sections.put(position, replacement);
             if (previous != null) previous.close(materials);
             evictExcessSections();
@@ -141,6 +158,31 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
         }
         return total;
     }
+
+
+    /** GPU buffers in the exact native terrain layout, or null for stale/empty sections. */
+    public synchronized LayerBuffers layerBuffers(SectionPos position, ChunkSectionLayer layer) {
+        if (position == null || layer == null) return null;
+        Entry entry = sections.get(position);
+        if (entry == null || entry.sourceSnapshot == null
+                || MinecraftSectionModelCaptureStore.get(entry.sourceSnapshot.position()) != entry.sourceSnapshot) {
+            return null;
+        }
+        MinecraftMeshGpuUpload upload = entry.layerUploads.get(layer);
+        if (upload == null || upload.isEmpty()) return null;
+        return new LayerBuffers(
+                upload.vertexBuffer(), upload.vertexCount(), upload.indexCount(),
+                upload.vertexFormat(), upload.topology()
+        );
+    }
+
+    public record LayerBuffers(
+            GpuBuffer vertexBuffer,
+            int vertexCount,
+            int indexCount,
+            String vertexFormat,
+            String topology
+    ) {}
 
     /** Draws only the selected layer into a caller-owned RenderPearl pass. */
     public synchronized int drawLayer(
@@ -217,6 +259,7 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
     private record Entry(
             MinecraftBlockModelMesh mesh,
             MinecraftFluidSectionMesher.SectionFluidMesh fluids,
+            MinecraftSectionModelCaptureStore.Snapshot sourceSnapshot,
             EnumMap<ChunkSectionLayer, MinecraftMeshGpuUpload> layerUploads,
             int[] materialIndices
     ) {
