@@ -42,6 +42,7 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
         MinecraftBlockModelMesh mesh = mesher.build(modelParts);
         EnumMap<ChunkSectionLayer, MinecraftMeshGpuUpload> layerUploads =
                 new EnumMap<>(ChunkSectionLayer.class);
+        int[] materialIndices;
         try {
             for (ChunkSectionLayer layer : ChunkSectionLayer.values()) {
                 MinecraftBlockModelMesh layerMesh = mesh.forLayer(layer);
@@ -50,20 +51,22 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
                     layerUploads.put(layer, gpuResources.upload(layerMesh, layerMaterialIndices));
                 }
             }
-            int[] materialIndices = materials.register(mesh);
+            materialIndices = materials.register(mesh);
             materials.retain(materialIndices);
-            Entry replacement = new Entry(mesh, MinecraftFluidSectionMesher.SectionFluidMesh.empty(), null,
-                    Set.of(), layerUploads, materialIndices);
-            Entry previous = sections.put(position, replacement);
-            if (previous != null) previous.close(materials, gpuResources);
-            translucentSortCameras.remove(position);
-            translucentSortOrders.remove(position);
-            evictExcessSections();
         } catch (RuntimeException | Error failure) {
-            for (MinecraftMeshGpuUpload upload : layerUploads.values()) gpuResources.release(upload);
-            materials.discardUnreferenced();
+            cleanupFailedBuild(layerUploads, failure);
             throw failure;
         }
+
+        // Commit only after every replacement upload and material reference is ready.
+        // A later disposal/eviction failure must not release buffers already installed.
+        Entry replacement = new Entry(mesh, MinecraftFluidSectionMesher.SectionFluidMesh.empty(), null,
+                Set.of(), layerUploads, materialIndices);
+        Entry previous = sections.put(position, replacement);
+        if (previous != null) previous.close(materials, gpuResources);
+        translucentSortCameras.remove(position);
+        translucentSortOrders.remove(position);
+        evictExcessSections();
     }
 
 
@@ -103,6 +106,8 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
         EnumMap<ChunkSectionLayer, MinecraftMeshGpuUpload> layerUploads =
                 new EnumMap<>(ChunkSectionLayer.class);
         List<MinecraftBlockModelMesh.Quad> allQuads = new ArrayList<>();
+        MinecraftBlockModelMesh combined;
+        int[] materialIndices;
         try {
             for (ChunkSectionLayer layer : ChunkSectionLayer.values()) {
                 if (!parityVerifiedLayers.contains(layer)) continue;
@@ -116,20 +121,43 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
                             layerMesh, layerMaterialIndices, fluidLayer.quads()));
                 }
             }
-            MinecraftBlockModelMesh combined = new MinecraftBlockModelMesh(allQuads);
-            int[] materialIndices = materials.register(combined);
+            combined = new MinecraftBlockModelMesh(allQuads);
+            materialIndices = materials.register(combined);
             materials.retain(materialIndices);
-            Entry replacement = new Entry(combined, sectionMesh.fluidMesh(), sourceSnapshot,
-                    Set.copyOf(parityVerifiedLayers), layerUploads, materialIndices);
-            Entry previous = sections.put(position, replacement);
-            if (previous != null) previous.close(materials, gpuResources);
-            translucentSortCameras.remove(position);
-            translucentSortOrders.remove(position);
-            evictExcessSections();
         } catch (RuntimeException | Error failure) {
-            for (MinecraftMeshGpuUpload upload : layerUploads.values()) gpuResources.release(upload);
-            materials.discardUnreferenced();
+            cleanupFailedBuild(layerUploads, failure);
             throw failure;
+        }
+
+        // Keep the old section intact until the complete replacement is prepared.
+        Entry replacement = new Entry(combined, sectionMesh.fluidMesh(), sourceSnapshot,
+                Set.copyOf(parityVerifiedLayers), layerUploads, materialIndices);
+        Entry previous = sections.put(position, replacement);
+        if (previous != null) previous.close(materials, gpuResources);
+        translucentSortCameras.remove(position);
+        translucentSortOrders.remove(position);
+        evictExcessSections();
+    }
+
+    /**
+     * Releases only resources from an uncommitted build. Cleanup failures are
+     * attached to the original error so they cannot hide the actual build cause.
+     */
+    private void cleanupFailedBuild(
+            EnumMap<ChunkSectionLayer, MinecraftMeshGpuUpload> uploads,
+            Throwable originalFailure
+    ) {
+        for (MinecraftMeshGpuUpload upload : uploads.values()) {
+            try {
+                gpuResources.release(upload);
+            } catch (RuntimeException | Error cleanupFailure) {
+                originalFailure.addSuppressed(cleanupFailure);
+            }
+        }
+        try {
+            materials.discardUnreferenced();
+        } catch (RuntimeException | Error cleanupFailure) {
+            originalFailure.addSuppressed(cleanupFailure);
         }
     }
 
