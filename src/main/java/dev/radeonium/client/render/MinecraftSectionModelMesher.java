@@ -9,6 +9,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.client.renderer.block.dispatch.BlockStateModel;
 import net.minecraft.client.renderer.block.dispatch.BlockStateModelPart;
+import net.minecraft.client.renderer.block.BlockModelLighter;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.color.block.BlockTintSource;
 import net.minecraft.client.resources.model.geometry.BakedQuad;
@@ -34,6 +35,7 @@ public final class MinecraftSectionModelMesher {
     private static final float EDGE_EPSILON = 1.0e-5f;
 
     private final MinecraftBlockModelMesher blockMesher = new MinecraftBlockModelMesher();
+    private final BlockModelLighter blockLighter = new BlockModelLighter();
 
     /**
      * Captures the actual 16x16x16 block inputs from Minecraft's immutable
@@ -105,6 +107,7 @@ public final class MinecraftSectionModelMesher {
             List<BlockStateModelPart> selectedParts = new ArrayList<>();
             blockModel.collectParts(net.minecraft.util.RandomSource.create(state.getSeed(pos)), selectedParts);
             Map<Integer, Integer> tintColors = captureTintColors(state, pos, region, selectedParts);
+            int packedLightCoords = blockLighter.getLightCoords(state, region, pos);
             resolved.add(new ResolvedBlockInput(selectedParts, x, y, z,
                     state.skipRendering(states[haloIndex(x, y - 1, z)], Direction.DOWN),
                     state.skipRendering(states[haloIndex(x, y + 1, z)], Direction.UP),
@@ -112,7 +115,7 @@ public final class MinecraftSectionModelMesher {
                     state.skipRendering(states[haloIndex(x, y, z + 1)], Direction.SOUTH),
                     state.skipRendering(states[haloIndex(x - 1, y, z)], Direction.WEST),
                     state.skipRendering(states[haloIndex(x + 1, y, z)], Direction.EAST),
-                    tintColors));
+                    tintColors, packedLightCoords));
         }
         return new CapturedSectionInput(resolved, blockEntities);
     }
@@ -151,7 +154,7 @@ public final class MinecraftSectionModelMesher {
 
         for (ResolvedBlockInput input : blocks) {
             if (input == null) continue;
-            MinecraftBlockModelMesh blockMesh = blockMesher.build(input.parts(), input.tintColors());
+            MinecraftBlockModelMesh blockMesh = blockMesher.build(input.parts(), input.tintColors(), input.packedLightCoords());
             for (MinecraftBlockModelMesh.Quad quad : blockMesh.quads()) {
                 Direction face = quad.direction();
                 if (face != null && input.neighborOccludes(face)
@@ -171,7 +174,7 @@ public final class MinecraftSectionModelMesher {
                         .add(new MinecraftBlockModelMesh.Quad(
                                 positions, quad.copyPackedUv(), quad.direction(),
                                 quad.layer(), quad.material(), quad.sourceQuad(),
-                                quad.ambientOcclusion(), quad.tintColor()));
+                                quad.ambientOcclusion(), quad.tintColor(), quad.packedLightCoords()));
             }
         }
 
@@ -239,7 +242,8 @@ public final class MinecraftSectionModelMesher {
             boolean downOccluded, boolean upOccluded,
             boolean northOccluded, boolean southOccluded,
             boolean westOccluded, boolean eastOccluded,
-            Map<Integer, Integer> tintColors
+            Map<Integer, Integer> tintColors,
+            int packedLightCoords
     ) {
         public ResolvedBlockInput {
             if (parts == null || tintColors == null) throw new IllegalArgumentException("parts and tintColors cannot be null");
@@ -266,7 +270,7 @@ public final class MinecraftSectionModelMesher {
             model.collectParts(net.minecraft.util.RandomSource.create(modelSeed), selectedParts);
             return new ResolvedBlockInput(selectedParts, localX, localY, localZ,
                     downOccluded, upOccluded, northOccluded, southOccluded,
-                    westOccluded, eastOccluded, Map.of());
+                    westOccluded, eastOccluded, Map.of(), -1);
         }
 
         boolean neighborOccludes(Direction direction) {
