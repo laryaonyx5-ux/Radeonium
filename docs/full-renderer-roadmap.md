@@ -11,7 +11,7 @@ A full replacement is a long-term target. The current implementation is only an 
 
 ## Milestone A — renderer contract (implementation)
 
-**Status: implementation complete; automated CI verification pending.**
+**Status: complete.**
 
 Milestone A establishes the API boundary before replacing any Minecraft terrain behavior.
 
@@ -62,6 +62,32 @@ Milestone A establishes the API boundary before replacing any Minecraft terrain 
 - [x] GitHub Actions build, JUnit tests and mod JAR packaging complete successfully for the milestone implementation commit (5f205df).
 
 Milestone B must not begin until the final CI item is green. This milestone does not yet implement Minecraft model resolution, a new terrain mesher, GPU uploads, shaders, pipelines or transparency; those belong to later milestones.
+
+## Milestone B — complete Minecraft mesher
+
+**Status: in progress; not accepted as a replacement for vanilla terrain compilation.**
+
+### Existing foundations
+
+- `MinecraftBlockModelMesher` extracts baked quad positions, packed UVs, face directions and Minecraft render-layer/material references from supplied model parts.
+- `MinecraftBlockModelMesh` stores copied quad geometry and can filter by vanilla render layer.
+- `MinecraftMaterialTable` assigns renderer-side material indices while retaining the source Minecraft material metadata for later translation.
+- `SectionMeshBuilder` contains a greedy voxel-mesh prototype for immutable 16×16×16 material snapshots.
+- `SectionMeshingExecutor` uses a bounded worker queue and reports rejected work instead of running expensive builds on the caller thread.
+- `SectionMesh` validates the prototype's fixed 28-byte vertex stride and defensively copies its payload.
+- Focused tests cover empty sections, single voxels, greedy merging, material boundaries, payload validation and vertex sanity.
+
+### Remaining acceptance blockers
+
+- Capture immutable per-block model inputs on the permitted Minecraft build thread; worker inputs must not retain live world objects or mutable Minecraft state.
+- Resolve block-state variants and multipart model selection for each actual block position.
+- Implement neighbor-aware face culling across section boundaries; the current voxel snapshot treats out-of-range neighbors as air and is not suitable for final terrain.
+- Preserve tint resolution, packed block/sky light, ambient occlusion, emissive behavior, atlas UVs and animated texture references.
+- Integrate fluid surfaces, model-specific special geometry, block entities and modded model hooks with explicit unsupported-content fallback.
+- Produce independent per-layer meshes and prove parity against vanilla before switching any terrain layer away from vanilla.
+- Add tests and visual comparison fixtures for model variants, culling, lighting, tint, fluids, resource reloads and all render layers.
+
+The greedy voxel prototype is deliberately not used as a substitute for Minecraft's baked-model semantics. Until every acceptance blocker is closed, vanilla terrain remains authoritative and Radeonium must fall back rather than omit or simplify geometry.
 
 ## What "Radeonium owns the renderer" means
 
