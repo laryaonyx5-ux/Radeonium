@@ -15,6 +15,10 @@ import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
+import net.fabricmc.fabric.api.resource.ResourceManagerHelper;
+import net.fabricmc.fabric.api.resource.SimpleSynchronousResourceReloadListener;
+import net.fabricmc.fabric.api.resource.ResourceType;
+import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.network.chat.Component;
@@ -87,6 +91,21 @@ public final class RadeoniumClient implements ClientModInitializer {
         LOGGER.info("CPU profile: {} logical processors; up to {} synchronous chunk builds on fast frames.",
                 CpuWorkProfile.availableLogicalProcessors(),
                 CpuWorkProfile.maxSynchronousChunkBuilds());
+
+        ResourceManagerHelper.get(ResourceType.CLIENT_RESOURCES).registerReloadListener(
+                new SimpleSynchronousResourceReloadListener() {
+                    @Override
+                    public Identifier getFabricId() {
+                        return Identifier.fromNamespaceAndPath(MOD_ID, "section_model_capture_invalidation");
+                    }
+
+                    @Override
+                    public void onResourceManagerReload(ResourceManager resourceManager) {
+                        // Baked quads and materials are tied to the current model/atlas reload.
+                        MinecraftSectionModelCaptureStore.clear();
+                    }
+                }
+        );
 
         ClientLifecycleEvents.CLIENT_STARTED.register(client -> GpuDetector.detectAndLog());
         ClientLifecycleEvents.CLIENT_STOPPING.register(client -> {
