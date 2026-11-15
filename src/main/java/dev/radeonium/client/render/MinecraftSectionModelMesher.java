@@ -50,7 +50,8 @@ public final class MinecraftSectionModelMesher {
             SectionPos sectionPos, RenderSectionRegion region, BlockStateModelSet modelSet
     ) {
         CapturedSectionInput captured = captureInputs(sectionPos, region, modelSet);
-        return buildResolved(captured.blocks()).withUnsupportedBlockEntityCount(captured.unsupportedBlockEntityCount());
+        return buildResolved(captured.blocks()).withUnsupportedBlockEntityCount(captured.unsupportedBlockEntityCount())
+                .withFluids(captured.fluids());
     }
 
     private static Map<BakedQuad, CapturedQuadLighting> captureQuadLighting(
@@ -164,7 +165,9 @@ public final class MinecraftSectionModelMesher {
                     state.skipRendering(states[haloIndex(x + 1, y, z)], Direction.EAST),
                     tintColors, packedLightCoords, quadLighting));
         }
-        return new CapturedSectionInput(resolved, blockEntities);
+        MinecraftFluidSectionMesher.SectionFluidMesh fluids =
+                new MinecraftFluidSectionMesher().capture(sectionPos, region);
+        return new CapturedSectionInput(resolved, blockEntities, fluids);
     }
 
     /**
@@ -268,10 +271,20 @@ public final class MinecraftSectionModelMesher {
     }
 
     /** Immutable, worker-safe result of section input capture. */
-    public record CapturedSectionInput(List<ResolvedBlockInput> blocks, int unsupportedBlockEntityCount) {
+    public record CapturedSectionInput(
+            List<ResolvedBlockInput> blocks,
+            int unsupportedBlockEntityCount,
+            MinecraftFluidSectionMesher.SectionFluidMesh fluids
+    ) {
         public CapturedSectionInput {
-            if (blocks == null || unsupportedBlockEntityCount < 0) throw new IllegalArgumentException("invalid capture");
+            if (blocks == null || unsupportedBlockEntityCount < 0 || fluids == null) {
+                throw new IllegalArgumentException("invalid capture");
+            }
             blocks = List.copyOf(blocks);
+        }
+
+        public CapturedSectionInput(List<ResolvedBlockInput> blocks, int unsupportedBlockEntityCount) {
+            this(blocks, unsupportedBlockEntityCount, MinecraftFluidSectionMesher.SectionFluidMesh.empty());
         }
     }
 
@@ -376,20 +389,30 @@ public final class MinecraftSectionModelMesher {
     public static final class SectionModelMesh {
         private final Map<ChunkSectionLayer, MinecraftBlockModelMesh> layers;
         private final int unsupportedBlockEntityCount;
+        private final MinecraftFluidSectionMesher.SectionFluidMesh fluids;
 
         private SectionModelMesh(Map<ChunkSectionLayer, MinecraftBlockModelMesh> layers) {
-            this(layers, 0);
+            this(layers, 0, MinecraftFluidSectionMesher.SectionFluidMesh.empty());
         }
 
         private SectionModelMesh(
                 Map<ChunkSectionLayer, MinecraftBlockModelMesh> layers,
                 int unsupportedBlockEntityCount
         ) {
-            if (unsupportedBlockEntityCount < 0) {
-                throw new IllegalArgumentException("unsupported block entity count cannot be negative");
+            this(layers, unsupportedBlockEntityCount, MinecraftFluidSectionMesher.SectionFluidMesh.empty());
+        }
+
+        private SectionModelMesh(
+                Map<ChunkSectionLayer, MinecraftBlockModelMesh> layers,
+                int unsupportedBlockEntityCount,
+                MinecraftFluidSectionMesher.SectionFluidMesh fluids
+        ) {
+            if (unsupportedBlockEntityCount < 0 || fluids == null) {
+                throw new IllegalArgumentException("invalid section model mesh metadata");
             }
             this.layers = Map.copyOf(layers);
             this.unsupportedBlockEntityCount = unsupportedBlockEntityCount;
+            this.fluids = fluids;
         }
 
         public MinecraftBlockModelMesh layer(ChunkSectionLayer layer) {
@@ -399,17 +422,23 @@ public final class MinecraftSectionModelMesher {
 
         public Map<ChunkSectionLayer, MinecraftBlockModelMesh> layers() { return layers; }
 
+        public MinecraftFluidSectionMesher.FluidLayerMesh fluids(ChunkSectionLayer layer) {
+            return fluids.layer(layer);
+        }
+
+        public MinecraftFluidSectionMesher.SectionFluidMesh fluidMesh() { return fluids; }
+
         /** Block entities require their dedicated renderer and are not baked into these block meshes. */
         public int unsupportedBlockEntityCount() { return unsupportedBlockEntityCount; }
 
         public SectionModelMesh withUnsupportedBlockEntityCount(int count) {
-            return new SectionModelMesh(layers, count);
+            return new SectionModelMesh(layers, count, fluids);
         }
 
         public int quadCount() {
             int total = 0;
             for (MinecraftBlockModelMesh mesh : layers.values()) total += mesh.quadCount();
-            return total;
+            return total + fluids.quadCount();
         }
     }
 }
