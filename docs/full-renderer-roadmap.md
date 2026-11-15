@@ -95,7 +95,7 @@ The greedy voxel prototype is deliberately not used as a substitute for Minecraf
 
 ## Milestone C — GPU resource owner
 
-**Status: implementation complete; CI and in-game device validation pending.**
+**Status: implementation complete; CI build, tests and JAR packaging green; in-game device validation pending.**
 
 ### Implemented foundation
 
