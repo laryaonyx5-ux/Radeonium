@@ -68,7 +68,12 @@ public final class RendererSectionTracker {
      * metadata can never hide terrain.
      */
     private static long visibilityConnections(SectionMesh mesh) {
-        if (mesh == null) return ALL_CONNECTIONS;
+        // These sentinels have no compiled VisibilitySet to consult. Treat them
+        // as transparent for traversal so a not-yet-compiled/empty section
+        // cannot incorrectly hide already-visible terrain behind it.
+        if (mesh == null || mesh == SectionMesh.UNCOMPILED || mesh == SectionMesh.EMPTY) {
+            return ALL_CONNECTIONS;
+        }
         long mask = 0L;
         try {
             for (SectionFace entry : SectionFace.values()) {
