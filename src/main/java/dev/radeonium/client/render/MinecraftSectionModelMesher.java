@@ -48,6 +48,7 @@ public final class MinecraftSectionModelMesher {
         }
 
         List<ResolvedBlockInput> resolved = new ArrayList<>(4096);
+        int unsupportedBlockEntityCount = 0;
         int baseX = sectionPos.minBlockX();
         int baseY = sectionPos.minBlockY();
         int baseZ = sectionPos.minBlockZ();
@@ -73,6 +74,9 @@ public final class MinecraftSectionModelMesher {
 
                     BlockPos position = new BlockPos(
                             baseX + localX, baseY + localY, baseZ + localZ);
+                    if (region.getBlockEntity(position) != null) {
+                        unsupportedBlockEntityCount++;
+                    }
                     BlockStateModel model = modelSet.get(state);
                     boolean down = state.skipRendering(
                             states[haloIndex(localX, localY - 1, localZ)], Direction.DOWN);
@@ -93,7 +97,8 @@ public final class MinecraftSectionModelMesher {
                 }
             }
         }
-        return buildResolved(resolved);
+        SectionModelMesh mesh = buildResolved(resolved);
+        return new SectionModelMesh(mesh.layers(), unsupportedBlockEntityCount);
     }
 
     /**
@@ -277,9 +282,21 @@ public final class MinecraftSectionModelMesher {
     /** Independent meshes for every Minecraft terrain layer. */
     public static final class SectionModelMesh {
         private final Map<ChunkSectionLayer, MinecraftBlockModelMesh> layers;
+        private final int unsupportedBlockEntityCount;
 
         private SectionModelMesh(Map<ChunkSectionLayer, MinecraftBlockModelMesh> layers) {
+            this(layers, 0);
+        }
+
+        private SectionModelMesh(
+                Map<ChunkSectionLayer, MinecraftBlockModelMesh> layers,
+                int unsupportedBlockEntityCount
+        ) {
+            if (unsupportedBlockEntityCount < 0) {
+                throw new IllegalArgumentException("unsupported block entity count cannot be negative");
+            }
             this.layers = Map.copyOf(layers);
+            this.unsupportedBlockEntityCount = unsupportedBlockEntityCount;
         }
 
         public MinecraftBlockModelMesh layer(ChunkSectionLayer layer) {
@@ -288,6 +305,9 @@ public final class MinecraftSectionModelMesher {
         }
 
         public Map<ChunkSectionLayer, MinecraftBlockModelMesh> layers() { return layers; }
+
+        /** Block entities require their dedicated renderer and are not baked into these block meshes. */
+        public int unsupportedBlockEntityCount() { return unsupportedBlockEntityCount; }
 
         public int quadCount() {
             int total = 0;
