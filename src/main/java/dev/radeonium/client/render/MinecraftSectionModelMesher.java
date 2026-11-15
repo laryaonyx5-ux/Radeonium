@@ -34,9 +34,9 @@ public final class MinecraftSectionModelMesher {
         List<ResolvedBlockInput> resolved = new ArrayList<>(blocks.size());
         for (BlockInput input : blocks) {
             if (input == null) continue;
-            List<BlockStateModelPart> parts = new ArrayList<>();
-            input.model().collectParts(net.minecraft.util.RandomSource.create(input.modelSeed()), parts);
-            resolved.add(new ResolvedBlockInput(parts, input.localX(), input.localY(), input.localZ(),
+            resolved.add(ResolvedBlockInput.capture(
+                    input.model(), input.modelSeed(),
+                    input.localX(), input.localY(), input.localZ(),
                     input.downOccluded(), input.upOccluded(), input.northOccluded(),
                     input.southOccluded(), input.westOccluded(), input.eastOccluded()));
         }
