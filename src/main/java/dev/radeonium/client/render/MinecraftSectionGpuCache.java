@@ -6,7 +6,8 @@ import com.mojang.renderpearl.api.commands.RenderPass;
 import com.mojang.renderpearl.api.pipeline.CompiledRenderPipeline;
 
 import java.util.EnumMap;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -20,7 +21,8 @@ import java.util.Map;
 public final class MinecraftSectionGpuCache implements AutoCloseable {
     private final MinecraftBlockModelMesher mesher = new MinecraftBlockModelMesher();
     private final MinecraftMaterialTable materials = new MinecraftMaterialTable();
-    private final Map<SectionPos, Entry> sections = new HashMap<>();
+    private static final int MAX_CACHED_SECTIONS = 64;
+    private final Map<SectionPos, Entry> sections = new LinkedHashMap<>(16, 0.75f, true);
 
     /** Builds one GPU upload per vanilla render layer, then atomically replaces the old entry. */
     public synchronized void rebuild(SectionPos position, List<BlockStateModelPart> modelParts) {
@@ -44,6 +46,49 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
         } catch (RuntimeException | Error failure) {
             for (MinecraftMeshGpuUpload upload : layerUploads.values()) upload.close();
             throw failure;
+        }
+    }
+
+
+    /**
+     * Uploads an asynchronously built, layer-separated section result.
+     * Call only on the render thread after the CPU snapshot is published.
+     */
+    public synchronized void rebuild(
+            SectionPos position, MinecraftSectionModelMesher.SectionModelMesh sectionMesh
+    ) {
+        if (position == null || sectionMesh == null) {
+            throw new IllegalArgumentException("position and sectionMesh are required");
+        }
+
+        EnumMap<ChunkSectionLayer, MinecraftMeshGpuUpload> layerUploads =
+                new EnumMap<>(ChunkSectionLayer.class);
+        List<MinecraftBlockModelMesh.Quad> allQuads = new ArrayList<>();
+        try {
+            for (ChunkSectionLayer layer : ChunkSectionLayer.values()) {
+                MinecraftBlockModelMesh layerMesh = sectionMesh.layer(layer);
+                if (layerMesh.quadCount() > 0) {
+                    allQuads.addAll(layerMesh.quads());
+                    layerUploads.put(layer, MinecraftMeshGpuUpload.upload(layerMesh));
+                }
+            }
+            MinecraftBlockModelMesh combined = new MinecraftBlockModelMesh(allQuads);
+            int[] materialIndices = materials.register(combined);
+            Entry replacement = new Entry(combined, layerUploads, materialIndices);
+            Entry previous = sections.put(position, replacement);
+            if (previous != null) previous.close();
+            evictExcessSections();
+        } catch (RuntimeException | Error failure) {
+            for (MinecraftMeshGpuUpload upload : layerUploads.values()) upload.close();
+            throw failure;
+        }
+    }
+
+    private void evictExcessSections() {
+        while (sections.size() > MAX_CACHED_SECTIONS) {
+            SectionPos oldest = sections.keySet().iterator().next();
+            Entry removed = sections.remove(oldest);
+            if (removed != null) removed.close();
         }
     }
 
