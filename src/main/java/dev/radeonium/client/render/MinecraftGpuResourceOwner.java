@@ -73,6 +73,7 @@ public final class MinecraftGpuResourceOwner implements AutoCloseable {
     }
 
     MinecraftMeshGpuUpload track(MinecraftMeshGpuUpload upload, ByteArrayKey key) {
+        renderThreadCheck.run();
         if (upload == null) throw new IllegalArgumentException("upload cannot be null");
         if (upload.isEmpty()) return upload;
         if (upload.isClosed()) throw new IllegalArgumentException("cannot track a closed GPU upload");
@@ -103,6 +104,7 @@ public final class MinecraftGpuResourceOwner implements AutoCloseable {
 
     /** Adds one section reference to an already tracked live upload. */
     boolean retain(MinecraftMeshGpuUpload upload) {
+        renderThreadCheck.run();
         if (upload == null || upload.isClosed()) return false;
         Allocation allocation = allocations.get(upload);
         if (allocation == null) return false;
