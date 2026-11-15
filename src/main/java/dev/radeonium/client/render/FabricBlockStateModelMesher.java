@@ -137,6 +137,19 @@ public final class FabricBlockStateModelMesher {
         @Override public boolean[] hasNormals() { return hasNormals.clone(); }
         @Override public int[] colors() { return colors.clone(); }
         @Override public int[] lightmaps() { return lightmaps.clone(); }
+
+        Quad translated(float x, float y, float z) {
+            float[] moved = positions.clone();
+            for (int vertex = 0; vertex < 4; vertex++) {
+                int offset = vertex * 3;
+                moved[offset] += x;
+                moved[offset + 1] += y;
+                moved[offset + 2] += z;
+            }
+            return new Quad(moved, uv, normals, hasNormals, colors, lightmaps,
+                    layer, atlas, cullFace, nominalFace, tintIndex, ambientOcclusion,
+                    emissive, animated, diffuseShade);
+        }
     }
 
     public static final class FabricBlockModelMesh {
@@ -148,6 +161,10 @@ public final class FabricBlockStateModelMesher {
 
         public List<Quad> quads() { return quads; }
         public int quadCount() { return quads.size(); }
+
+        static FabricBlockModelMesh combine(List<Quad> quads) {
+            return new FabricBlockModelMesh(quads);
+        }
         public int quadCount(ChunkSectionLayer layer) {
             int count = 0;
             for (Quad quad : quads) if (quad.layer() == layer) count++;
