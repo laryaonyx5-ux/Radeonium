@@ -1,6 +1,7 @@
 package dev.radeonium.client.render;
 
 import net.minecraft.client.renderer.block.dispatch.BlockStateModelPart;
+import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
 import com.mojang.renderpearl.api.commands.RenderPass;
 import com.mojang.renderpearl.api.pipeline.CompiledRenderPipeline;
@@ -14,18 +15,20 @@ import java.util.Map;
 /**
  * Owns layer-separated GPU uploads and material indices produced from baked models.
  *
- * GPU creation and destruction must run on Minecraft's render thread. This
- * The section compiler feeds this cache through a bounded render-thread upload
+ * GPU creation and destruction must run on Minecraft's render thread. The
+ * section compiler feeds this cache through a bounded render-thread upload
  * queue. Terrain draw submission remains owned by the caller's frame graph.
  */
 public final class MinecraftSectionGpuCache implements AutoCloseable {
     private final MinecraftBlockModelMesher mesher = new MinecraftBlockModelMesher();
     private final MinecraftMaterialTable materials = new MinecraftMaterialTable();
     private static final int MAX_CACHED_SECTIONS = 64;
+    private static final long MAX_CACHED_BYTES = 64L * 1024L * 1024L;
     private final Map<SectionPos, Entry> sections = new LinkedHashMap<>(16, 0.75f, true);
 
     /** Builds one GPU upload per vanilla render layer, then atomically replaces the old entry. */
     public synchronized void rebuild(SectionPos position, List<BlockStateModelPart> modelParts) {
+        RenderSystem.assertOnRenderThread();
         if (position == null) throw new IllegalArgumentException("position cannot be null");
         if (modelParts == null) throw new IllegalArgumentException("modelParts cannot be null");
 
@@ -41,12 +44,14 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
                 }
             }
             int[] materialIndices = materials.register(mesh);
+            materials.retain(materialIndices);
             Entry replacement = new Entry(mesh, layerUploads, materialIndices);
             Entry previous = sections.put(position, replacement);
-            if (previous != null) previous.close();
+            if (previous != null) previous.close(materials);
             evictExcessSections();
         } catch (RuntimeException | Error failure) {
             for (MinecraftMeshGpuUpload upload : layerUploads.values()) upload.close();
+            materials.discardUnreferenced();
             throw failure;
         }
     }
@@ -59,6 +64,7 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
     public synchronized void rebuild(
             SectionPos position, MinecraftSectionModelMesher.SectionModelMesh sectionMesh
     ) {
+        RenderSystem.assertOnRenderThread();
         if (position == null || sectionMesh == null) {
             throw new IllegalArgumentException("position and sectionMesh are required");
         }
@@ -77,9 +83,10 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
             }
             MinecraftBlockModelMesh combined = new MinecraftBlockModelMesh(allQuads);
             int[] materialIndices = materials.register(combined);
+            materials.retain(materialIndices);
             Entry replacement = new Entry(combined, layerUploads, materialIndices);
             Entry previous = sections.put(position, replacement);
-            if (previous != null) previous.close();
+            if (previous != null) previous.close(materials);
             evictExcessSections();
         } catch (RuntimeException | Error failure) {
             for (MinecraftMeshGpuUpload upload : layerUploads.values()) upload.close();
@@ -88,20 +95,22 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
     }
 
     private void evictExcessSections() {
-        while (sections.size() > MAX_CACHED_SECTIONS) {
+        while (sections.size() > MAX_CACHED_SECTIONS || uploadedBytes() > MAX_CACHED_BYTES) {
             SectionPos oldest = sections.keySet().iterator().next();
             Entry removed = sections.remove(oldest);
-            if (removed != null) removed.close();
+            if (removed != null) removed.close(materials);
         }
     }
 
     public synchronized void remove(SectionPos position) {
+        RenderSystem.assertOnRenderThread();
         Entry removed = sections.remove(position);
-        if (removed != null) removed.close();
+        if (removed != null) removed.close(materials);
     }
 
     public synchronized void clear() {
-        for (Entry entry : sections.values()) entry.close();
+        RenderSystem.assertOnRenderThread();
+        for (Entry entry : sections.values()) entry.close(materials);
         sections.clear();
         materials.clear();
     }
@@ -206,8 +215,9 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
             materialIndices = materialIndices.clone();
         }
 
-        private void close() {
+        private void close(MinecraftMaterialTable materials) {
             for (MinecraftMeshGpuUpload upload : layerUploads.values()) upload.close();
+            materials.release(materialIndices);
         }
     }
 }
