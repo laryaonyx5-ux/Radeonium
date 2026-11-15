@@ -62,10 +62,10 @@ public final class FluidSectionSnapshot {
         }
     }
 
-    public short fluidId(int x, int y, int z) { return fluidIds[index(x, y, z)]; }
-    public int heightEighths(int x, int y, int z) { return Byte.toUnsignedInt(heights[index(x, y, z)]); }
-    public int tint(int x, int y, int z) { return tints[index(x, y, z)]; }
-    public int packedLight(int x, int y, int z) { return packedLights[index(x, y, z)]; }
+    public short fluidId(int x, int y, int z) { return fluidIds[dataIndex(x, y, z)]; }
+    public int heightEighths(int x, int y, int z) { return Byte.toUnsignedInt(heights[dataIndex(x, y, z)]); }
+    public int tint(int x, int y, int z) { return tints[dataIndex(x, y, z)]; }
+    public int packedLight(int x, int y, int z) { return packedLights[dataIndex(x, y, z)]; }
     public boolean hasHalo() { return hasHalo; }
 
     /** Returns zero outside the section when no neighbor halo was captured. */
@@ -83,6 +83,13 @@ public final class FluidSectionSnapshot {
     public byte[] copyHeights() { return heights.clone(); }
     public int[] copyTints() { return tints.clone(); }
     public int[] copyPackedLights() { return packedLights.clone(); }
+
+    private int dataIndex(int x, int y, int z) {
+        if (!inSection(x, y, z)) {
+            throw new IndexOutOfBoundsException("Fluid block coordinates must be in [0, 15]");
+        }
+        return hasHalo ? haloIndex(x, y, z) : index(x, y, z);
+    }
 
     private static boolean inSection(int x, int y, int z) {
         return x >= 0 && x < EDGE && y >= 0 && y < EDGE && z >= 0 && z < EDGE;
