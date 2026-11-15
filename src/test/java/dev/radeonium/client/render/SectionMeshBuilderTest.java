@@ -111,6 +111,34 @@ class SectionMeshBuilderTest {
         }
     }
 
+
+    @Test
+    void fullySolidSectionMergesToSixExteriorQuads() {
+        short[] blocks = new short[4096];
+        java.util.Arrays.fill(blocks, (short) 1);
+
+        SectionMesh mesh = builder.build(new VoxelSectionSnapshot(blocks));
+
+        assertEquals(36, mesh.vertexCount());
+        assertEquals(36 * SectionMesh.VERTEX_STRIDE_BYTES, mesh.byteSize());
+    }
+
+    @Test
+    void repeatedBuildsProduceIdenticalVertexBytes() {
+        short[] blocks = new short[4096];
+        for (int y = 3; y < 9; y++) {
+            for (int z = 2; z < 12; z++) {
+                for (int x = 4; x < 10; x++) {
+                    blocks[index(x, y, z)] = (short) ((x + y + z) % 3 + 1);
+                }
+            }
+        }
+        VoxelSectionSnapshot snapshot = new VoxelSectionSnapshot(blocks);
+
+        assertArrayEquals(builder.build(snapshot).copyVertexData(),
+                builder.build(snapshot).copyVertexData());
+    }
+
     private static int index(int x, int y, int z) {
         return x | (y << 4) | (z << 8);
     }
