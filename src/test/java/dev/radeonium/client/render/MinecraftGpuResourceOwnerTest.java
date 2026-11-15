@@ -202,6 +202,42 @@ class MinecraftGpuResourceOwnerTest {
         assertTrue(upload.isClosed());
     }
 
+
+    @Test
+    void bulkReleaseContinuesAfterOneDisposalFailureAndRemainsReusable() {
+        AtomicInteger failedAttempts = new AtomicInteger();
+        AtomicInteger successfulClose = new AtomicInteger();
+        MinecraftGpuResourceOwner owner = new MinecraftGpuResourceOwner(() -> {});
+        MinecraftMeshGpuUpload retryable = MinecraftMeshGpuUpload.forTesting(4, 40L, () -> {
+            if (failedAttempts.incrementAndGet() == 1) {
+                throw new IllegalStateException("first disposal attempt fails");
+            }
+        });
+        MinecraftMeshGpuUpload independent =
+                MinecraftMeshGpuUpload.forTesting(4, 56L, successfulClose::incrementAndGet);
+        owner.track(retryable, null);
+        owner.track(independent, null);
+
+        assertThrows(IllegalStateException.class, owner::releaseAll);
+        assertTrue(retryable.isClosed() == false);
+        assertTrue(independent.isClosed());
+        assertEquals(1, owner.allocationCount());
+        assertEquals(40L, owner.allocatedBytes());
+
+        owner.releaseAll();
+        assertEquals(0, owner.allocationCount());
+        assertEquals(0L, owner.allocatedBytes());
+        assertEquals(2, failedAttempts.get());
+
+        // releaseAll does not close the owner; new allocations remain valid.
+        MinecraftMeshGpuUpload later =
+                MinecraftMeshGpuUpload.forTesting(4, 24L, () -> {});
+        owner.track(later, null);
+        assertEquals(1, owner.allocationCount());
+        owner.release(later);
+        assertEquals(0, owner.allocationCount());
+    }
+
     @Test
     void closeCanBeRetriedAfterDisposalFailure() {
         AtomicInteger closeAttempts = new AtomicInteger();
