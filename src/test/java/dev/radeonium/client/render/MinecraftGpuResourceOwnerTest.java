@@ -60,6 +60,45 @@ class MinecraftGpuResourceOwnerTest {
     }
 
 
+
+    @Test
+    void sharedUploadClosesOnlyAfterEveryOwnerReferenceIsReleased() {
+        AtomicInteger closeCalls = new AtomicInteger();
+        MinecraftGpuResourceOwner owner = new MinecraftGpuResourceOwner(() -> {});
+        MinecraftMeshGpuUpload upload =
+                MinecraftMeshGpuUpload.forTesting(4, 80L, closeCalls::incrementAndGet);
+        owner.track(upload, new MinecraftGpuResourceOwner.ByteArrayKey(new byte[] {7, 8}));
+
+        assertTrue(owner.retain(upload));
+        assertEquals(1, owner.allocationCount());
+        assertEquals(80L, owner.allocatedBytes());
+
+        assertTrue(owner.release(upload));
+        assertEquals(0, closeCalls.get());
+        assertEquals(1, owner.allocationCount());
+        assertEquals(80L, owner.allocatedBytes());
+
+        assertTrue(owner.release(upload));
+        assertEquals(1, closeCalls.get());
+        assertEquals(0, owner.allocationCount());
+        assertEquals(0L, owner.allocatedBytes());
+    }
+
+    @Test
+    void duplicateTrackingDoesNotCloseAnAlreadyOwnedUpload() {
+        AtomicInteger closeCalls = new AtomicInteger();
+        MinecraftGpuResourceOwner owner = new MinecraftGpuResourceOwner(() -> {});
+        MinecraftMeshGpuUpload upload =
+                MinecraftMeshGpuUpload.forTesting(4, 80L, closeCalls::incrementAndGet);
+        owner.track(upload, null);
+
+        assertThrows(IllegalStateException.class, () -> owner.track(upload, null));
+        assertEquals(0, closeCalls.get());
+        assertFalse(upload.isClosed());
+        assertEquals(1, owner.allocationCount());
+        assertEquals(80L, owner.allocatedBytes());
+    }
+
     @Test
     void trackingRejectsClosedUploadsWithoutCountingThem() {
         MinecraftGpuResourceOwner owner = new MinecraftGpuResourceOwner(() -> {});
