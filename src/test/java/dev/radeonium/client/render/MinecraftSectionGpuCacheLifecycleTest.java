@@ -159,6 +159,37 @@ class MinecraftSectionGpuCacheLifecycleTest {
         assertEquals(3, closeAttempts.get());
     }
 
+
+    @Test
+    void clearContinuesDisposalAndRetainsOnlyFailedEntries() {
+        AtomicInteger firstAttempts = new AtomicInteger();
+        MinecraftGpuResourceOwner owner = new MinecraftGpuResourceOwner(() -> {});
+        MinecraftSectionGpuCache cache =
+                new MinecraftSectionGpuCache(owner, () -> {});
+        MinecraftMeshGpuUpload retryable = MinecraftMeshGpuUpload.forTesting(4, 24L, () -> {
+            if (firstAttempts.incrementAndGet() == 1) {
+                throw new IllegalStateException("first buffer disposal fails");
+            }
+        });
+        MinecraftMeshGpuUpload independent =
+                MinecraftMeshGpuUpload.forTesting(4, 32L, () -> {});
+        owner.track(retryable, null);
+        owner.track(independent, null);
+        cache.installPreparedEntry(new SectionPos(0, 0, 0), entry(retryable));
+        cache.installPreparedEntry(new SectionPos(1, 0, 0), entry(independent));
+
+        assertThrows(IllegalStateException.class, cache::clear);
+
+        assertEquals(1, cache.sectionCount());
+        assertFalse(retryable.isClosed());
+        assertTrue(independent.isClosed());
+        assertEquals(1, owner.allocationCount());
+
+        cache.clear();
+        assertEquals(0, cache.sectionCount());
+        assertEquals(0, owner.allocationCount());
+    }
+
     @Test
     void evictionReleasesOldestGpuAllocation() {
         MinecraftGpuResourceOwner owner = new MinecraftGpuResourceOwner(() -> {});
