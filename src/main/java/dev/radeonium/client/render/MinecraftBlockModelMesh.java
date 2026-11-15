@@ -63,6 +63,8 @@ public final class MinecraftBlockModelMesh {
         private final boolean partAmbientOcclusion;
         private final int tintColor;
         private final int packedLightCoords;
+        private final int[] vertexColors;
+        private final int[] vertexLightCoords;
 
         Quad(
                 float[] positions,
@@ -73,12 +75,16 @@ public final class MinecraftBlockModelMesh {
                 BakedQuad sourceQuad,
                 boolean partAmbientOcclusion,
                 int tintColor,
-                int packedLightCoords
+                int packedLightCoords,
+                int[] vertexColors,
+                int[] vertexLightCoords
         ) {
             if (positions == null || packedUv == null || positions.length != 12 || packedUv.length != 4) {
                 throw new IllegalArgumentException("A baked quad needs four positions and four UV pairs");
             }
-            if (layer == null || material == null || sourceQuad == null) {
+            if (layer == null || material == null || sourceQuad == null
+                    || vertexColors == null || vertexLightCoords == null
+                    || vertexColors.length != 4 || vertexLightCoords.length != 4) {
                 throw new IllegalArgumentException("A baked quad needs layer, material and source data");
             }
             for (float coordinate : positions) {
@@ -95,6 +101,8 @@ public final class MinecraftBlockModelMesh {
             this.partAmbientOcclusion = partAmbientOcclusion;
             this.tintColor = tintColor;
             this.packedLightCoords = packedLightCoords;
+            this.vertexColors = vertexColors.clone();
+            this.vertexLightCoords = vertexLightCoords.clone();
         }
 
         public float[] copyPositions() {
@@ -144,6 +152,8 @@ public final class MinecraftBlockModelMesh {
 
         /** Packed block/sky light sampled from Minecraft's section region. */
         public int packedLightCoords() { return packedLightCoords; }
+        public int[] copyVertexColors() { return vertexColors.clone(); }
+        public int[] copyVertexLightCoords() { return vertexLightCoords.clone(); }
 
         /**
          * Writes two triangles in the vertex format used by
@@ -160,6 +170,8 @@ public final class MinecraftBlockModelMesh {
                 target.putInt((int) (packedUv[vertex] >>> 32));
                 target.putInt(tintColor);
                 target.putInt(packedLightCoords);
+                target.putInt(vertexColors[vertex]);
+                target.putInt(vertexLightCoords[vertex]);
             }
         }
     }
