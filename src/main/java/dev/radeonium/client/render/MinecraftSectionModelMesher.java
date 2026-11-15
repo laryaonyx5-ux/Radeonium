@@ -59,7 +59,9 @@ public final class MinecraftSectionModelMesher {
                                 quad.copyPackedUv(),
                                 quad.direction(),
                                 quad.layer(),
-                                quad.material()
+                                quad.material(),
+                                quad.sourceQuad(),
+                                quad.ambientOcclusion()
                         ));
             }
         }
