@@ -2,7 +2,7 @@
 
 ## Status
 
-**In progress — architecture mapped; no vanilla terrain draw path has been replaced yet.**
+**Implementation connected in code; runtime validation still pending. Radeonium now prepares and submits its own per-layer draw list and can draw from its own GPU copies, with vanilla-buffer fallback. Minecraft still owns the frame graph and pass/OIT scheduling.**
 
 The step 6 RenderPearl submission methods are a low-level draw bridge only. They do not provide the data or frame-graph integration needed to replace Minecraft's terrain renderer.
 
@@ -99,3 +99,27 @@ Step 7.5 cannot be marked fully complete, and the full terrain replacement canno
 - Commit `0dbfdcc684ffd766c771ff93c75c49f1715e11e1` adds stale-result protection to the CPU section pipeline.
 - This is infrastructure only: it does not yet feed real Minecraft-compiled section geometry into Radeonium, upload full terrain, or replace any draw calls.
 - The next implementation target is the real compiled-section lifecycle bridge, followed by complete section extraction and layer-aware GPU uploads.
+
+
+## Implementation update — 2026-11-15
+
+The live section-geometry path is now connected:
+
+- `SectionCompilerMixin` is registered in `radeonium.mixins.json` and observes the actual Minecraft 26.3 `SectionCompiler.compile` return path.
+- A per-section compile generation rejects late worker results when a newer compile for the same section has started. Completed capture generations are released, and world swaps clear the retained state.
+- The capture copies each compiled layer's actual vertex and index bytes, vertex format, topology, index type and draw counts before Minecraft releases its `MeshData`. This intentionally reuses Minecraft's complete model/fluid/lighting compilation rather than attempting a second incomplete block mesher.
+- The render-thread GPU cache uploads those exact bytes through RenderPearl. It only exposes buffers while the corresponding CPU snapshot remains current.
+- `RadeoniumChunkSectionsToRender` now prefers Radeonium-owned GPU buffers for each layer. If an upload is absent, stale, or requires the shared sequential index buffer, the draw list falls back to Minecraft's current section slice. This prevents missing terrain while asynchronous uploads are pending.
+- The existing `ChunkSectionsToRender.DrawSeparate` layer submission hook submits Radeonium's prepared draw list through RenderPearl. Minecraft's frame graph still schedules the passes and owns the transparency/OIT stages; those are not replaced.
+
+### Updated step status
+
+| Sub-step | Code status | Remaining validation |
+|---|---|---|
+| 7.1 | Live compiler hook, generation guard and world-reset cleanup connected | In-game rebuild/removal/world-swap stress test |
+| 7.2 | Actual compiled layer geometry copied with format and index metadata | Verify all target layers and modded-renderer compatibility in-game |
+| 7.3 | RenderPearl GPU mirror connected and used by the draw-list where compatible | Validate GPU resource lifetime and both graphics backends |
+| 7.4 | Radeonium-owned layer draw list/submission connected, with per-layer vanilla fallback | Verify frame-graph, translucent ordering and OIT behavior in-game |
+| 7.5 | CI build and JAR packaging pass on the current implementation | Runtime matrix and performance comparison remain pending |
+
+**Important boundary:** this is a real custom section-data upload and draw-list path, but it is not yet a complete Sodium-equivalent renderer. The Minecraft frame graph, terrain layer pipelines/shaders, and OIT pass scheduling remain Minecraft-owned. Do not describe the renderer as fully independent or claim FPS gains until runtime correctness and benchmarks pass.
