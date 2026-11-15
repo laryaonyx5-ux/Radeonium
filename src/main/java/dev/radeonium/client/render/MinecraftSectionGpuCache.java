@@ -75,22 +75,9 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
         }
 
         // Commit only after every replacement upload and material reference is ready.
-        // A later disposal/eviction failure must not release buffers already installed.
         Entry replacement = new Entry(mesh, MinecraftFluidSectionMesher.SectionFluidMesh.empty(), null,
                 Set.of(), layerUploads, materialIndices);
-        Entry previous = sections.get(position);
-        if (previous != null) {
-            try {
-                previous.close(materials, gpuResources);
-            } catch (RuntimeException | Error failure) {
-                cleanupFailedReplacement(layerUploads, materialIndices, failure);
-                throw failure;
-            }
-        }
-        sections.put(position, replacement);
-        translucentSortCameras.remove(position);
-        translucentSortOrders.remove(position);
-        evictExcessSections();
+        installPreparedEntry(position, replacement);
     }
 
 
@@ -158,12 +145,24 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
         // Keep the old section intact until the complete replacement is prepared.
         Entry replacement = new Entry(combined, sectionMesh.fluidMesh(), sourceSnapshot,
                 verifiedLayers, layerUploads, materialIndices);
+        installPreparedEntry(position, replacement);
+    }
+
+    /**
+     * Installs a fully prepared cache entry. Kept separate from meshing/upload
+     * so replacement, eviction and disposal lifecycle can be tested independently.
+     */
+    void installPreparedEntry(SectionPos position, Entry replacement) {
+        renderThreadCheck.run();
+        if (position == null || replacement == null) {
+            throw new IllegalArgumentException("position and replacement are required");
+        }
         Entry previous = sections.get(position);
         if (previous != null) {
             try {
                 previous.close(materials, gpuResources);
             } catch (RuntimeException | Error failure) {
-                cleanupFailedReplacement(layerUploads, materialIndices, failure);
+                cleanupFailedReplacement(replacement.layerUploads(), replacement.materialIndices(), failure);
                 throw failure;
             }
         }
@@ -509,7 +508,7 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
         gpuResources.close();
     }
 
-    private record Entry(
+    record Entry(
             MinecraftBlockModelMesh mesh,
             MinecraftFluidSectionMesher.SectionFluidMesh fluids,
             MinecraftSectionModelCaptureStore.Snapshot sourceSnapshot,
@@ -517,7 +516,7 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
             EnumMap<ChunkSectionLayer, MinecraftMeshGpuUpload> layerUploads,
             int[] materialIndices
     ) {
-        private Entry {
+        Entry {
             if (fluids == null || parityVerified == null) throw new IllegalArgumentException("fluids and parity verification cannot be null");
             parityVerified = Set.copyOf(parityVerified);
             layerUploads = new EnumMap<>(layerUploads);
