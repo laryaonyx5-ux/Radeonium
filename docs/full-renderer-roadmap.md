@@ -171,6 +171,29 @@ Runtime RenderPearl compilation, visual comparison and backend checks remain pen
 
 Section-center ordering is an approximation for ordinary alpha blending; it cannot correctly order intersecting translucent surfaces across section boundaries. Water, glass and modded translucent geometry therefore continue to use the host OIT override when available, or Minecraft's vanilla translucent path otherwise. Radeonium does not yet own a replacement OIT implementation or its backend-specific depth/blend resources. Runtime visual checks for water, glass, ice, intersecting surfaces and camera movement remain required before any host transparency path can be replaced.
 
+## Milestone G — visibility and section lifecycle
+
+**Status: implementation and focused lifecycle tests complete; in-game unload/reload and visibility validation pending.**
+
+### Implemented lifecycle safeguards
+
+- Keeps section build generations globally monotonic for the lifetime of the renderer pipeline. Clearing a world, removing a section and later recreating the same coordinates can no longer reuse an old generation token (the stale-worker ABA case).
+- Dirty-section notifications invalidate the changed section and all six face-neighbors in the renderer pipeline.
+- The same invalidation now removes each affected optional model snapshot before queuing its render-thread GPU-cache removal. This prevents the removal queue from retaining a stale GPU mesh merely because the old CPU snapshot still exists.
+- Existing world-identity tracking clears section CPU/GPU state, pending uploads and capture generations when the client changes level or unloads the world.
+- Existing resource reload handling clears baked-model snapshots and pending model uploads/removals, then schedules render-thread GPU-cache invalidation.
+- Visible-section reconciliation continues to use Minecraft's visible set as the authority; Radeonium does not invent a competing frustum/occlusion result.
+- Focused tests cover generation invalidation across world clear/recreation, section removal/recreation, repeated dirty notifications and visible-set reconciliation.
+
+### Remaining acceptance work
+
+- In-game stress test rapid block edits at section borders and confirm the changed section plus six neighbors rebuild without stale faces or seams.
+- Travel repeatedly across chunk boundaries and verify unload/reload does not leave missing or stale geometry.
+- Change dimensions and reload resource packs while asynchronous section jobs are active; confirm old jobs cannot publish into the new world/resource epoch.
+- Compare Radeonium's visible draw list with Minecraft under camera rotation, occlusion and frustum movement; confirm invisible sections do not appear and returning sections rebuild correctly.
+
+Vanilla remains the compatibility authority for unsupported or stale geometry. No independent Radeonium occlusion system or performance gain is claimed by this milestone.
+
 ## What "Radeonium owns the renderer" means
 
 Radeonium must eventually own these responsibilities:
