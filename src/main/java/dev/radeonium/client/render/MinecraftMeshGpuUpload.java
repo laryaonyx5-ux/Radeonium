@@ -62,6 +62,14 @@ public final class MinecraftMeshGpuUpload implements AutoCloseable {
         return upload(device, mesh, defaultMaterials);
     }
 
+
+    /** Uploads with the active RenderPearl device and per-quad material indices. */
+    public static MinecraftMeshGpuUpload upload(
+            MinecraftBlockModelMesh mesh, int[] materialIndices
+    ) {
+        return upload(RenderSystem.getDevice(), mesh, materialIndices);
+    }
+
     /** Uploads one material-table index per quad into every emitted vertex. */
     public static MinecraftMeshGpuUpload upload(
             GpuDevice device, MinecraftBlockModelMesh mesh, int[] materialIndices
