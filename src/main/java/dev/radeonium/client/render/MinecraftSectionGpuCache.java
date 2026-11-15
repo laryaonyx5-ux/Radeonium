@@ -259,7 +259,7 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
         int total = 0;
         for (Entry entry : sections.values()) {
             for (MinecraftMeshGpuUpload upload : entry.layerUploads.values()) {
-                total = Math.addExact(total, upload.vertexCount());
+                if (!upload.isClosed()) total = Math.addExact(total, upload.vertexCount());
             }
         }
         return total;
@@ -337,7 +337,7 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
             }
         }
         MinecraftMeshGpuUpload upload = entry.layerUploads.get(layer);
-        if (upload == null || upload.isEmpty()) return null;
+        if (upload == null || upload.isEmpty() || upload.isClosed()) return null;
         return new LayerBuffers(
                 upload.vertexBuffer(), upload.vertexCount(), upload.indexCount(),
                 upload.vertexFormat(), upload.topology()
@@ -403,7 +403,7 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
                     || MinecraftSectionModelCaptureStore.get(entry.sourceSnapshot.position()) != entry.sourceSnapshot
                     || !entry.parityVerified.contains(layer)) continue;
             MinecraftMeshGpuUpload upload = entry.layerUploads.get(layer);
-            if (upload == null || upload.isEmpty()) continue;
+            if (upload == null || upload.isEmpty() || upload.isClosed()) continue;
             if (submitted == 0) pass.setPipeline(pipeline);
             upload.drawInto(pass);
             submitted++;
@@ -424,7 +424,7 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
             if (entry.sourceSnapshot == null
                     || MinecraftSectionModelCaptureStore.get(entry.sourceSnapshot.position()) != entry.sourceSnapshot) continue;
             for (MinecraftMeshGpuUpload upload : entry.layerUploads.values()) {
-                if (upload.isEmpty()) continue;
+                if (upload.isEmpty() || upload.isClosed()) continue;
                 if (submitted == 0) pass.setPipeline(pipeline);
                 upload.drawInto(pass);
                 submitted++;
@@ -438,14 +438,16 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
             SectionPos position, ChunkSectionLayer layer
     ) {
         Entry entry = sections.get(position);
-        return entry == null ? null : entry.layerUploads.get(layer);
+        if (entry == null) return null;
+        MinecraftMeshGpuUpload upload = entry.layerUploads.get(layer);
+        return upload == null || upload.isClosed() ? null : upload;
     }
 
     /** Legacy accessor: returns the first available layer upload. Prefer the layer-aware overload. */
     public synchronized MinecraftMeshGpuUpload upload(SectionPos position) {
         Entry entry = sections.get(position);
         if (entry == null || entry.layerUploads.isEmpty()) return null;
-        return entry.layerUploads.values().iterator().next();
+        return entry.layerUploads.values().stream().filter(upload -> !upload.isClosed()).findFirst().orElse(null);
     }
 
     public synchronized MinecraftFluidSectionMesher.SectionFluidMesh fluidMesh(SectionPos position) {
