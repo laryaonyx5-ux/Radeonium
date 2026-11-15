@@ -186,7 +186,14 @@ public final class MinecraftCompiledGeometryGpuCache implements AutoCloseable {
                 MinecraftCompiledGeometryStore.LayerData source
         ) {
             byte[] vertexBytes = source.vertexBytes();
+            byte[] indexBytes = source.indexBytes();
+            IndexType type = source.indexType();
             if (vertexBytes.length == 0 || source.vertexCount() <= 0) return null;
+            if (source.indexCount() < 0 || (source.indexCount() > 0
+                    && (type == null || indexBytes.length < (long) source.indexCount() * type.bytes))
+                    || (source.indexCount() == 0 && indexBytes.length != 0)) {
+                return null;
+            }
 
             GpuBuffer vertexBuffer = null;
             GpuBuffer indexBuffer = null;
@@ -197,9 +204,7 @@ public final class MinecraftCompiledGeometryGpuCache implements AutoCloseable {
                         directBuffer(vertexBytes)
                 );
 
-                byte[] indexBytes = source.indexBytes();
-                IndexType type = source.indexType();
-                if (indexBytes.length > 0 && source.indexCount() > 0) {
+                if (source.indexCount() > 0) {
                     indexBuffer = device.createBuffer(
                             () -> "Radeonium compiled section " + layer + " indices",
                             GpuBuffer.USAGE_INDEX,
