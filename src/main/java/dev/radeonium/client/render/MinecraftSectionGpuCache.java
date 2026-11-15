@@ -45,7 +45,7 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
             }
             int[] materialIndices = materials.register(mesh);
             materials.retain(materialIndices);
-            Entry replacement = new Entry(mesh, layerUploads, materialIndices);
+            Entry replacement = new Entry(mesh, MinecraftFluidSectionMesher.SectionFluidMesh.empty(), layerUploads, materialIndices);
             Entry previous = sections.put(position, replacement);
             if (previous != null) previous.close(materials);
             evictExcessSections();
@@ -75,16 +75,19 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
         try {
             for (ChunkSectionLayer layer : ChunkSectionLayer.values()) {
                 MinecraftBlockModelMesh layerMesh = sectionMesh.layer(layer);
-                if (layerMesh.quadCount() > 0) {
+                MinecraftFluidSectionMesher.FluidLayerMesh fluidLayer = sectionMesh.fluids(layer);
+                if (layerMesh.quadCount() > 0 || !fluidLayer.quads().isEmpty()) {
                     allQuads.addAll(layerMesh.quads());
                     int[] layerMaterialIndices = materials.register(layerMesh);
-                    layerUploads.put(layer, MinecraftMeshGpuUpload.upload(layerMesh, layerMaterialIndices));
+                    layerUploads.put(layer, MinecraftMeshGpuUpload.upload(
+                            com.mojang.blaze3d.systems.RenderSystem.getDevice(),
+                            layerMesh, layerMaterialIndices, fluidLayer.quads()));
                 }
             }
             MinecraftBlockModelMesh combined = new MinecraftBlockModelMesh(allQuads);
             int[] materialIndices = materials.register(combined);
             materials.retain(materialIndices);
-            Entry replacement = new Entry(combined, layerUploads, materialIndices);
+            Entry replacement = new Entry(combined, sectionMesh.fluidMesh(), layerUploads, materialIndices);
             Entry previous = sections.put(position, replacement);
             if (previous != null) previous.close(materials);
             evictExcessSections();
@@ -191,6 +194,11 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
         return entry.layerUploads.values().iterator().next();
     }
 
+    public synchronized MinecraftFluidSectionMesher.SectionFluidMesh fluidMesh(SectionPos position) {
+        Entry entry = sections.get(position);
+        return entry == null ? MinecraftFluidSectionMesher.SectionFluidMesh.empty() : entry.fluids;
+    }
+
     public synchronized MinecraftBlockModelMesh mesh(SectionPos position) {
         Entry entry = sections.get(position);
         return entry == null ? null : entry.mesh;
@@ -208,10 +216,12 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
 
     private record Entry(
             MinecraftBlockModelMesh mesh,
+            MinecraftFluidSectionMesher.SectionFluidMesh fluids,
             EnumMap<ChunkSectionLayer, MinecraftMeshGpuUpload> layerUploads,
             int[] materialIndices
     ) {
         private Entry {
+            if (fluids == null) throw new IllegalArgumentException("fluids cannot be null");
             layerUploads = new EnumMap<>(layerUploads);
             materialIndices = materialIndices.clone();
         }
