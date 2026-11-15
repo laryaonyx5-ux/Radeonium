@@ -67,6 +67,10 @@ public final class ChunkRenderPipeline {
         if (sections.containsKey(position)) vanillaMeshes.put(position, snapshot);
     }
 
+    public synchronized void forgetVanillaMesh(SectionPos position) {
+        vanillaMeshes.remove(position);
+    }
+
     public synchronized VanillaSectionMeshSnapshot vanillaMesh(SectionPos position) {
         return vanillaMeshes.get(position);
     }
