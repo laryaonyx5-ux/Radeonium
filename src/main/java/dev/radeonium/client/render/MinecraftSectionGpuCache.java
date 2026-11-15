@@ -26,7 +26,23 @@ import java.util.EnumSet;
 public final class MinecraftSectionGpuCache implements AutoCloseable {
     private final MinecraftBlockModelMesher mesher = new MinecraftBlockModelMesher();
     private final MinecraftMaterialTable materials = new MinecraftMaterialTable();
-    private final MinecraftGpuResourceOwner gpuResources = new MinecraftGpuResourceOwner();
+    private final MinecraftGpuResourceOwner gpuResources;
+    private final Runnable renderThreadCheck;
+
+    public MinecraftSectionGpuCache() {
+        this(new MinecraftGpuResourceOwner(), RenderSystem::assertOnRenderThread);
+    }
+
+    MinecraftSectionGpuCache(
+            MinecraftGpuResourceOwner gpuResources,
+            Runnable renderThreadCheck
+    ) {
+        if (gpuResources == null || renderThreadCheck == null) {
+            throw new IllegalArgumentException("gpuResources and renderThreadCheck are required");
+        }
+        this.gpuResources = gpuResources;
+        this.renderThreadCheck = renderThreadCheck;
+    }
     private static final int MAX_CACHED_SECTIONS = 64;
     private static final long MAX_CACHED_BYTES = 64L * 1024L * 1024L;
     private final Map<SectionPos, Entry> sections = new LinkedHashMap<>(16, 0.75f, true);
@@ -35,7 +51,7 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
 
     /** Builds one GPU upload per vanilla render layer, then atomically replaces the old entry. */
     public synchronized void rebuild(SectionPos position, List<BlockStateModelPart> modelParts) {
-        RenderSystem.assertOnRenderThread();
+        renderThreadCheck.run();
         if (position == null) throw new IllegalArgumentException("position cannot be null");
         if (modelParts == null) throw new IllegalArgumentException("modelParts cannot be null");
 
@@ -106,7 +122,7 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
             MinecraftSectionModelCaptureStore.Snapshot sourceSnapshot,
             Set<ChunkSectionLayer> parityVerifiedLayers
     ) {
-        RenderSystem.assertOnRenderThread();
+        renderThreadCheck.run();
         if (position == null || sectionMesh == null || parityVerifiedLayers == null) {
             throw new IllegalArgumentException("position and sectionMesh are required");
         }
@@ -220,7 +236,7 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
     }
 
     public synchronized void remove(SectionPos position) {
-        RenderSystem.assertOnRenderThread();
+        renderThreadCheck.run();
         Entry entry = sections.get(position);
         if (entry != null) entry.close(materials, gpuResources);
         sections.remove(position);
@@ -229,7 +245,7 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
     }
 
     public synchronized void clear() {
-        RenderSystem.assertOnRenderThread();
+        renderThreadCheck.run();
         RuntimeException failure = null;
         var iterator = sections.entrySet().iterator();
         while (iterator.hasNext()) {
@@ -403,7 +419,7 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
     public synchronized int drawLayer(
             RenderPass pass, CompiledRenderPipeline pipeline, ChunkSectionLayer layer
     ) {
-        RenderSystem.assertOnRenderThread();
+        renderThreadCheck.run();
         if (pass == null || pipeline == null || layer == null) {
             throw new IllegalArgumentException("pass, pipeline and layer are required");
         }
@@ -427,7 +443,7 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
      * matching the selected layer's blend/depth state.
      */
     public synchronized int drawAll(RenderPass pass, CompiledRenderPipeline pipeline) {
-        RenderSystem.assertOnRenderThread();
+        renderThreadCheck.run();
         if (pass == null || pipeline == null) throw new IllegalArgumentException("pass and pipeline are required");
         int submitted = 0;
         for (Entry entry : sections.values()) {
