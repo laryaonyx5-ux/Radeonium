@@ -92,7 +92,7 @@ public final class RadeoniumChunkSectionsToRender {
             boolean respectTranslucentOrder
     ) {
         LevelRendererAccessor access = (LevelRendererAccessor) renderer;
-        Vec3 cameraPosition = Minecraft.getInstance().gameRenderer.mainCamera().getPosition();
+        Vec3 cameraPosition = Minecraft.getInstance().gameRenderer.mainCamera().position();
         SectionRenderDispatcher dispatcher = access.radeonium$getSectionRenderDispatcher();
 
         EnumMap<ChunkSectionLayer, List<RenderPass.Draw<GpuBufferSlice[]>>> draws =
