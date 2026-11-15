@@ -72,6 +72,7 @@ Milestone B must not begin until the final CI item is green. This milestone does
 - `MinecraftBlockModelMesher` extracts baked quad positions, packed UVs, face directions and Minecraft render-layer/material references from supplied model parts.
 - `MinecraftBlockModelMesh` stores copied quad geometry and can filter by vanilla render layer; each copied quad retains its immutable source `BakedQuad`, effective model-part/material AO, tint index and light-emission metadata.
 - `MinecraftMaterialTable` assigns renderer-side material indices while retaining the source Minecraft material metadata for later translation.
+- `MinecraftSectionModelMesher` now accepts immutable `ResolvedBlockInput` records: variant/weighted/multipart parts can be selected on the Minecraft build thread, copied into an immutable list, then meshed independently by a worker; this path is not yet wired to `SectionCompiler.compile`.
 - `SectionMeshBuilder` contains a greedy opaque-voxel mesher for immutable 16×16×16 material snapshots; it merges coplanar faces of equal material and culls faces against any non-air opaque neighbor.
 - `FluidSectionSnapshot` is an immutable 16³ fluid capture with fluid IDs, quantized heights, tint and packed light.
 - `FluidSectionMesher` emits top and side surfaces from the capture, removes shared same-fluid sides and emits only the exposed portion where adjacent fluid heights differ. Tests cover isolated cells, shared sides, stepped fluid heights and defensive copies.
