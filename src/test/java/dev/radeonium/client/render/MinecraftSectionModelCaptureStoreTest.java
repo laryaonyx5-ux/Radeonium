@@ -137,6 +137,42 @@ class MinecraftSectionModelCaptureStoreTest {
     }
 
     @Test
+    void olderConcurrentCompileCannotReplaceNewerSectionMesh() throws Exception {
+        SectionPos position = SectionPos.of(12, 2, 1);
+        var oldMesh = new MinecraftSectionModelMesher().buildResolved(List.of());
+        var newMesh = new MinecraftSectionModelMesher().buildResolved(List.of());
+        CountDownLatch oldStaged = new CountDownLatch(1);
+        CountDownLatch finishOld = new CountDownLatch(1);
+        AtomicReference<MinecraftSectionModelCaptureStore.Snapshot> oldResult =
+                new AtomicReference<>();
+
+        Thread oldWorker = new Thread(() -> {
+            MinecraftSectionModelCaptureStore.beginCapture(position);
+            MinecraftSectionModelCaptureStore.stage(position, oldMesh);
+            oldStaged.countDown();
+            try {
+                finishOld.await();
+            } catch (InterruptedException exception) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+            oldResult.set(MinecraftSectionModelCaptureStore.complete(position));
+        }, "Radeonium-Old-Compile-Test");
+        oldWorker.start();
+        oldStaged.await();
+
+        MinecraftSectionModelCaptureStore.beginCapture(position);
+        MinecraftSectionModelCaptureStore.stage(position, newMesh);
+        var newest = MinecraftSectionModelCaptureStore.complete(position);
+        finishOld.countDown();
+        oldWorker.join();
+
+        assertNotNull(newest);
+        assertNull(oldResult.get());
+        assertSame(newest, MinecraftSectionModelCaptureStore.get(position));
+    }
+
+    @Test
     void removeAndClearReleaseCapturedSections() {
         SectionPos position = SectionPos.of(5, 6, 7);
         var mesh = new MinecraftSectionModelMesher().buildResolved(List.of());
