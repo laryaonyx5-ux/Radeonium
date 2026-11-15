@@ -21,7 +21,9 @@ Milestone A establishes the API boundary before replacing any Minecraft terrain 
 - `SectionSnapshot` is the boundary for immutable data captured from Minecraft. It must not expose live world, chunk or mutable game objects to worker threads.
 - `SectionMesher` is the CPU-only worker contract.
 - `GpuResourceOwner` is the Radeonium GPU allocation/release contract.
-- `TerrainPassSubmitter` is the terrain draw submission contract.
+- `TerrainPassSubmitter` is the render-thread terrain draw submission contract.
+- `VanillaFallback` defines the explicit per-section/per-layer hand-off when Radeonium cannot safely draw its own mesh.
+- `requireMatchingResult` rejects a worker mesh whose world epoch or section generation no longer matches the source snapshot.
 - `TerrainRenderer` defines the renderer lifecycle and section invalidation entry points.
 - `RendererThreadGuard` binds GPU-facing operations to one render thread and rejects calls from other threads.
 - Mesh payload constructors validate vertex/index byte counts and defensively copy their arrays, preventing callers from mutating submitted CPU mesh data after construction.
@@ -53,6 +55,8 @@ Milestone A establishes the API boundary before replacing any Minecraft terrain 
 - [x] Backend-neutral renderer interfaces and data contracts exist.
 - [x] Thread-affinity guard exists for GPU-facing operations.
 - [x] Immutable mesh payloads validate metadata and copy mutable arrays.
+- [x] Worker results are checked against their originating world/section generation.
+- [x] The code contract exposes explicit per-layer vanilla fallback.
 - [x] Ownership and vanilla fallback rules are documented.
 - [x] Automated tests cover the contract invariants.
 - [ ] GitHub Actions build and test job completes successfully for the commit containing this milestone.
