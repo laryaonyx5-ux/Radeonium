@@ -160,7 +160,7 @@ public final class MinecraftGpuResourceOwner implements AutoCloseable {
         }
     }
 
-    private static final class ByteArrayKey {
+    static final class ByteArrayKey {
         private final byte[] bytes;
         private final int hash;
 
