@@ -123,6 +123,7 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
             Entry previous = sections.put(position, replacement);
             if (previous != null) previous.close(materials);
             translucentSortCameras.remove(position);
+            translucentSortOrders.remove(position);
             evictExcessSections();
         } catch (RuntimeException | Error failure) {
             for (MinecraftMeshGpuUpload upload : layerUploads.values()) upload.close();
