@@ -7,6 +7,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -103,7 +104,7 @@ class MinecraftGpuResourceOwnerTest {
                 MinecraftMeshGpuUpload.forTesting(4, 80L, () -> {});
         owner.track(original, new MinecraftGpuResourceOwner.ByteArrayKey(new byte[] {1, 2}));
 
-        assertEquals(null, owner.findReusable(
+        assertNull(owner.findReusable(
                 new MinecraftGpuResourceOwner.ByteArrayKey(new byte[] {1, 3})));
         assertEquals(1, owner.allocationCount());
         owner.release(original);
