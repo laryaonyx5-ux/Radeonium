@@ -2,6 +2,8 @@ package dev.radeonium.client.render;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.concurrent.atomic.AtomicInteger;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -29,6 +31,67 @@ class MinecraftGpuResourceOwnerTest {
         assertEquals(first, same);
         assertEquals(first.hashCode(), same.hashCode());
         assertNotEquals(first, different);
+    }
+
+
+    @Test
+    void ownerTracksAndReleasesOnlyItsOwnUpload() {
+        AtomicInteger closeCalls = new AtomicInteger();
+        MinecraftGpuResourceOwner owner = new MinecraftGpuResourceOwner(() -> {});
+        MinecraftMeshGpuUpload upload =
+                MinecraftMeshGpuUpload.forTesting(4, 112L, closeCalls::incrementAndGet);
+
+        owner.track(upload, null);
+        assertEquals(1, owner.allocationCount());
+        assertEquals(112L, owner.allocatedBytes());
+
+        assertTrue(owner.release(upload));
+        assertEquals(1, closeCalls.get());
+        assertEquals(0, owner.allocationCount());
+        assertEquals(0L, owner.allocatedBytes());
+        assertFalse(owner.release(upload));
+        assertEquals(1, closeCalls.get());
+    }
+
+    @Test
+    void failedDisposalRemainsTrackedAndCanBeRetried() {
+        AtomicInteger closeAttempts = new AtomicInteger();
+        MinecraftGpuResourceOwner owner = new MinecraftGpuResourceOwner(() -> {});
+        MinecraftMeshGpuUpload upload = MinecraftMeshGpuUpload.forTesting(4, 224L, () -> {
+            if (closeAttempts.incrementAndGet() == 1) {
+                throw new IllegalStateException("simulated disposal failure");
+            }
+        });
+        owner.track(upload, null);
+
+        assertThrows(IllegalStateException.class, owner::releaseAll);
+        assertEquals(1, owner.allocationCount());
+        assertEquals(224L, owner.allocatedBytes());
+        assertFalse(upload.isClosed());
+
+        owner.releaseAll();
+        assertEquals(2, closeAttempts.get());
+        assertEquals(0, owner.allocationCount());
+        assertEquals(0L, owner.allocatedBytes());
+        assertTrue(upload.isClosed());
+    }
+
+    @Test
+    void closeCanBeRetriedAfterDisposalFailure() {
+        AtomicInteger closeAttempts = new AtomicInteger();
+        MinecraftGpuResourceOwner owner = new MinecraftGpuResourceOwner(() -> {});
+        MinecraftMeshGpuUpload upload = MinecraftMeshGpuUpload.forTesting(4, 64L, () -> {
+            if (closeAttempts.incrementAndGet() == 1) {
+                throw new IllegalStateException("simulated disposal failure");
+            }
+        });
+        owner.track(upload, null);
+
+        assertThrows(IllegalStateException.class, owner::close);
+        assertFalse(owner.isClosed());
+        owner.close();
+        assertTrue(owner.isClosed());
+        assertEquals(0, owner.allocationCount());
     }
 
     @Test
