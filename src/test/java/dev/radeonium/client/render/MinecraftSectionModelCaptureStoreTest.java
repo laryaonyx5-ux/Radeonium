@@ -102,6 +102,38 @@ class MinecraftSectionModelCaptureStoreTest {
     }
 
     @Test
+    void reloadDuringModelCapturePreventsStaleMeshFromBeingStaged() throws Exception {
+        SectionPos position = SectionPos.of(11, 2, 1);
+        var mesh = new MinecraftSectionModelMesher().buildResolved(List.of());
+        CountDownLatch captureStarted = new CountDownLatch(1);
+        CountDownLatch continueWorker = new CountDownLatch(1);
+        AtomicReference<MinecraftSectionModelCaptureStore.Snapshot> completed =
+                new AtomicReference<>();
+
+        Thread worker = new Thread(() -> {
+            MinecraftSectionModelCaptureStore.beginCapture(position);
+            captureStarted.countDown();
+            try {
+                continueWorker.await();
+            } catch (InterruptedException exception) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+            MinecraftSectionModelCaptureStore.stage(position, mesh);
+            completed.set(MinecraftSectionModelCaptureStore.complete(position));
+        }, "Radeonium-Reload-Race-Test");
+        worker.start();
+        captureStarted.await();
+
+        MinecraftSectionModelCaptureStore.clear();
+        continueWorker.countDown();
+        worker.join();
+
+        assertNull(completed.get());
+        assertNull(MinecraftSectionModelCaptureStore.get(position));
+    }
+
+    @Test
     void removeAndClearReleaseCapturedSections() {
         SectionPos position = SectionPos.of(5, 6, 7);
         var mesh = new MinecraftSectionModelMesher().buildResolved(List.of());
