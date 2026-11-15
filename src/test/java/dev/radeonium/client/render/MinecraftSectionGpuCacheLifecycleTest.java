@@ -41,6 +41,23 @@ class MinecraftSectionGpuCacheLifecycleTest {
         assertTrue(renderThreadChecks.get() > 0);
     }
 
+
+    @Test
+    void sectionCountRemainsBoundedByCacheCapacity() {
+        MinecraftGpuResourceOwner owner = new MinecraftGpuResourceOwner(() -> {});
+        MinecraftSectionGpuCache cache =
+                new MinecraftSectionGpuCache(owner, () -> {});
+
+        for (int index = 0; index < 70; index++) {
+            cache.rebuild(new SectionPos(index, 0, 0), List.of());
+        }
+
+        assertEquals(64, cache.sectionCount());
+        assertEquals(0, cache.gpuAllocationCount());
+        cache.clear();
+        assertEquals(0, cache.sectionCount());
+    }
+
     @Test
     void closeClearsCacheAndClosesGpuOwner() {
         MinecraftGpuResourceOwner owner = new MinecraftGpuResourceOwner(() -> {});
