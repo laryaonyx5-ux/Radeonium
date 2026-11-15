@@ -43,9 +43,10 @@ public abstract class SectionCompilerMixin {
             try {
                 var mesh = new MinecraftSectionModelMesher()
                         .captureAndBuild(sectionPos, region, blockModelSet);
-                MinecraftSectionModelCaptureStore.put(sectionPos, mesh);
+                MinecraftSectionModelCaptureStore.stage(sectionPos, mesh);
             } catch (RuntimeException exception) {
                 // Unsupported modded model behavior must never break vanilla compilation.
+                MinecraftSectionModelCaptureStore.abort(sectionPos);
                 MinecraftSectionModelCaptureStore.remove(sectionPos);
             }
         } else {
@@ -64,6 +65,7 @@ public abstract class SectionCompilerMixin {
             SectionBufferBuilderPack builders,
             CallbackInfoReturnable<SectionCompiler.Results> cir
     ) {
+        MinecraftSectionModelCaptureStore.complete(sectionPos);
         MinecraftCompiledGeometryStore.Snapshot snapshot =
                 MinecraftCompiledGeometryStore.captureCurrent(sectionPos, cir.getReturnValue());
         if (snapshot != null) {
