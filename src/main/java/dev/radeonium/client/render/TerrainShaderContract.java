@@ -14,6 +14,8 @@ public final class TerrainShaderContract {
             "assets/radeonium/shaders/core/terrain.vsh";
     public static final String FRAGMENT_SHADER =
             "assets/radeonium/shaders/core/terrain.fsh";
+    public static final String VERTEX_SHADER_ID = "radeonium:core/terrain";
+    public static final String FRAGMENT_SHADER_ID = "radeonium:core/terrain";
 
     public static final int POSITION_LOCATION = 0;
     public static final int COLOR_LOCATION = 1;
@@ -27,10 +29,10 @@ public final class TerrainShaderContract {
     public static final int VERTEX_STRIDE_BYTES = MinecraftMeshGpuUpload.VERTEX_STRIDE_BYTES;
 
     public static final List<String> VERTEX_UNIFORMS =
-            List.of("ModelViewProjection", "ModelView");
+            List.of("ModelViewMat", "ProjMat", "ChunkPosition", "CameraBlockPos", "CameraOffset");
     public static final List<String> FRAGMENT_UNIFORMS =
-            List.of("BlockAtlas", "LightMap", "FogColor", "FogStart", "FogEnd",
-                    "AlphaCutoff", "UseLightmap");
+            List.of("Sampler0", "FogColor", "FogEnvironmentalStart", "FogEnvironmentalEnd",
+                    "FogRenderDistanceStart", "FogRenderDistanceEnd", "ChunkVisibility");
 
     private TerrainShaderContract() {}
 
