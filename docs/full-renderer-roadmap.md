@@ -110,10 +110,10 @@ The greedy voxel prototype is deliberately not used as a substitute for Minecraf
 
 ### Remaining acceptance work
 
-- Unit tests now cover empty-owner accounting, immutable content-key equality, and reference-count transitions/underflow.
-- Run the Gradle build and JUnit suite, then add integration coverage for successful GPU allocation, cache replacement, eviction, repeated release and shutdown.
-- Verify failed rebuilds and disposal errors leave no leaked or untracked Radeonium allocations.
-- Confirm CI compilation, JUnit tests and JAR packaging are green after this milestone's final changes.
+- Unit tests cover empty-owner accounting, immutable content-key equality and defensive copying, reference-count transitions/underflow, and rejection of negative allocation sizes.
+- Section rebuilds now prepare all replacement uploads and material references before committing the new cache entry. Failures during preparation release only uncommitted uploads; cleanup errors are attached to the original failure instead of masking it.
+- Remaining: add executable integration coverage for successful GPU allocation/reuse, cache replacement, eviction, repeated release and shutdown, including injected upload/disposal failures.
+- Run the Gradle build and JUnit suite only after implementation and test authoring are complete; then confirm CI compilation, JUnit tests and JAR packaging.
 
 ## What "Radeonium owns the renderer" means
 
