@@ -6,12 +6,12 @@ import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
 import net.minecraft.resources.Identifier;
 
 /**
- * Radeonium-owned RenderPearl pipeline identities for opaque terrain.
+ * Radeonium-owned RenderPearl pipelines and shader stages for opaque terrain.
  *
- * The pipelines reuse Minecraft's public terrain shader/bind-group snippet as
- * a compatibility baseline, but have independent Radeonium locations. The
- * translucent layer deliberately remains host-owned until Milestone F can
- * replace its OIT/depth-bounds integration without changing transparency.
+ * Radeonium supplies its own vertex and fragment shaders while reusing
+ * Minecraft's terrain snippet for the compatible bind-group layout, vertex
+ * format and fixed render state. Translucent terrain remains host-owned so
+ * Minecraft's OIT/depth-bounds integration is not accidentally bypassed.
  */
 public final class RadeoniumTerrainPipelines {
     private static final Identifier VERTEX_SHADER =
