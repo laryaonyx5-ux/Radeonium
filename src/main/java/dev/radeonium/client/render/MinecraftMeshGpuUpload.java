@@ -17,21 +17,16 @@ import java.util.List;
  * buffer. Call upload on Minecraft's render thread: GPU resources are owned by
  * the active RenderPearl device and must not be created by meshing workers.
  *
- * Vertex format (40-byte stride): float3 model position, packed UV (two words),
- * captured ARGB tint, packed block/sky light, per-vertex AO color and lightmap.
- * Material/shader binding and
- * terrain draw submission are intentionally separate later stages.
+ * Vertex format matches Minecraft's DefaultVertexFormat.BLOCK (28-byte stride):
+ * float3 position, packed RGBA color, float2 atlas UV and packed block/sky light.
+ * Quads are retained as four vertices and use Minecraft's sequential QUADS index buffer.
  */
 public final class MinecraftMeshGpuUpload implements AutoCloseable {
     public static final int POSITION_OFFSET_BYTES = 0;
-    public static final int UV_LOW_OFFSET_BYTES = 12;
-    public static final int UV_HIGH_OFFSET_BYTES = 16;
-    public static final int TINT_OFFSET_BYTES = 20;
-    public static final int BLOCK_LIGHT_OFFSET_BYTES = 24;
-    public static final int AO_COLOR_OFFSET_BYTES = 28;
-    public static final int VERTEX_LIGHT_OFFSET_BYTES = 32;
-    public static final int MATERIAL_INDEX_OFFSET_BYTES = 36;
-    public static final int VERTEX_STRIDE_BYTES = 40;
+    public static final int COLOR_OFFSET_BYTES = 12;
+    public static final int UV_OFFSET_BYTES = 16;
+    public static final int LIGHT_OFFSET_BYTES = 24;
+    public static final int VERTEX_STRIDE_BYTES = 28;
 
     private final GpuBuffer vertexBuffer;
     private final int vertexCount;
@@ -97,16 +92,16 @@ public final class MinecraftMeshGpuUpload implements AutoCloseable {
         }
 
         int totalQuads = Math.addExact(mesh.quadCount(), fluidQuads.size());
-        int vertexCount = Math.multiplyExact(totalQuads, 6);
+        int vertexCount = Math.multiplyExact(totalQuads, 4);
         if (vertexCount == 0) return new MinecraftMeshGpuUpload(null, 0);
 
         int byteCount = Math.multiplyExact(vertexCount, VERTEX_STRIDE_BYTES);
         ByteBuffer data = ByteBuffer.allocateDirect(byteCount).order(ByteOrder.nativeOrder());
         for (int i = 0; i < mesh.quadCount(); i++) {
-            mesh.quads().get(i).writeTriangleVertices(data, materialIndices[i]);
+            mesh.quads().get(i).writeBlockVertices(data);
         }
         for (MinecraftFluidSectionMesher.FluidQuad quad : fluidQuads) {
-            writeFluidTriangleVertices(data, quad);
+            writeFluidBlockVertices(data, quad);
         }
 
         data.flip();
@@ -118,27 +113,24 @@ public final class MinecraftMeshGpuUpload implements AutoCloseable {
         return new MinecraftMeshGpuUpload(buffer, vertexCount);
     }
 
-    private static void writeFluidTriangleVertices(
+    private static void writeFluidBlockVertices(
             ByteBuffer target, MinecraftFluidSectionMesher.FluidQuad quad
     ) {
         float[] positions = quad.positions();
         float[] uv = quad.uv();
         int[] colors = quad.colors();
         int[] light = quad.lightCoords();
-        int[] order = {0, 1, 2, 0, 2, 3};
-        for (int vertex : order) {
+        for (int vertex = 0; vertex < 4; vertex++) {
             int positionOffset = vertex * 3;
             int uvOffset = vertex * 2;
             target.putFloat(positions[positionOffset]);
             target.putFloat(positions[positionOffset + 1]);
             target.putFloat(positions[positionOffset + 2]);
-            target.putInt(Float.floatToRawIntBits(uv[uvOffset]));
-            target.putInt(Float.floatToRawIntBits(uv[uvOffset + 1]));
-            target.putInt(-1);
-            target.putInt(light[vertex]);
             target.putInt(colors[vertex]);
-            target.putInt(light[vertex]);
-            target.putInt(-1);
+            target.putFloat(uv[uvOffset]);
+            target.putFloat(uv[uvOffset + 1]);
+            target.putShort((short) (light[vertex] & 0xffff));
+            target.putShort((short) ((light[vertex] >>> 16) & 0xffff));
         }
     }
 
@@ -148,6 +140,19 @@ public final class MinecraftMeshGpuUpload implements AutoCloseable {
 
     public int vertexCount() {
         return vertexCount;
+    }
+
+    /** Minecraft's sequential QUADS index count for this four-vertex-per-quad buffer. */
+    public int indexCount() {
+        return Math.multiplyExact(vertexCount / 4, 6);
+    }
+
+    public String vertexFormat() {
+        return com.mojang.blaze3d.vertex.DefaultVertexFormat.BLOCK.toString();
+    }
+
+    public String topology() {
+        return com.mojang.renderpearl.api.pipeline.PrimitiveTopology.QUADS.toString();
     }
 
     public long byteSize() {
