@@ -185,6 +185,26 @@ public final class ChunkRenderPipeline {
         return installMesh(position, generation, mesh);
     }
 
+    /**
+     * Applies portal reachability and then a conservative section-frustum test.
+     * The live draw path still consumes Minecraft's authoritative visible set
+     * until Radeonium has a trusted runtime face-mask and frustum-plane feed.
+     */
+    public synchronized Set<SectionPos> collectVisibleSections(
+            SectionPos cameraSection, SectionFrustumCuller frustum
+    ) {
+        if (cameraSection == null || frustum == null) {
+            throw new IllegalArgumentException("cameraSection and frustum are required");
+        }
+        Set<SectionPos> result = new HashSet<>();
+        for (SectionPos position : visibility.collectVisible(cameraSection)) {
+            if (visibleSections.contains(position) && frustum.intersects(position)) {
+                result.add(position);
+            }
+        }
+        return Set.copyOf(result);
+    }
+
     public SectionVisibilityGraph visibilityGraph() { return visibility; }
 
     public synchronized RenderRegion region(SectionPos.RegionPos position) {
