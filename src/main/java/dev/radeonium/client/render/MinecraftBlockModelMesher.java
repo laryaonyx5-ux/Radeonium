@@ -55,16 +55,30 @@ public final class MinecraftBlockModelMesher {
         }
 
         List<MinecraftBlockModelMesh.Quad> quads = new ArrayList<>();
+        appendTo(quads, modelParts, tintColors, packedLightCoords, quadLighting);
+        return new MinecraftBlockModelMesh(quads);
+    }
+
+    /** Appends directly into a caller-owned list so section builds can reuse scratch storage. */
+    void appendTo(
+            List<MinecraftBlockModelMesh.Quad> output,
+            List<BlockStateModelPart> modelParts,
+            Map<Integer, Integer> tintColors,
+            int packedLightCoords,
+            Map<BakedQuad, MinecraftSectionModelMesher.CapturedQuadLighting> quadLighting
+    ) {
+        if (output == null || modelParts == null || tintColors == null || quadLighting == null) {
+            throw new IllegalArgumentException("output and model inputs are required");
+        }
         for (BlockStateModelPart part : modelParts) {
             if (part == null) continue;
-            appendQuads(quads, part.getQuads(null), part.useAmbientOcclusion(),
+            appendQuads(output, part.getQuads(null), part.useAmbientOcclusion(),
                     tintColors, packedLightCoords, quadLighting);
             for (Direction direction : Direction.values()) {
-                appendQuads(quads, part.getQuads(direction), part.useAmbientOcclusion(),
+                appendQuads(output, part.getQuads(direction), part.useAmbientOcclusion(),
                         tintColors, packedLightCoords, quadLighting);
             }
         }
-        return new MinecraftBlockModelMesh(quads);
     }
 
     private static void appendQuads(
@@ -101,9 +115,9 @@ public final class MinecraftBlockModelMesher {
                     ? new int[]{packedLightCoords, packedLightCoords, packedLightCoords, packedLightCoords}
                     : captured.lightCoords();
 
-            output.add(new MinecraftBlockModelMesh.Quad(
-                    positions, packedUv, quad.direction(), material.layer(), material, quad,
-                    partAmbientOcclusion,
+            output.add(MinecraftBlockModelMesh.Quad.takeOwnership(
+                    positions, packedUv, quad.direction(), material.layer(), material,
+                    quad, partAmbientOcclusion,
                     tintColors.getOrDefault(material.tintIndex(), -1),
                     packedLightCoords, colors, lightCoords
             ));
