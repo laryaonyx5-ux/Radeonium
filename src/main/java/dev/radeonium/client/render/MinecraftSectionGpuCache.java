@@ -157,6 +157,8 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
         sections.clear();
         translucentSortCameras.clear();
         translucentSortOrders.clear();
+        // Sweep any owner-tracked allocation left by an interrupted replacement.
+        gpuResources.releaseAll();
         materials.clear();
     }
 
