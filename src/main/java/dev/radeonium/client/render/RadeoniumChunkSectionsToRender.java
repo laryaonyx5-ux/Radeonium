@@ -94,7 +94,11 @@ public final class RadeoniumChunkSectionsToRender {
                         MinecraftCompiledGeometryGpuCache.LayerBuffers owned =
                                 RadeoniumClient.compiledGeometryGpuCache().layerBuffers(minecraftPosition, layer);
 
-                        if (owned != null) {
+                        boolean compatibleOwnedGeometry = owned != null
+                                && format.toString().equals(owned.vertexFormat())
+                                && PrimitiveTopology.QUADS.toString().equals(owned.topology());
+
+                        if (compatibleOwnedGeometry) {
                             // The copied MeshData is section-local, so its base vertex and first index are zero.
                             vertexBuffer = owned.vertexBuffer();
                             baseVertex = 0;
