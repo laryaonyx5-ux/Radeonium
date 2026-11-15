@@ -202,30 +202,21 @@ public final class MinecraftSectionModelMesher {
             byLayer.put(layer, new ArrayList<>());
         }
 
+        List<MinecraftBlockModelMesh.Quad> blockQuads = new ArrayList<>();
         for (ResolvedBlockInput input : blocks) {
             if (input == null) continue;
-            MinecraftBlockModelMesh blockMesh = blockMesher.build(input.parts(), input.tintColors(), input.packedLightCoords(), input.quadLighting());
-            for (MinecraftBlockModelMesh.Quad quad : blockMesh.quads()) {
+            blockQuads.clear();
+            blockMesher.appendTo(blockQuads, input.parts(), input.tintColors(),
+                    input.packedLightCoords(), input.quadLighting());
+            for (MinecraftBlockModelMesh.Quad quad : blockQuads) {
                 Direction face = quad.direction();
                 if (face != null && input.neighborOccludes(face)
-                        && liesOnBlockBoundary(quad.copyPositions(), face)) {
+                        && quad.liesOnBlockBoundary(face, EDGE_EPSILON)) {
                     continue;
                 }
 
-                float[] positions = quad.copyPositions();
-                for (int vertex = 0; vertex < 4; vertex++) {
-                    int offset = vertex * 3;
-                    positions[offset] += input.localX();
-                    positions[offset + 1] += input.localY();
-                    positions[offset + 2] += input.localZ();
-                }
-
                 byLayer.computeIfAbsent(quad.layer(), ignored -> new ArrayList<>())
-                        .add(new MinecraftBlockModelMesh.Quad(
-                                positions, quad.copyPackedUv(), quad.direction(),
-                                quad.layer(), quad.material(), quad.sourceQuad(),
-                                quad.ambientOcclusion(), quad.tintColor(), quad.packedLightCoords(),
-                                quad.copyVertexColors(), quad.copyVertexLightCoords()));
+                        .add(quad.translated(input.localX(), input.localY(), input.localZ()));
             }
         }
 
