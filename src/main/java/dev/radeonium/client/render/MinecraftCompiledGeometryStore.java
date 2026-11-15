@@ -56,7 +56,9 @@ public final class MinecraftCompiledGeometryStore {
                 || !Objects.equals(CAPTURE_GENERATIONS.get(position), generation)) {
             return null;
         }
-        return capture(position, results, generation);
+        Snapshot snapshot = capture(position, results, generation);
+        CAPTURE_GENERATIONS.remove(position);
+        return snapshot;
     }
 
     private static synchronized Snapshot capture(
