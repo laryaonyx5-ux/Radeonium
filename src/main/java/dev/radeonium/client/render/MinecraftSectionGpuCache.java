@@ -252,9 +252,9 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
         x = section.x() * 16.0 + x * 0.25;
         y = section.y() * 16.0 + y * 0.25;
         z = section.z() * 16.0 + z * 0.25;
-        double dx = x - camera.x;
-        double dy = y - camera.y;
-        double dz = z - camera.z;
+        double dx = x - camera.x();
+        double dy = y - camera.y();
+        double dz = z - camera.z();
         return dx * dx + dy * dy + dz * dz;
     }
 
