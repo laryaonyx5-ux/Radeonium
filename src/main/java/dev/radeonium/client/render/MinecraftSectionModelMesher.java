@@ -1,6 +1,11 @@
 package dev.radeonium.client.render;
 
 import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
+import net.minecraft.client.renderer.chunk.RenderSectionRegion;
+import net.minecraft.client.renderer.block.BlockStateModelSet;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.SectionPos;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.client.renderer.block.dispatch.BlockStateModel;
 import net.minecraft.client.renderer.block.dispatch.BlockStateModelPart;
 import net.minecraft.core.Direction;
@@ -24,6 +29,58 @@ public final class MinecraftSectionModelMesher {
     private static final float EDGE_EPSILON = 1.0e-5f;
 
     private final MinecraftBlockModelMesher blockMesher = new MinecraftBlockModelMesher();
+
+    /**
+     * Captures the actual 16x16x16 block inputs from Minecraft's immutable
+     * compile region and resolves each state's deterministic model choice.
+     * Call from SectionCompiler's build thread. The resulting worker input
+     * contains no live world, block state, position or block entity objects.
+     *
+     * Face culling uses BlockState.skipRendering against each copied neighbor;
+     * special block-entity renderers remain a separate vanilla fallback path.
+     */
+    public SectionModelMesh captureAndBuild(
+            SectionPos sectionPos, RenderSectionRegion region, BlockStateModelSet modelSet
+    ) {
+        if (sectionPos == null || region == null || modelSet == null) {
+            throw new IllegalArgumentException("sectionPos, region and modelSet are required");
+        }
+
+        List<ResolvedBlockInput> resolved = new ArrayList<>(4096);
+        int baseX = sectionPos.minBlockX();
+        int baseY = sectionPos.minBlockY();
+        int baseZ = sectionPos.minBlockZ();
+
+        for (int localY = 0; localY < 16; localY++) {
+            for (int localZ = 0; localZ < 16; localZ++) {
+                for (int localX = 0; localX < 16; localX++) {
+                    BlockPos position = new BlockPos(
+                            baseX + localX, baseY + localY, baseZ + localZ);
+                    BlockState state = region.getBlockState(position);
+                    if (state.isAir()) continue;
+
+                    BlockStateModel model = modelSet.get(state);
+                    boolean down = state.skipRendering(
+                            region.getBlockState(position.relative(Direction.DOWN)), Direction.DOWN);
+                    boolean up = state.skipRendering(
+                            region.getBlockState(position.relative(Direction.UP)), Direction.UP);
+                    boolean north = state.skipRendering(
+                            region.getBlockState(position.relative(Direction.NORTH)), Direction.NORTH);
+                    boolean south = state.skipRendering(
+                            region.getBlockState(position.relative(Direction.SOUTH)), Direction.SOUTH);
+                    boolean west = state.skipRendering(
+                            region.getBlockState(position.relative(Direction.WEST)), Direction.WEST);
+                    boolean east = state.skipRendering(
+                            region.getBlockState(position.relative(Direction.EAST)), Direction.EAST);
+
+                    resolved.add(ResolvedBlockInput.capture(
+                            model, state.getSeed(position), localX, localY, localZ,
+                            down, up, north, south, west, east));
+                }
+            }
+        }
+        return buildResolved(resolved);
+    }
 
     /**
      * Compatibility entry point. This performs collectParts while building and
