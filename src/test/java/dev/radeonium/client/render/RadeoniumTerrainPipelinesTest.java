@@ -9,19 +9,16 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class RadeoniumTerrainPipelinesTest {
     @Test
-    void createsDistinctRadeoniumPipelineIdentitiesForEveryTerrainLayer() {
+    void createsDistinctRadeoniumPipelineIdentitiesForOpaqueAndCutoutLayers() {
         RenderPipeline solid = RadeoniumTerrainPipelines.forLayer(ChunkSectionLayer.SOLID);
         RenderPipeline cutout = RadeoniumTerrainPipelines.forLayer(ChunkSectionLayer.CUTOUT);
-        RenderPipeline translucent = RadeoniumTerrainPipelines.forLayer(ChunkSectionLayer.TRANSLUCENT);
 
         assertNotSame(solid, RenderPipelines.SOLID_TERRAIN);
         assertNotSame(cutout, RenderPipelines.CUTOUT_TERRAIN);
-        assertNotSame(translucent, RenderPipelines.TRANSLUCENT_TERRAIN);
         assertNotSame(solid, cutout);
-        assertNotSame(cutout, translucent);
         assertTrue(RadeoniumTerrainPipelines.owns(solid));
         assertTrue(RadeoniumTerrainPipelines.owns(cutout));
-        assertTrue(RadeoniumTerrainPipelines.owns(translucent));
+        assertFalse(RadeoniumTerrainPipelines.owns(RenderPipelines.TRANSLUCENT_TERRAIN));
     }
 
     @Test
@@ -35,13 +32,19 @@ class RadeoniumTerrainPipelinesTest {
     }
 
     @Test
-    void translucentKeepsHostOverrideForOitCompatibility() {
+    void translucentKeepsHostOverrideOrVanillaFallback() {
         RenderPipeline hostOverride = RenderPipelines.TRANSLUCENT_TERRAIN;
 
         assertSame(hostOverride,
                 RadeoniumTerrainPipelines.resolve(ChunkSectionLayer.TRANSLUCENT, hostOverride));
-        assertSame(RadeoniumTerrainPipelines.forLayer(ChunkSectionLayer.TRANSLUCENT),
+        assertSame(ChunkSectionLayer.TRANSLUCENT.pipeline(false),
                 RadeoniumTerrainPipelines.resolve(ChunkSectionLayer.TRANSLUCENT, null));
+    }
+
+    @Test
+    void translucentPipelineIsNotClaimedAsRadeoniumOwned() {
+        assertThrows(IllegalArgumentException.class,
+                () -> RadeoniumTerrainPipelines.forLayer(ChunkSectionLayer.TRANSLUCENT));
     }
 
     @Test
