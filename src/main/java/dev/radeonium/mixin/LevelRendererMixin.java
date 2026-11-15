@@ -1,27 +1,26 @@
 package dev.radeonium.mixin;
 
 import dev.radeonium.client.chunk.ChunkBuildBudget;
+import dev.radeonium.client.render.RadeoniumChunkSectionsToRender;
 import net.minecraft.client.renderer.LevelRenderer;
+import net.minecraft.client.renderer.chunk.ChunkSectionsToRender;
 import net.minecraft.client.renderer.chunk.RenderSectionRegion;
 import net.minecraft.client.renderer.chunk.SectionRenderDispatcher;
 import net.minecraft.world.phys.Vec3;
+import org.joml.Matrix4fc;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
- * Adapts render-thread chunk rebuild work while preserving Minecraft's own
- * asynchronous task queue, cancellation, ordering and GPU upload pipeline.
+ * Routes the terrain frame-graph through Radeonium's own section submission
+ * builder while retaining Minecraft's model compilation and buffer allocator.
  */
 @Mixin(LevelRenderer.class)
 public abstract class LevelRendererMixin {
-    /**
-     * endFrame is the renderer's frame boundary. Sampling here measures the
-     * complete interval between rendered frames instead of only the time
-     * between two entries into compileSections.
-     */
     @Inject(method = "endFrame", at = @At("HEAD"))
     private void radeonium$sampleCompletedFrameInterval(CallbackInfo ci) {
         ChunkBuildBudget.beginFrame(System.nanoTime());
@@ -63,5 +62,35 @@ public abstract class LevelRendererMixin {
         } finally {
             ChunkBuildBudget.recordSynchronousBuild(System.nanoTime() - startedAt);
         }
+    }
+
+    @Inject(
+            method = "prepareChunkRenders(Lorg/joml/Matrix4fc;Z)Lnet/minecraft/client/renderer/chunk/ChunkSectionsToRender;",
+            at = @At("HEAD"),
+            cancellable = true
+    )
+    private void radeonium$buildTerrainDrawList(
+            Matrix4fc modelViewMatrix,
+            boolean respectTranslucentOrder,
+            CallbackInfoReturnable<ChunkSectionsToRender> cir
+    ) {
+        cir.setReturnValue(RadeoniumChunkSectionsToRender.create(
+                (LevelRenderer) (Object) this, modelViewMatrix, respectTranslucentOrder
+        ));
+    }
+
+    @Inject(
+            method = "prepareChunkRendersIndirect(Lorg/joml/Matrix4fc;Z)Lnet/minecraft/client/renderer/chunk/ChunkSectionsToRender;",
+            at = @At("HEAD"),
+            cancellable = true
+    )
+    private void radeonium$replaceIndirectTerrainPreparation(
+            Matrix4fc modelViewMatrix,
+            boolean respectTranslucentOrder,
+            CallbackInfoReturnable<ChunkSectionsToRender> cir
+    ) {
+        cir.setReturnValue(RadeoniumChunkSectionsToRender.create(
+                (LevelRenderer) (Object) this, modelViewMatrix, respectTranslucentOrder
+        ));
     }
 }

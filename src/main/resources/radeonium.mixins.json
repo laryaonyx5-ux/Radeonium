@@ -3,8 +3,8 @@
   "package": "dev.radeonium.mixin",
   "client": [
     "LevelRendererMixin",
-    "LevelExtractorMixin",
-    "SectionCompilerMixin"
+    "LevelRendererAccessor",
+    "LevelExtractorMixin"
   ],
   "injectors": {
     "defaultRequire": 1
