@@ -70,6 +70,21 @@ public final class RadeoniumChunkSectionsToRender {
         return owned.indexBuffer() == null && owned.indexCount() == sectionDraw.indexCount();
     }
 
+
+    private static boolean isCompatibleModelGeometry(
+            MinecraftSectionGpuCache.LayerBuffers owned, VertexFormat activeFormat
+    ) {
+        if (owned == null || owned.vertexBuffer() == null || owned.vertexBuffer().isClosed()
+                || owned.vertexCount() <= 0 || owned.indexCount() <= 0
+                || !activeFormat.toString().equals(owned.vertexFormat())
+                || !PrimitiveTopology.QUADS.toString().equals(owned.topology())) {
+            return false;
+        }
+        return owned.vertexBuffer().size() >= (long) owned.vertexCount() * activeFormat.getVertexSize()
+                && owned.vertexCount() % 4 == 0
+                && owned.indexCount() == (owned.vertexCount() / 4) * 6;
+    }
+
     public static ChunkSectionsToRender create(
             LevelRenderer renderer,
             Matrix4fc modelViewMatrix,
@@ -127,14 +142,28 @@ public final class RadeoniumChunkSectionsToRender {
                         int indexCount = sectionDraw.indexCount();
 
                         net.minecraft.core.SectionPos minecraftPosition = net.minecraft.core.SectionPos.of(section.getSectionNode());
+                        SectionPos radeoniumPosition = new SectionPos(
+                                minecraftPosition.x(), minecraftPosition.y(), minecraftPosition.z());
+                        MinecraftSectionGpuCache.LayerBuffers modelOwned =
+                                layer == ChunkSectionLayer.TRANSLUCENT
+                                        ? null
+                                        : RadeoniumClient.minecraftGpuCache().layerBuffers(radeoniumPosition, layer);
                         MinecraftCompiledGeometryGpuCache.LayerBuffers owned =
                                 RadeoniumClient.compiledGeometryGpuCache().layerBuffers(minecraftPosition, layer);
 
-                        boolean compatibleOwnedGeometry = isCompatibleOwnedGeometry(
-                                owned, format, sectionDraw
-                        );
+                        boolean compatibleModelGeometry = isCompatibleModelGeometry(modelOwned, format);
+                        boolean compatibleOwnedGeometry = !compatibleModelGeometry
+                                && isCompatibleOwnedGeometry(owned, format, sectionDraw);
 
-                        if (compatibleOwnedGeometry) {
+                        if (compatibleModelGeometry) {
+                            // Native BLOCK vertices use Minecraft's sequential QUADS index buffer.
+                            vertexBuffer = modelOwned.vertexBuffer();
+                            baseVertex = 0;
+                            indexBuffer = null;
+                            indexType = null;
+                            indexCount = modelOwned.indexCount();
+                            largestDefaultIndexCount = Math.max(largestDefaultIndexCount, indexCount);
+                        } else if (compatibleOwnedGeometry) {
                             // The copied MeshData is section-local, so its base vertex and first index are zero.
                             vertexBuffer = owned.vertexBuffer();
                             baseVertex = 0;
