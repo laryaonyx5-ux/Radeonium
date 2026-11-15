@@ -282,11 +282,15 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
     public synchronized int drawLayer(
             RenderPass pass, CompiledRenderPipeline pipeline, ChunkSectionLayer layer
     ) {
+        RenderSystem.assertOnRenderThread();
         if (pass == null || pipeline == null || layer == null) {
             throw new IllegalArgumentException("pass, pipeline and layer are required");
         }
         int submitted = 0;
         for (Entry entry : sections.values()) {
+            if (entry.sourceSnapshot == null
+                    || MinecraftSectionModelCaptureStore.get(entry.sourceSnapshot.position()) != entry.sourceSnapshot
+                    || !entry.parityVerified.contains(layer)) continue;
             MinecraftMeshGpuUpload upload = entry.layerUploads.get(layer);
             if (upload == null || upload.isEmpty()) continue;
             if (submitted == 0) pass.setPipeline(pipeline);
@@ -302,9 +306,12 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
      * matching the selected layer's blend/depth state.
      */
     public synchronized int drawAll(RenderPass pass, CompiledRenderPipeline pipeline) {
+        RenderSystem.assertOnRenderThread();
         if (pass == null || pipeline == null) throw new IllegalArgumentException("pass and pipeline are required");
         int submitted = 0;
         for (Entry entry : sections.values()) {
+            if (entry.sourceSnapshot == null
+                    || MinecraftSectionModelCaptureStore.get(entry.sourceSnapshot.position()) != entry.sourceSnapshot) continue;
             for (MinecraftMeshGpuUpload upload : entry.layerUploads.values()) {
                 if (upload.isEmpty()) continue;
                 if (submitted == 0) pass.setPipeline(pipeline);
