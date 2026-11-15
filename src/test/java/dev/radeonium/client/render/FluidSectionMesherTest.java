@@ -49,7 +49,7 @@ class FluidSectionMesherTest {
         var mesh = new FluidSectionMesher().build(new FluidSectionSnapshot(ids, heights, tints, lights));
         var top = mesh.quads().stream().filter(q -> q.normalY() == 1.0f).findFirst().orElseThrow();
         float[] positions = top.positions();
-        assertNotEquals(positions[1], positions[4],
+        assertNotEquals(positions[1], positions[10],
                 "the top surface should slope between unequal neighboring fluid heights");
     }
 
@@ -69,7 +69,7 @@ class FluidSectionMesherTest {
                 .filter(q -> q.normalY() == 1.0f)
                 .filter(q -> q.positions()[0] == 1.0f && q.positions()[2] == 1.0f)
                 .findFirst().orElseThrow();
-        assertEquals(2.0f, lowerTop.positions()[4],
+        assertEquals(2.0f, lowerTop.positions()[10],
                 "a same-fluid block above any cell sharing the corner makes it full height");
     }
 
@@ -167,7 +167,7 @@ class FluidSectionMesherTest {
                 .filter(q -> q.normalY() == 1.0f && q.positions()[0] == 0.0f
                         && q.positions()[2] == 0.0f)
                 .findFirst().orElseThrow();
-        assertEquals(16.0f, top.positions()[4], 1.0e-6f);
+        assertEquals(16.0f, top.positions()[10], 1.0e-6f);
     }
 
     @Test
