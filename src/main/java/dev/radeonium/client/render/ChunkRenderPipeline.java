@@ -201,8 +201,8 @@ public final class ChunkRenderPipeline {
 
     /**
      * Applies portal reachability and then a conservative section-frustum test.
-     * The live draw path still consumes Minecraft's authoritative visible set
-     * until Radeonium has a trusted runtime face-mask and frustum-plane feed.
+     * The live draw path uses collectPortalVisibleSections with the exact
+     * compiled VisibilitySet data; Minecraft remains the frustum authority.
      */
     public synchronized Set<SectionPos> collectVisibleSections(
             SectionPos cameraSection, SectionFrustumCuller frustum
