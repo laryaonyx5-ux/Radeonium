@@ -2,7 +2,7 @@
 
 ## Current status
 
-**The code path is connected and guarded by vanilla fallback. Step 7.5 is only partially complete: the automated build is passing, but in-game validation has not been performed.**
+**Step 7.5 implementation is complete. Step 8 is the in-game validation phase.**
 
 Radeonium captures Minecraft's completed section meshes, keeps a bounded CPU mirror, uploads copies to RenderPearl GPU buffers, builds its own per-layer draw lists, and submits those lists from the existing `ChunkSectionsToRender.DrawSeparate` hook.
 
@@ -27,7 +27,9 @@ This is not a complete Sodium-equivalent renderer. Minecraft still owns the fram
 
 - The render-thread cache uploads the captured byte streams through RenderPearl.
 - CPU and GPU caches are bounded by section count and byte budgets.
+- The pending render-thread upload queue is also bounded; when saturated, it drops the oldest pending snapshot rather than allowing an unlimited backlog.
 - Uploads are exposed only while their source CPU snapshot remains current.
+- Invalid index metadata is rejected before GPU upload, and draw-time compatibility checks verify vertex-buffer capacity, index-buffer presence/type/capacity and draw counts before using copied geometry.
 
 ### 7.4 — Layer draw-list submission
 
@@ -36,18 +38,17 @@ This is not a complete Sodium-equivalent renderer. Minecraft still owns the fram
 - Missing, stale or incompatible copied geometry falls back to Minecraft's current section slice.
 - Minecraft continues to schedule the frame-graph passes and transparency/OIT stages.
 
-## 7.5 — Validation
+## 7.5 — Technical completion
 
-### Automated checks
+- The section capture, bounded CPU mirror, bounded upload queue, bounded GPU mirror and per-layer submission path are connected.
+- Stale section snapshots are rejected before upload and before exposure to the draw-list builder.
+- Invalid or mismatched copied geometry is rejected and the live Minecraft section slice remains the fallback.
+- GitHub Actions runs `gradle --no-daemon clean build` and packages the mod JAR.
+- This closes the implementation milestone. Visual/runtime verification is deliberately reserved for Step 8.
 
-- GitHub Actions runs `gradle --no-daemon clean build` on pushes and pull requests.
-- The workflow packages the mod JAR as an artifact.
-- A successful build proves compilation and packaging only; it does not prove that mixins apply correctly at runtime or that terrain renders correctly.
-- There is currently no dedicated unit/integration test suite for the live renderer path.
+## Step 8 — In-game validation
 
-### Runtime checks still required
-
-These checks require launching the mod in Minecraft 26.3 on the target machine:
+These checks are the next phase and require launching the mod in Minecraft 26.3 on the target machine:
 
 1. Confirm the client starts without mixin or RenderPearl errors.
 2. Check terrain in all layers: solid, cutout, cutout-mipped and translucent.
@@ -67,7 +68,9 @@ Do not disable vanilla fallback or claim performance gains until correctness and
 | Actual compiled layer geometry mirror | Implemented; in-game layer checks pending |
 | RenderPearl GPU mirror | Implemented; resource lifetime/backend checks pending |
 | Radeonium per-layer draw-list submission | Connected with format/topology guard and vanilla fallback |
+| Bounded capture, upload queue and GPU mirror | Implemented |
+| Draw-time geometry validation and vanilla fallback | Implemented |
 | Gradle build and JAR packaging | CI check |
-| Full runtime validation and benchmark | **Pending — must be tested in Minecraft 26.3** |
+| In-game rendering, lifecycle and graphics-backend checks | **Step 8 — pending** |
 
-**Step 7.5 is not complete until the runtime checklist passes.** The user-side test is necessary because CI cannot launch the user's Minecraft client or validate their graphics hardware.
+**Step 7.5 is the implementation milestone; Step 8 is the separate runtime-validation milestone.**
