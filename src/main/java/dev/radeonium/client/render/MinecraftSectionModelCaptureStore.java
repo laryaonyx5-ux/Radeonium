@@ -159,22 +159,6 @@ public final class MinecraftSectionModelCaptureStore {
         return SNAPSHOTS.get(position);
     }
 
-    /**
-     * A section mesh depends on its six face-neighbor states. When a section is
-     * rebuilt, invalidate its cached mesh and every adjacent section result so
-     * no boundary face decision can outlive the capture it depended on.
-     */
-    public static synchronized void invalidateSectionAndNeighbors(SectionPos position) {
-        if (position == null) return;
-        remove(position);
-        remove(SectionPos.of(position.x() - 1, position.y(), position.z()));
-        remove(SectionPos.of(position.x() + 1, position.y(), position.z()));
-        remove(SectionPos.of(position.x(), position.y() - 1, position.z()));
-        remove(SectionPos.of(position.x(), position.y() + 1, position.z()));
-        remove(SectionPos.of(position.x(), position.y(), position.z() - 1));
-        remove(SectionPos.of(position.x(), position.y(), position.z() + 1));
-    }
-
     public static synchronized void remove(SectionPos position) {
         if (position == null) return;
         CAPTURE_GENERATIONS.remove(position);
