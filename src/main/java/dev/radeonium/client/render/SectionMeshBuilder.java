@@ -9,6 +9,9 @@ import java.util.Arrays;
  *
  * Coplanar faces with the same material are merged. A one-cell neighbor halo
  * allows faces on section borders to be culled without creating seams.
+ * The hot voxel scan and quad emission deliberately avoid per-voxel and
+ * per-quad temporary arrays.
+ *
  * This is a conservative opaque-voxel path, not a replacement for Minecraft's
  * baked-model, translucent, fluid, tint or lighting semantics.
  */
@@ -20,22 +23,22 @@ public final class SectionMeshBuilder {
         short[] mask = new short[16 * 16];
 
         for (int axis = 0; axis < 3; axis++) {
-            int uAxis = (axis + 1) % 3;
-            int vAxis = (axis + 2) % 3;
-
-            for (int sign : new int[]{-1, 1}) {
+            for (int sign = -1; sign <= 1; sign += 2) {
                 for (int slice = 0; slice < 16; slice++) {
                     Arrays.fill(mask, (short) 0);
 
                     for (int v = 0; v < 16; v++) {
                         for (int u = 0; u < 16; u++) {
-                            int[] p = coordinates(axis, uAxis, vAxis, slice, u, v);
-                            short material = snapshot.materialAt(p[0], p[1], p[2]);
+                            int x = coordinateX(axis, slice, u, v);
+                            int y = coordinateY(axis, slice, u, v);
+                            int z = coordinateZ(axis, slice, u, v);
+                            short material = snapshot.materialAt(x, y, z);
                             if (material == 0) continue;
 
-                            int[] neighbor = p.clone();
-                            neighbor[axis] += sign;
-                            if (!snapshot.occludesFace(neighbor[0], neighbor[1], neighbor[2])) {
+                            int neighborX = x + (axis == 0 ? sign : 0);
+                            int neighborY = y + (axis == 1 ? sign : 0);
+                            int neighborZ = z + (axis == 2 ? sign : 0);
+                            if (!snapshot.occludesFace(neighborX, neighborY, neighborZ)) {
                                 mask[u + v * 16] = material;
                             }
                         }
@@ -65,13 +68,11 @@ public final class SectionMeshBuilder {
                             }
 
                             float plane = slice + (sign > 0 ? 1.0f : 0.0f);
-                            emitQuad(output, axis, uAxis, vAxis, plane, u, v,
-                                    width, height, sign, material);
+                            emitQuad(output, axis, plane, u, v, width, height, sign, material);
 
                             for (int dy = 0; dy < height; dy++) {
-                                for (int dx = 0; dx < width; dx++) {
-                                    mask[u + dx + (v + dy) * 16] = 0;
-                                }
+                                Arrays.fill(mask, (v + dy) * 16 + u,
+                                        (v + dy) * 16 + u + width, (short) 0);
                             }
                             u += width;
                         }
@@ -86,47 +87,62 @@ public final class SectionMeshBuilder {
         return new SectionMesh(bytes.array(), output.size() / SectionMesh.FLOATS_PER_VERTEX);
     }
 
-    private static int[] coordinates(int axis, int uAxis, int vAxis,
-                                     int slice, int u, int v) {
-        int[] p = new int[3];
-        p[axis] = slice;
-        p[uAxis] = u;
-        p[vAxis] = v;
-        return p;
+    private static int coordinateX(int axis, int slice, int u, int v) {
+        return switch (axis) {
+            case 0 -> slice;
+            case 1 -> v;
+            default -> u;
+        };
     }
 
-    private static void emitQuad(FloatBuilder out, int axis, int uAxis, int vAxis,
-                                 float plane, int u, int v, int width, int height,
-                                 int sign, short material) {
-        float[][] corners = new float[4][3];
-        setPoint(corners[0], axis, uAxis, vAxis, plane, u, v);
-        setPoint(corners[1], axis, uAxis, vAxis, plane, u + width, v);
-        setPoint(corners[2], axis, uAxis, vAxis, plane, u + width, v + height);
-        setPoint(corners[3], axis, uAxis, vAxis, plane, u, v + height);
+    private static int coordinateY(int axis, int slice, int u, int v) {
+        return switch (axis) {
+            case 0 -> u;
+            case 1 -> slice;
+            default -> v;
+        };
+    }
 
-        int[] order = sign > 0 ? new int[]{0, 1, 2, 0, 2, 3}
-                : new int[]{0, 2, 1, 0, 3, 2};
+    private static int coordinateZ(int axis, int slice, int u, int v) {
+        return switch (axis) {
+            case 0 -> v;
+            case 1 -> u;
+            default -> slice;
+        };
+    }
+
+    private static void emitQuad(FloatBuilder out, int axis, float plane,
+                                 int u, int v, int width, int height,
+                                 int sign, short material) {
         float nx = axis == 0 ? sign : 0;
         float ny = axis == 1 ? sign : 0;
         float nz = axis == 2 ? sign : 0;
 
-        for (int index : order) {
-            float[] point = corners[index];
-            out.add(point[0]);
-            out.add(point[1]);
-            out.add(point[2]);
-            out.add(nx);
-            out.add(ny);
-            out.add(nz);
-            out.add(material);
+        if (sign > 0) {
+            emitCorner(out, axis, plane, u, v, nx, ny, nz, material);
+            emitCorner(out, axis, plane, u + width, v, nx, ny, nz, material);
+            emitCorner(out, axis, plane, u + width, v + height, nx, ny, nz, material);
+            emitCorner(out, axis, plane, u, v, nx, ny, nz, material);
+            emitCorner(out, axis, plane, u + width, v + height, nx, ny, nz, material);
+            emitCorner(out, axis, plane, u, v + height, nx, ny, nz, material);
+        } else {
+            emitCorner(out, axis, plane, u, v, nx, ny, nz, material);
+            emitCorner(out, axis, plane, u + width, v + height, nx, ny, nz, material);
+            emitCorner(out, axis, plane, u + width, v, nx, ny, nz, material);
+            emitCorner(out, axis, plane, u, v, nx, ny, nz, material);
+            emitCorner(out, axis, plane, u, v + height, nx, ny, nz, material);
+            emitCorner(out, axis, plane, u + width, v + height, nx, ny, nz, material);
         }
     }
 
-    private static void setPoint(float[] point, int axis, int uAxis, int vAxis,
-                                 float plane, float u, float v) {
-        point[axis] = plane;
-        point[uAxis] = u;
-        point[vAxis] = v;
+    private static void emitCorner(FloatBuilder out, int axis, float plane,
+                                   float u, float v, float nx, float ny, float nz,
+                                   short material) {
+        switch (axis) {
+            case 0 -> out.addVertex(plane, u, v, nx, ny, nz, material);
+            case 1 -> out.addVertex(v, plane, u, nx, ny, nz, material);
+            default -> out.addVertex(u, v, plane, nx, ny, nz, material);
+        }
     }
 
     private static final class FloatBuilder {
@@ -137,11 +153,24 @@ public final class SectionMeshBuilder {
             values = new float[initialCapacity];
         }
 
-        private void add(float value) {
-            if (size == values.length) {
-                values = Arrays.copyOf(values, Math.max(16, values.length * 2));
+        private void addVertex(float x, float y, float z,
+                               float nx, float ny, float nz, short material) {
+            ensureCapacity(SectionMesh.FLOATS_PER_VERTEX);
+            values[size++] = x;
+            values[size++] = y;
+            values[size++] = z;
+            values[size++] = nx;
+            values[size++] = ny;
+            values[size++] = nz;
+            values[size++] = material;
+        }
+
+        private void ensureCapacity(int additional) {
+            int required = size + additional;
+            if (required > values.length) {
+                int capacity = Math.max(required, Math.max(16, values.length * 2));
+                values = Arrays.copyOf(values, capacity);
             }
-            values[size++] = value;
         }
 
         private int size() {
