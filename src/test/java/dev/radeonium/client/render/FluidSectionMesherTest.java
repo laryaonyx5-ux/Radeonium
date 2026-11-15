@@ -1,0 +1,42 @@
+package dev.radeonium.client.render;
+
+import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
+
+class FluidSectionMesherTest {
+    @Test
+    void emitsFiveFacesForAnIsolatedFluidCell() {
+        short[] ids = new short[4096]; byte[] heights = new byte[4096];
+        int[] tints = new int[4096], lights = new int[4096];
+        int index = 1 + 16 * (1 + 16 * 1);
+        ids[index] = 2; heights[index] = 8; tints[index] = 0xAABBCC; lights[index] = 0x00F000F0;
+        var mesh = new FluidSectionMesher().build(new FluidSectionSnapshot(ids, heights, tints, lights));
+        assertEquals(5, mesh.quadCount());
+        assertEquals(5, mesh.quadCount((short) 2));
+        assertEquals(0, mesh.quadCount((short) 3));
+    }
+
+    @Test
+    void removesSharedSidesBetweenSameFluidCells() {
+        short[] ids = new short[4096]; byte[] heights = new byte[4096];
+        int[] tints = new int[4096], lights = new int[4096];
+        int a = 1 + 16 * (1 + 16 * 1), b = 2 + 16 * (1 + 16 * 1);
+        ids[a] = ids[b] = 1; heights[a] = heights[b] = 8;
+        var mesh = new FluidSectionMesher().build(new FluidSectionSnapshot(ids, heights, tints, lights));
+        assertEquals(8, mesh.quadCount());
+    }
+
+    @Test
+    void copiesCaptureArraysAndRejectsInvalidHeights() {
+        short[] ids = new short[4096]; byte[] heights = new byte[4096];
+        int[] tints = new int[4096], lights = new int[4096];
+        ids[0] = 1; heights[0] = 4;
+        var snapshot = new FluidSectionSnapshot(ids, heights, tints, lights);
+        ids[0] = 0; heights[0] = 0;
+        assertEquals(1, snapshot.fluidId(0,0,0));
+        assertEquals(4, snapshot.heightEighths(0,0,0));
+        heights[0] = 9;
+        assertThrows(IllegalArgumentException.class,
+                () -> new FluidSectionSnapshot(new short[4096], heights, tints, lights));
+    }
+}
