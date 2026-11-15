@@ -35,7 +35,7 @@ public final class MinecraftBlockModelMesher {
 
         List<BlockStateModelPart> parts = new ArrayList<>();
         model.collectParts(RandomSource.create(seed), parts);
-        return build(parts, java.util.Map.of());
+        return build(parts, java.util.Map.of(), -1);
     }
 
     /**
@@ -44,12 +44,20 @@ public final class MinecraftBlockModelMesher {
      * level/position/state snapshot to select their parts.
      */
     public MinecraftBlockModelMesh build(List<BlockStateModelPart> modelParts) {
-        return build(modelParts, java.util.Map.of());
+        return build(modelParts, java.util.Map.of(), -1);
     }
 
     /** Copies resolved parts with per-tint-index colors captured on the compiler thread. */
     public MinecraftBlockModelMesh build(
             List<BlockStateModelPart> modelParts, java.util.Map<Integer, Integer> tintColors
+    ) {
+        return build(modelParts, tintColors, -1);
+    }
+
+    /** Copies resolved geometry with captured tint and packed light inputs. */
+    public MinecraftBlockModelMesh build(
+            List<BlockStateModelPart> modelParts, java.util.Map<Integer, Integer> tintColors,
+            int packedLightCoords
     ) {
         if (modelParts == null || tintColors == null) {
             throw new IllegalArgumentException("modelParts cannot be null");
@@ -105,7 +113,8 @@ public final class MinecraftBlockModelMesher {
                     material,
                     quad,
                     partAmbientOcclusion,
-                    tintColors.getOrDefault(material.tintIndex(), -1)
+                    tintColors.getOrDefault(material.tintIndex(), -1),
+                    packedLightCoords
             ));
         }
     }
