@@ -74,6 +74,25 @@ class FluidSectionMesherTest {
     }
 
     @Test
+    void sideQuadsStayOnTheirFacePlaneAndHaveCorrectTopVertices() {
+        short[] ids = new short[4096]; byte[] heights = new byte[4096];
+        int[] tints = new int[4096], lights = new int[4096];
+        int cell = 1 + 16 * (1 + 16 * 1);
+        ids[cell] = 2;
+        heights[cell] = 8;
+
+        var mesh = new FluidSectionMesher().build(new FluidSectionSnapshot(ids, heights, tints, lights));
+        var west = mesh.quads().stream().filter(q -> q.normalX() == -1.0f).findFirst().orElseThrow();
+        float[] p = west.positions();
+        assertEquals(p[0], p[3], 1.0e-6f);
+        assertEquals(p[0], p[6], 1.0e-6f);
+        assertEquals(p[0], p[9], 1.0e-6f);
+        assertEquals(1.0f, p[10], 1.0e-6f);
+        assertEquals(1.0f, p[4], 1.0e-6f);
+        assertEquals(2.0f, p[7], 1.0e-6f);
+    }
+
+    @Test
     void copiesCaptureArraysAndRejectsInvalidHeights() {
         short[] ids = new short[4096]; byte[] heights = new byte[4096];
         int[] tints = new int[4096], lights = new int[4096];
