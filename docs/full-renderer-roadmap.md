@@ -142,16 +142,16 @@ This milestone supplies shader sources and material-binding contracts. It does n
 
 ### Implemented foundation
 
-- Adds three distinct Radeonium-owned RenderPearl pipeline identities for SOLID, CUTOUT and TRANSLUCENT terrain layers, each with a Radeonium pipeline location.
-- Clones the matching Minecraft terrain pipeline state as a compatibility baseline, preserving the active vertex format, depth/cull configuration, shader bindings and backend-neutral RenderPearl representation.
+- Adds two distinct Radeonium-owned RenderPearl pipeline identities for SOLID and CUTOUT terrain layers, each with a Radeonium pipeline location and the public terrain shader/bind-group snippet.
+- Uses a dedicated alpha-cutout shader define for CUTOUT while retaining the same native terrain vertex contract.
 - Routes opaque and cutout terrain submissions through Radeonium's pipeline identities in the existing per-layer draw hook.
-- Retains a host-provided translucent pipeline override when present so Minecraft's OIT accumulation/composite path is not accidentally bypassed. Radeonium's full translucent replacement remains Milestone F.
+- Keeps TRANSLUCENT on the host-provided OIT override or Minecraft's vanilla translucent pipeline. Radeonium's full translucent replacement remains Milestone F.
 - Adds focused tests for pipeline identity separation, layer routing, override policy and null handling.
 - The section draw list and batching remain Radeonium-built; no second submission is added, so the same terrain layer is not intentionally drawn twice.
 
 ### Deliberate compatibility boundary
 
-The current pipeline objects have Radeonium identities and are used for SOLID/CUTOUT submissions, but their shader stages and descriptor layouts are inherited from Minecraft's matching terrain templates. The custom GLSL files from Milestone D are not yet bound to these pipelines because their uniform/sampler contract still needs to be reconciled with RenderPearl's live terrain bind groups. This avoids activating a shader with incompatible descriptors. Translucent OIT remains host-overridable until Milestone F.
+The current pipeline objects have Radeonium identities and are used for SOLID/CUTOUT submissions, but their shader stages and descriptor layouts come from Minecraft's public terrain snippet. The custom GLSL files from Milestone D are not yet bound because their uniform/sampler contract still needs to be reconciled with RenderPearl's live terrain bind groups. This avoids activating a shader with incompatible descriptors. Translucent OIT remains host-owned until Milestone F.
 
 Runtime RenderPearl compilation, visual comparison and backend checks remain pending. If a pipeline cannot compile or render correctly, the corresponding vanilla path must remain available.
 
