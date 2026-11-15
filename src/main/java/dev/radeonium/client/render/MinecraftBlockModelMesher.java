@@ -1,25 +1,48 @@
 package dev.radeonium.client.render;
 
+import net.minecraft.client.renderer.block.dispatch.BlockStateModel;
 import net.minecraft.client.renderer.block.dispatch.BlockStateModelPart;
 import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
 import net.minecraft.client.resources.model.geometry.BakedQuad;
 import net.minecraft.core.Direction;
+import net.minecraft.util.RandomSource;
 import org.joml.Vector3fc;
 
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Extracts the real baked quad geometry from Minecraft 26.3 block-model parts.
+ * Resolves Minecraft's baked block-state model into Radeonium-owned CPU
+ * geometry. The model's collectParts implementation is responsible for
+ * selecting variants, weighted alternatives and multipart pieces.
  *
- * This deliberately does not pretend to be a complete section compiler:
- * contextual model selection, neighbor culling, tint resolution, lighting/AO,
- * fluids, block entities and GPU upload are handled by later integration
- * stages. Material metadata is retained so those stages do not have to guess.
+ * This adapter uses the vanilla RandomSource-only contract. Models whose
+ * geometry depends on live level/block-entity context must be resolved by a
+ * game-thread adapter with an immutable context snapshot before calling
+ * build(List); Radeonium workers must never receive a live world object.
  */
 public final class MinecraftBlockModelMesher {
-    private static final Direction[] CULL_DIRECTIONS = Direction.values();
+    /**
+     * Resolves the selected baked parts for a stable per-block seed and then
+     * copies their quads into Radeonium-owned storage. Call once per block
+     * state/position; use a position-derived seed to match Minecraft's
+     * deterministic chunk-model selection.
+     */
+    public MinecraftBlockModelMesh build(BlockStateModel model, long seed) {
+        if (model == null) {
+            throw new IllegalArgumentException("model cannot be null");
+        }
 
+        List<BlockStateModelPart> parts = new ArrayList<>();
+        model.collectParts(RandomSource.create(seed), parts);
+        return build(parts);
+    }
+
+    /**
+     * Copies already-resolved parts. This overload is also the integration
+     * point for context-aware Fabric model adapters that need a captured
+     * level/position/state snapshot to select their parts.
+     */
     public MinecraftBlockModelMesh build(List<BlockStateModelPart> modelParts) {
         if (modelParts == null) {
             throw new IllegalArgumentException("modelParts cannot be null");
@@ -30,7 +53,7 @@ public final class MinecraftBlockModelMesher {
             if (part == null) continue;
 
             appendQuads(quads, part.getQuads(null));
-            for (Direction direction : CULL_DIRECTIONS) {
+            for (Direction direction : Direction.values()) {
                 appendQuads(quads, part.getQuads(direction));
             }
         }
