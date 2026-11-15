@@ -90,7 +90,7 @@ public final class RadeoniumChunkSectionsToRender {
                         IndexType indexType = null;
                         int indexCount = sectionDraw.indexCount();
 
-                        SectionPos minecraftPosition = SectionPos.of(section.getSectionNode());
+                        net.minecraft.core.SectionPos minecraftPosition = net.minecraft.core.SectionPos.of(section.getSectionNode());
                         MinecraftCompiledGeometryGpuCache.LayerBuffers owned =
                                 RadeoniumClient.compiledGeometryGpuCache().layerBuffers(minecraftPosition, layer);
 
