@@ -15,6 +15,7 @@ import java.util.concurrent.TimeUnit;
 public final class SectionMeshingExecutor implements AutoCloseable {
     private final ThreadPoolExecutor workers;
     private final SectionMeshBuilder builder = new SectionMeshBuilder();
+    private final MinecraftSectionModelMesher minecraftMesher = new MinecraftSectionModelMesher();
 
     public SectionMeshingExecutor() {
         int processors = Math.max(1, Runtime.getRuntime().availableProcessors());
@@ -43,6 +44,27 @@ public final class SectionMeshingExecutor implements AutoCloseable {
                     result.complete(builder.build(snapshot));
                 } catch (Throwable throwable) {
                     result.completeExceptionally(throwable);
+                }
+            });
+        } catch (java.util.concurrent.RejectedExecutionException rejected) {
+            result.completeExceptionally(rejected);
+        }
+        return result;
+    }
+
+    /** CPU-mesh an immutable Minecraft capture without accessing world or renderer state. */
+    public CompletableFuture<MinecraftSectionModelMesher.SectionModelMesh> buildMinecraftAsync(
+            MinecraftSectionModelMesher.CapturedSectionInput input
+    ) {
+        if (input == null) throw new IllegalArgumentException("input cannot be null");
+        CompletableFuture<MinecraftSectionModelMesher.SectionModelMesh> result = new CompletableFuture<>();
+        try {
+            workers.execute(() -> {
+                try {
+                    result.complete(minecraftMesher.buildResolved(input.blocks())
+                            .withUnsupportedBlockEntityCount(input.unsupportedBlockEntityCount()));
+                } catch (Throwable failure) {
+                    result.completeExceptionally(failure);
                 }
             });
         } catch (java.util.concurrent.RejectedExecutionException rejected) {
