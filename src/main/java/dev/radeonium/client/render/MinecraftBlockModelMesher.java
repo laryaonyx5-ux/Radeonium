@@ -49,7 +49,8 @@ public final class MinecraftBlockModelMesher {
 
     /** Copies resolved parts with per-tint-index colors captured on the compiler thread. */
     public MinecraftBlockModelMesh build(
-            List<BlockStateModelPart> modelParts, java.util.Map<Integer, Integer> tintColors
+            List<BlockStateModelPart> modelParts, java.util.Map<Integer, Integer> tintColors,
+            int packedLightCoords
     ) {
         return build(modelParts, tintColors, -1);
     }
@@ -67,7 +68,7 @@ public final class MinecraftBlockModelMesher {
         for (BlockStateModelPart part : modelParts) {
             if (part == null) continue;
 
-            appendQuads(quads, part.getQuads(null), part.useAmbientOcclusion(), tintColors);
+            appendQuads(quads, part.getQuads(null), part.useAmbientOcclusion(), tintColors, packedLightCoords);
             for (Direction direction : Direction.values()) {
                 appendQuads(quads, part.getQuads(direction), part.useAmbientOcclusion(), tintColors);
             }
