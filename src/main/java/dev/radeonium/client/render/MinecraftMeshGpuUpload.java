@@ -134,6 +134,92 @@ public final class MinecraftMeshGpuUpload implements AutoCloseable {
         }
     }
 
+
+    /** Uploads a pre-sorted list of model/fluid quads using native BLOCK vertices. */
+    public static MinecraftMeshGpuUpload uploadQuadData(
+            GpuDevice device, List<QuadData> quads
+    ) {
+        RenderSystem.assertOnRenderThread();
+        if (device == null || quads == null) throw new IllegalArgumentException("device and quads are required");
+        int vertexCount = Math.multiplyExact(quads.size(), 4);
+        if (vertexCount == 0) return new MinecraftMeshGpuUpload(null, 0);
+        ByteBuffer data = ByteBuffer.allocateDirect(
+                Math.multiplyExact(vertexCount, VERTEX_STRIDE_BYTES)
+        ).order(ByteOrder.nativeOrder());
+        for (QuadData quad : quads) writeQuadData(data, quad);
+        data.flip();
+        GpuBuffer buffer = device.createBuffer(
+                () -> "Radeonium sorted translucent section vertices",
+                GpuBuffer.USAGE_VERTEX,
+                data
+        );
+        return new MinecraftMeshGpuUpload(buffer, vertexCount);
+    }
+
+    private static void writeQuadData(ByteBuffer target, QuadData quad) {
+        float[] positions = quad.positions();
+        float[] uv = quad.uv();
+        int[] colors = quad.colors();
+        int[] light = quad.lightCoords();
+        for (int vertex = 0; vertex < 4; vertex++) {
+            int p = vertex * 3;
+            int t = vertex * 2;
+            target.putFloat(positions[p]);
+            target.putFloat(positions[p + 1]);
+            target.putFloat(positions[p + 2]);
+            target.putInt(colors[vertex]);
+            target.putFloat(uv[t]);
+            target.putFloat(uv[t + 1]);
+            target.putShort((short) (light[vertex] & 0xffff));
+            target.putShort((short) ((light[vertex] >>> 16) & 0xffff));
+        }
+    }
+
+    public static QuadData fromModelQuad(MinecraftBlockModelMesh.Quad quad) {
+        if (quad == null) throw new IllegalArgumentException("quad cannot be null");
+        long[] packedUv = quad.copyPackedUv();
+        float[] uv = new float[8];
+        int[] colors = quad.copyVertexColors();
+        int tint = quad.tintColor();
+        for (int vertex = 0; vertex < 4; vertex++) {
+            uv[vertex * 2] = Float.intBitsToFloat((int) packedUv[vertex]);
+            uv[vertex * 2 + 1] = Float.intBitsToFloat((int) (packedUv[vertex] >>> 32));
+            colors[vertex] = multiplyArgb(colors[vertex], tint);
+        }
+        return new QuadData(quad.copyPositions(), uv, colors, quad.copyVertexLightCoords());
+    }
+
+    public static QuadData fromFluidQuad(MinecraftFluidSectionMesher.FluidQuad quad) {
+        if (quad == null) throw new IllegalArgumentException("quad cannot be null");
+        return new QuadData(quad.positions(), quad.uv(), quad.colors(), quad.lightCoords());
+    }
+
+    private static int multiplyArgb(int color, int tint) {
+        if (tint == -1) return color;
+        int a = ((color >>> 24) & 255) * ((tint >>> 24) & 255) / 255;
+        int r = ((color >>> 16) & 255) * ((tint >>> 16) & 255) / 255;
+        int g = ((color >>> 8) & 255) * ((tint >>> 8) & 255) / 255;
+        int b = (color & 255) * (tint & 255) / 255;
+        return (a << 24) | (r << 16) | (g << 8) | b;
+    }
+
+    public record QuadData(float[] positions, float[] uv, int[] colors, int[] lightCoords) {
+        public QuadData {
+            if (positions == null || positions.length != 12 || uv == null || uv.length != 8
+                    || colors == null || colors.length != 4 || lightCoords == null || lightCoords.length != 4) {
+                throw new IllegalArgumentException("quad data requires four complete vertices");
+            }
+            positions = positions.clone();
+            uv = uv.clone();
+            colors = colors.clone();
+            lightCoords = lightCoords.clone();
+        }
+        @Override public float[] positions() { return positions.clone(); }
+        @Override public float[] uv() { return uv.clone(); }
+        @Override public int[] colors() { return colors.clone(); }
+        @Override public int[] lightCoords() { return lightCoords.clone(); }
+    }
+
     public GpuBuffer vertexBuffer() {
         if (vertexBuffer == null || vertexBuffer.isClosed()) {
             throw new IllegalStateException("GPU vertex buffer is not available");
