@@ -37,7 +37,7 @@ class MinecraftSectionModelMesherTest {
     void resolvedInputsCopyTheirPartList() {
         List<net.minecraft.client.renderer.block.dispatch.BlockStateModelPart> source = new ArrayList<>();
         var input = new MinecraftSectionModelMesher.ResolvedBlockInput(
-                source, 1, 2, 3, false, false, false, false, false, false);
+                source, 1, 2, 3, false, false, false, false, false, false, java.util.Map.of());
         source.clear();
         assertTrue(input.parts().isEmpty());
         assertThrows(UnsupportedOperationException.class, () -> input.parts().clear());
@@ -47,7 +47,21 @@ class MinecraftSectionModelMesherTest {
     void resolvedInputsRejectCoordinatesOutsideTheirSection() {
         assertThrows(IllegalArgumentException.class, () ->
                 new MinecraftSectionModelMesher.ResolvedBlockInput(
-                        List.of(), 16, 0, 0, false, false, false, false, false, false));
+                        List.of(), 16, 0, 0, false, false, false, false, false, false, java.util.Map.of()));
+    }
+
+
+    @Test
+    void resolvedInputsCopyTintColorsForWorkerSafety() {
+        var source = new java.util.HashMap<Integer, Integer>();
+        source.put(0, 0xFF80A040);
+        var input = new MinecraftSectionModelMesher.ResolvedBlockInput(
+                List.of(), 1, 2, 3, false, false, false, false, false, false, source);
+
+        source.put(0, 0xFFFFFFFF);
+        assertEquals(0xFF80A040, input.tintColors().get(0));
+        assertThrows(UnsupportedOperationException.class,
+                () -> input.tintColors().put(1, 0xFFFFFFFF));
     }
 
     @Test
