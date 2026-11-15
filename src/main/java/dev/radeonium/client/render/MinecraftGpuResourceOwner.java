@@ -9,6 +9,7 @@ import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 
 /**
  * Owns every Radeonium-created terrain vertex upload.
@@ -55,12 +56,8 @@ public final class MinecraftGpuResourceOwner implements AutoCloseable {
 
         byte[] payload = MinecraftMeshGpuUpload.encodeLayer(mesh, fluids).vertexBytes();
         ByteArrayKey key = new ByteArrayKey(payload);
-        MinecraftMeshGpuUpload reusable = findReusable(key);
-        if (reusable != null) return reusable;
-
-        MinecraftMeshGpuUpload created =
-                MinecraftMeshGpuUpload.upload(device, mesh, materialIndices, fluids);
-        return track(created, key);
+        return getOrCreate(key,
+                () -> MinecraftMeshGpuUpload.upload(device, mesh, materialIndices, fluids));
     }
 
     public MinecraftMeshGpuUpload uploadQuadData(
@@ -100,6 +97,24 @@ public final class MinecraftGpuResourceOwner implements AutoCloseable {
         if (key != null) reusableUploads.put(key, upload);
         allocatedBytes = nextAllocatedBytes;
         return upload;
+    }
+
+    /**
+     * Reuses a matching live allocation or creates and tracks exactly one new upload.
+     * The supplier is invoked only on a cache miss.
+     */
+    MinecraftMeshGpuUpload getOrCreate(
+            ByteArrayKey key,
+            Supplier<MinecraftMeshGpuUpload> createUpload
+    ) {
+        renderThreadCheck.run();
+        ensureOpen();
+        if (createUpload == null) throw new IllegalArgumentException("createUpload cannot be null");
+        if (key != null) {
+            MinecraftMeshGpuUpload reusable = findReusable(key);
+            if (reusable != null) return reusable;
+        }
+        return track(createUpload.get(), key);
     }
 
     /** Finds a content-identical live allocation and retains it for another section. */
