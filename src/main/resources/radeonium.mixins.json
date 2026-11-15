@@ -4,7 +4,8 @@
   "client": [
     "LevelRendererMixin",
     "LevelRendererAccessor",
-    "LevelExtractorMixin"
+    "LevelExtractorMixin",
+    "ChunkSectionsToRenderMixin"
   ],
   "injectors": {
     "defaultRequire": 1
