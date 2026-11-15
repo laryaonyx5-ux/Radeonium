@@ -30,10 +30,29 @@ public final class MinecraftMeshGpuUpload implements AutoCloseable {
 
     private final GpuBuffer vertexBuffer;
     private final int vertexCount;
+    private final long testByteSize;
+    private final Runnable testCloseAction;
+    private boolean testClosed;
 
     private MinecraftMeshGpuUpload(GpuBuffer vertexBuffer, int vertexCount) {
         this.vertexBuffer = vertexBuffer;
         this.vertexCount = vertexCount;
+        this.testByteSize = -1L;
+        this.testCloseAction = null;
+    }
+
+    private MinecraftMeshGpuUpload(int vertexCount, long byteSize, Runnable closeAction) {
+        if (vertexCount <= 0 || byteSize < 0 || closeAction == null) {
+            throw new IllegalArgumentException("test upload requires vertices, non-negative bytes and a close action");
+        }
+        this.vertexBuffer = null;
+        this.vertexCount = vertexCount;
+        this.testByteSize = byteSize;
+        this.testCloseAction = closeAction;
+    }
+
+    static MinecraftMeshGpuUpload forTesting(int vertexCount, long byteSize, Runnable closeAction) {
+        return new MinecraftMeshGpuUpload(vertexCount, byteSize, closeAction);
     }
 
     /**
@@ -267,6 +286,7 @@ public final class MinecraftMeshGpuUpload implements AutoCloseable {
 
     /** True when this upload has no live Radeonium-owned GPU buffer. */
     public boolean isClosed() {
+        if (testCloseAction != null) return testClosed;
         return vertexBuffer == null || vertexBuffer.isClosed();
     }
 
@@ -288,7 +308,7 @@ public final class MinecraftMeshGpuUpload implements AutoCloseable {
     }
 
     public long byteSize() {
-        return vertexBuffer == null ? 0L : vertexBuffer.size();
+        return testCloseAction != null ? testByteSize : vertexBuffer == null ? 0L : vertexBuffer.size();
     }
 
     /**
@@ -321,6 +341,13 @@ public final class MinecraftMeshGpuUpload implements AutoCloseable {
     @Override
     public void close() {
         RenderSystem.assertOnRenderThread();
+        if (testCloseAction != null) {
+            if (!testClosed) {
+                testCloseAction.run();
+                testClosed = true;
+            }
+            return;
+        }
         if (vertexBuffer != null && !vertexBuffer.isClosed()) {
             vertexBuffer.close();
         }
