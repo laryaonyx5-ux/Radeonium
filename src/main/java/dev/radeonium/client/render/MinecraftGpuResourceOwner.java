@@ -168,14 +168,17 @@ public final class MinecraftGpuResourceOwner implements AutoCloseable {
     }
 
     public int allocationCount() {
+        renderThreadCheck.run();
         return allocations.size();
     }
 
     public long allocatedBytes() {
+        renderThreadCheck.run();
         return allocatedBytes;
     }
 
     public boolean isClosed() {
+        renderThreadCheck.run();
         return closed;
     }
 
