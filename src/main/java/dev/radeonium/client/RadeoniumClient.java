@@ -8,6 +8,7 @@ import dev.radeonium.client.memory.MemoryPressureMonitor;
 import dev.radeonium.client.render.ChunkRenderPipeline;
 import dev.radeonium.client.render.MinecraftSectionGpuCache;
 import dev.radeonium.client.render.MinecraftCompiledGeometryStore;
+import dev.radeonium.client.render.MinecraftCompiledGeometryGpuCache;
 import dev.radeonium.client.render.RendererSectionTracker;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
@@ -26,7 +27,13 @@ public final class RadeoniumClient implements ClientModInitializer {
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
     private static final ChunkRenderPipeline RENDERER_PIPELINE = new ChunkRenderPipeline();
     private static final MinecraftSectionGpuCache MINECRAFT_GPU_CACHE = new MinecraftSectionGpuCache();
+    private static final MinecraftCompiledGeometryGpuCache COMPILED_GEOMETRY_GPU_CACHE =
+            new MinecraftCompiledGeometryGpuCache();
     private static ClientLevel trackedWorld;
+
+    public static MinecraftCompiledGeometryGpuCache compiledGeometryGpuCache() {
+        return COMPILED_GEOMETRY_GPU_CACHE;
+    }
 
     public static ChunkRenderPipeline rendererPipeline() {
         return RENDERER_PIPELINE;
@@ -61,6 +68,7 @@ public final class RadeoniumClient implements ClientModInitializer {
         ClientLifecycleEvents.CLIENT_STARTED.register(client -> GpuDetector.detectAndLog());
         ClientLifecycleEvents.CLIENT_STOPPING.register(client -> {
             MINECRAFT_GPU_CACHE.close();
+            COMPILED_GEOMETRY_GPU_CACHE.close();
             MinecraftCompiledGeometryStore.clear();
             RendererSectionTracker.reset();
         });
@@ -71,6 +79,7 @@ public final class RadeoniumClient implements ClientModInitializer {
                 if (trackedWorld != null) {
                     RendererSectionTracker.reset();
                     MINECRAFT_GPU_CACHE.clear();
+                    COMPILED_GEOMETRY_GPU_CACHE.clear();
                     MinecraftCompiledGeometryStore.clear();
                 }
                 trackedWorld = client.level;

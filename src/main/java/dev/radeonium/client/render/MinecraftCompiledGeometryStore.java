@@ -29,8 +29,8 @@ public final class MinecraftCompiledGeometryStore {
 
     private MinecraftCompiledGeometryStore() {}
 
-    public static synchronized void capture(SectionPos position, SectionCompiler.Results results) {
-        if (position == null || results == null) return;
+    public static synchronized Snapshot capture(SectionPos position, SectionCompiler.Results results) {
+        if (position == null || results == null) return null;
 
         EnumMap<ChunkSectionLayer, LayerData> layers =
                 new EnumMap<>(ChunkSectionLayer.class);
@@ -60,6 +60,7 @@ public final class MinecraftCompiledGeometryStore {
         if (previous != null) retainedBytes -= previous.byteSize();
         retainedBytes += replacement.byteSize();
         evictToBudget();
+        return SNAPSHOTS.get(position);
     }
 
     private static byte[] copy(ByteBuffer source) {
@@ -82,6 +83,11 @@ public final class MinecraftCompiledGeometryStore {
 
     public static synchronized Snapshot get(SectionPos position) {
         return SNAPSHOTS.get(position);
+    }
+
+    /** Prevents delayed render-thread uploads from installing stale worker results. */
+    public static synchronized boolean isCurrent(Snapshot snapshot) {
+        return snapshot != null && SNAPSHOTS.get(snapshot.position()) == snapshot;
     }
 
     public static synchronized void remove(SectionPos position) {
