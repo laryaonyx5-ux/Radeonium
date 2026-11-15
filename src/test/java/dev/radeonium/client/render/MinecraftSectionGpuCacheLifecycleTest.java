@@ -65,6 +65,33 @@ class MinecraftSectionGpuCacheLifecycleTest {
     }
 
 
+
+    @Test
+    void cacheRejectsForeignGpuUploadsBeforeReplacingAnExistingEntry() {
+        MinecraftGpuResourceOwner owner = new MinecraftGpuResourceOwner(() -> {});
+        MinecraftSectionGpuCache cache =
+                new MinecraftSectionGpuCache(owner, () -> {});
+        SectionPos position = new SectionPos(3, 0, 0);
+        MinecraftMeshGpuUpload owned =
+                MinecraftMeshGpuUpload.forTesting(4, 24L, () -> {});
+        owner.track(owned, null);
+        cache.installPreparedEntry(position, entry(owned));
+
+        MinecraftMeshGpuUpload foreign =
+                MinecraftMeshGpuUpload.forTesting(4, 32L, () -> {});
+        assertThrows(IllegalArgumentException.class,
+                () -> cache.installPreparedEntry(position, entry(foreign)));
+
+        assertFalse(owned.isClosed());
+        assertFalse(foreign.isClosed());
+        assertEquals(1, cache.sectionCount());
+        assertEquals(1, owner.allocationCount());
+        assertEquals(24L, owner.allocatedBytes());
+
+        cache.clear();
+        foreign.close();
+    }
+
     @Test
     void replacementDisposesOldUploadAndRetainsOnlyTheNewOne() {
         MinecraftGpuResourceOwner owner = new MinecraftGpuResourceOwner(() -> {});
