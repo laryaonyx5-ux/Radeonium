@@ -33,9 +33,9 @@ public final class FluidSectionMesher {
                         add(quads, id, tint, light, 0, 1, 0,
                                 new float[]{
                                         x, y + northWest, z,
-                                        x + 1, y + northEast, z,
+                                        x, y + southWest, z + 1,
                                         x + 1, y + southEast, z + 1,
-                                        x, y + southWest, z + 1
+                                        x + 1, y + northEast, z
                                 });
                     }
                     int westHeight = snapshot.fluidIdWithHalo(x - 1, y, z) != id
