@@ -10,6 +10,8 @@ import java.util.Collections;
 import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.HashMap;
+import java.util.Objects;
 
 /**
  * Bounded CPU-side mirror of the actual geometry emitted by Minecraft's
@@ -26,10 +28,42 @@ public final class MinecraftCompiledGeometryStore {
     private static final LinkedHashMap<SectionPos, Snapshot> SNAPSHOTS =
             new LinkedHashMap<>(32, 0.75f, true);
     private static long retainedBytes;
+    private static long nextGeneration;
+    private static final Map<SectionPos, Long> CAPTURE_GENERATIONS = new HashMap<>();
+    private static final ThreadLocal<Map<SectionPos, Long>> ACTIVE_CAPTURES =
+            ThreadLocal.withInitial(HashMap::new);
 
     private MinecraftCompiledGeometryStore() {}
 
-    public static synchronized Snapshot capture(SectionPos position, SectionCompiler.Results results) {
+    /** Called at SectionCompiler entry on the worker thread. */
+    public static synchronized void beginCapture(SectionPos position) {
+        if (position == null) return;
+        long generation = ++nextGeneration;
+        CAPTURE_GENERATIONS.put(position, generation);
+        ACTIVE_CAPTURES.get().put(position, generation);
+    }
+
+    /**
+     * Completes the current worker-thread capture only if no newer compile for
+     * this section has started in the meantime.
+     */
+    public static synchronized Snapshot captureCurrent(
+            SectionPos position, SectionCompiler.Results results
+    ) {
+        if (position == null || results == null) return null;
+        Long generation = ACTIVE_CAPTURES.get().remove(position);
+        if (generation == null
+                || !Objects.equals(CAPTURE_GENERATIONS.get(position), generation)) {
+            return null;
+        }
+        return capture(position, results, generation);
+    }
+
+    private static synchronized Snapshot capture(
+            SectionPos position, SectionCompiler.Results results, long generation
+    ) {
+        if (position == null || results == null
+                || !Objects.equals(CAPTURE_GENERATIONS.get(position), generation)) return null;
         if (position == null || results == null) return null;
 
         EnumMap<ChunkSectionLayer, LayerData> layers =
@@ -55,7 +89,7 @@ public final class MinecraftCompiledGeometryStore {
             ));
         }
 
-        Snapshot replacement = new Snapshot(position, layers, System.nanoTime());
+        Snapshot replacement = new Snapshot(position, layers, System.nanoTime(), generation);
         Snapshot previous = SNAPSHOTS.put(position, replacement);
         if (previous != null) retainedBytes -= previous.byteSize();
         retainedBytes += replacement.byteSize();
@@ -91,12 +125,15 @@ public final class MinecraftCompiledGeometryStore {
     }
 
     public static synchronized void remove(SectionPos position) {
+        CAPTURE_GENERATIONS.put(position, ++nextGeneration);
         Snapshot removed = SNAPSHOTS.remove(position);
         if (removed != null) retainedBytes -= removed.byteSize();
     }
 
     public static synchronized void clear() {
         SNAPSHOTS.clear();
+        CAPTURE_GENERATIONS.clear();
+        ACTIVE_CAPTURES.remove();
         retainedBytes = 0L;
     }
 
@@ -111,7 +148,8 @@ public final class MinecraftCompiledGeometryStore {
     public record Snapshot(
             SectionPos position,
             Map<ChunkSectionLayer, LayerData> layers,
-            long capturedAtNanos
+            long capturedAtNanos,
+            long generation
     ) {
         public Snapshot {
             EnumMap<ChunkSectionLayer, LayerData> copy =
