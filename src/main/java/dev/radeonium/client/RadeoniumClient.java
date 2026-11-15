@@ -11,6 +11,7 @@ import dev.radeonium.client.render.MinecraftCompiledGeometryStore;
 import dev.radeonium.client.render.MinecraftCompiledGeometryGpuCache;
 import dev.radeonium.client.render.MinecraftSectionModelCaptureStore;
 import dev.radeonium.client.render.RendererSectionTracker;
+import dev.radeonium.client.render.SectionMeshingExecutor;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
@@ -33,6 +34,7 @@ public final class RadeoniumClient implements ClientModInitializer {
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
     private static final ChunkRenderPipeline RENDERER_PIPELINE = new ChunkRenderPipeline();
     private static final MinecraftSectionGpuCache MINECRAFT_GPU_CACHE = new MinecraftSectionGpuCache();
+    private static final SectionMeshingExecutor SECTION_MESHING_EXECUTOR = new SectionMeshingExecutor();
     private static final MinecraftCompiledGeometryGpuCache COMPILED_GEOMETRY_GPU_CACHE =
             new MinecraftCompiledGeometryGpuCache();
     private static ClientLevel trackedWorld;
@@ -57,6 +59,8 @@ public final class RadeoniumClient implements ClientModInitializer {
             COMPILED_GEOMETRY_GPU_CACHE.upload(snapshot);
         }
     }
+
+    public static SectionMeshingExecutor sectionMeshingExecutor() { return SECTION_MESHING_EXECUTOR; }
 
     public static MinecraftCompiledGeometryGpuCache compiledGeometryGpuCache() {
         return COMPILED_GEOMETRY_GPU_CACHE;
@@ -109,6 +113,7 @@ public final class RadeoniumClient implements ClientModInitializer {
 
         ClientLifecycleEvents.CLIENT_STARTED.register(client -> GpuDetector.detectAndLog());
         ClientLifecycleEvents.CLIENT_STOPPING.register(client -> {
+            SECTION_MESHING_EXECUTOR.close();
             MINECRAFT_GPU_CACHE.close();
             COMPILED_GEOMETRY_GPU_CACHE.close();
             PENDING_GEOMETRY_UPLOADS.clear();
