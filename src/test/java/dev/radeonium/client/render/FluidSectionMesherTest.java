@@ -150,6 +150,30 @@ class FluidSectionMesherTest {
     }
 
     @Test
+    void haloSnapshotCopiesAllPaddedArraysAndValidatesEveryCell() {
+        short[] ids = new short[18 * 18 * 18]; byte[] heights = new byte[18 * 18 * 18];
+        int[] tints = new int[18 * 18 * 18], lights = new int[18 * 18 * 18];
+        int index = haloIndex(-1, 0, 4);
+        ids[index] = 9;
+        heights[index] = 8;
+        var snapshot = FluidSectionSnapshot.withHalo(ids, heights, tints, lights);
+        ids[index] = 0;
+        heights[index] = 0;
+        assertEquals(9, snapshot.fluidIdWithHalo(-1, 0, 4));
+        assertEquals(8, snapshot.heightEighthsWithHalo(-1, 0, 4));
+
+        short[] invalidIds = new short[18 * 18 * 18];
+        byte[] invalidHeights = new byte[18 * 18 * 18];
+        invalidHeights[haloIndex(16, 16, 16)] = 1;
+        assertThrows(IllegalArgumentException.class,
+                () -> FluidSectionSnapshot.withHalo(invalidIds, invalidHeights,
+                        new int[18 * 18 * 18], new int[18 * 18 * 18]));
+        assertThrows(IllegalArgumentException.class,
+                () -> FluidSectionSnapshot.withHalo(new short[4096], new byte[4096],
+                        new int[4096], new int[4096]));
+    }
+
+    @Test
     void copiesCaptureArraysAndRejectsInvalidHeights() {
         short[] ids = new short[4096]; byte[] heights = new byte[4096];
         int[] tints = new int[4096], lights = new int[4096];
