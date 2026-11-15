@@ -288,7 +288,7 @@ public final class MinecraftMeshGpuUpload implements AutoCloseable {
 
     /**
      * Binds this upload to an already-open RenderPearl pass and submits its
-     * triangle-list vertices. The caller owns the pass, pipeline, uniforms,
+     * four-vertex QUADS geometry. The caller owns the pass, pipeline, uniforms,
      * render target and draw ordering. This method never opens or submits a pass.
      */
     public void drawInto(RenderPass pass) {
