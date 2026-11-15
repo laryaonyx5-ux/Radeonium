@@ -79,7 +79,6 @@ public final class MinecraftSectionModelMesher {
     ) {
         if (quads == null) return;
         for (BakedQuad quad : quads) {
-            lighter.reset();
             QuadInstance instance = new QuadInstance();
             if (useAmbientOcclusion) {
                 lighter.prepareQuadAmbientOcclusion(region, state, position, quad, instance);
