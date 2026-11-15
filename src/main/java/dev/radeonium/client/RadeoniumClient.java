@@ -11,9 +11,9 @@ import dev.radeonium.client.render.RendererSectionTracker;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
-import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientWorldEvents;
 import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
 import net.minecraft.client.KeyMapping;
+import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import org.slf4j.Logger;
@@ -25,6 +25,7 @@ public final class RadeoniumClient implements ClientModInitializer {
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
     private static final ChunkRenderPipeline RENDERER_PIPELINE = new ChunkRenderPipeline();
     private static final MinecraftSectionGpuCache MINECRAFT_GPU_CACHE = new MinecraftSectionGpuCache();
+    private static ClientLevel trackedWorld;
 
     public static ChunkRenderPipeline rendererPipeline() {
         return RENDERER_PIPELINE;
@@ -61,14 +62,17 @@ public final class RadeoniumClient implements ClientModInitializer {
             MINECRAFT_GPU_CACHE.close();
             RendererSectionTracker.reset();
         });
-        ClientWorldEvents.UNLOAD.register((client, world) -> {
-            // World-owned CPU snapshots and GPU uploads must not leak into the
-            // next dimension, server, or single-player world.
-            RendererSectionTracker.reset();
-            MINECRAFT_GPU_CACHE.clear();
-        });
-
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
+            // Fabric API versions used by this project do not expose a world-unload event.
+            // Detect level identity changes on the client tick instead.
+            if (client.level != trackedWorld) {
+                if (trackedWorld != null) {
+                    RendererSectionTracker.reset();
+                    MINECRAFT_GPU_CACHE.clear();
+                }
+                trackedWorld = client.level;
+            }
+
             if (MemoryPressureMonitor.tickAndSample()) {
                 LOGGER.info("JVM heap pressure: {}", MemoryPressureMonitor.current());
             }
