@@ -206,6 +206,32 @@ Section-center ordering is an approximation for ordinary alpha blending; it cann
 
 Vanilla remains the compatibility authority for unsupported or stale geometry. No independent Radeonium occlusion system or performance gain is claimed by this milestone.
 
+## Milestone I — render diagnostics and fallback accounting (Step 9)
+
+**Status: implementation and focused tests complete; in-game counter inspection and visual validation belong to Step 10.**
+
+### Implemented
+
+- Adds thread-safe cumulative counters for terrain draws sourced from Radeonium's model mesh cache, Radeonium's copied compiled-geometry cache, or Minecraft's vanilla fallback.
+- Tracks counters independently for SOLID, CUTOUT and TRANSLUCENT layers.
+- Counts visible sections that currently have no compiled mesh, separately from submitted draws.
+- Exposes immutable snapshots with per-layer and total counts through `RadeoniumClient.terrainRenderDiagnostics()`.
+- Provides an explicit reset operation and resets counters during client shutdown.
+- Records the source at the point the visible terrain draw is selected, so the counters report actual submitted draw-list choices rather than estimates of GPU work.
+- Uses `LongAdder` counters to support safe reads and recording without serializing worker/render diagnostics.
+- Focused tests cover per-layer source accounting, immutable snapshots, reset behavior, invalid inputs and concurrent updates.
+
+### Deliberate boundary
+
+These counters do not measure frame time, GPU execution, bytes transferred or FPS. They are observability for draw ownership and fallback only. They do not change draw selection, bypass compatibility checks or disable vanilla fallback.
+
+### Step 10 validation checklist
+
+- Inspect snapshots in a live client while viewing ordinary opaque terrain, cutout foliage, water/glass and unsupported/modded blocks.
+- Confirm Radeonium counters increase only for the owned buffers actually selected and vanilla fallback counters increase when compatibility checks reject an upload.
+- Confirm no-mesh counts fall as visible sections compile, and no stale/missing terrain appears during movement, edits, unload/reload or resource-pack changes.
+- Run the visual/backend/resource-pack/mod compatibility matrix and collect frame-time/memory measurements separately; no performance claim follows from draw counters alone.
+
 ## What "Radeonium owns the renderer" means
 
 Radeonium must eventually own these responsibilities:
