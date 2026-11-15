@@ -435,6 +435,10 @@ public final class MinecraftSectionModelMesher {
             return new SectionModelMesh(layers, count, fluids);
         }
 
+        public SectionModelMesh withFluids(MinecraftFluidSectionMesher.SectionFluidMesh fluids) {
+            return new SectionModelMesh(layers, unsupportedBlockEntityCount, fluids);
+        }
+
         public int quadCount() {
             int total = 0;
             for (MinecraftBlockModelMesh mesh : layers.values()) total += mesh.quadCount();
