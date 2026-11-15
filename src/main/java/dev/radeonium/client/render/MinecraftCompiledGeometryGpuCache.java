@@ -50,7 +50,7 @@ public final class MinecraftCompiledGeometryGpuCache implements AutoCloseable {
                 return false;
             }
 
-            SectionUpload replacement = new SectionUpload(layers);
+            SectionUpload replacement = new SectionUpload(snapshot, layers);
             SectionUpload previous = sections.put(snapshot.position(), replacement);
             if (previous != null) {
                 uploadedBytes -= previous.byteSize();
@@ -96,6 +96,30 @@ public final class MinecraftCompiledGeometryGpuCache implements AutoCloseable {
         uploadedBytes = 0L;
     }
 
+    /**
+     * Returns Radeonium-owned buffers only while their source CPU snapshot is
+     * still the newest compile for that section. Null means the caller must
+     * keep using Minecraft's live buffer as a safe fallback.
+     */
+    public synchronized LayerBuffers layerBuffers(SectionPos position, ChunkSectionLayer layer) {
+        SectionUpload section = sections.get(position);
+        if (section == null || !MinecraftCompiledGeometryStore.isCurrent(section.snapshot)) return null;
+        LayerUpload upload = section.layers.get(layer);
+        if (upload == null || upload.isEmpty()) return null;
+        return new LayerBuffers(
+                upload.vertices, upload.indices, upload.indexType,
+                upload.vertexCount, upload.indexCount
+        );
+    }
+
+    public record LayerBuffers(
+            GpuBuffer vertexBuffer,
+            GpuBuffer indexBuffer,
+            IndexType indexType,
+            int vertexCount,
+            int indexCount
+    ) {}
+
     public synchronized int sectionCount() { return sections.size(); }
     public synchronized long uploadedBytes() { return uploadedBytes; }
 
@@ -117,7 +141,10 @@ public final class MinecraftCompiledGeometryGpuCache implements AutoCloseable {
     @Override
     public void close() { clear(); }
 
-    private record SectionUpload(EnumMap<ChunkSectionLayer, LayerUpload> layers) {
+    private record SectionUpload(
+            MinecraftCompiledGeometryStore.Snapshot snapshot,
+            EnumMap<ChunkSectionLayer, LayerUpload> layers
+    ) {
         private SectionUpload {
             layers = new EnumMap<>(layers);
         }
