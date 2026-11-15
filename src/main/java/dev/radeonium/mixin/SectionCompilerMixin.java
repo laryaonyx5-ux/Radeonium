@@ -1,8 +1,6 @@
 package dev.radeonium.mixin;
 
-import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.VertexSorting;
-import dev.radeonium.client.RadeoniumClient;
 import dev.radeonium.client.render.MinecraftCompiledGeometryStore;
 import net.minecraft.client.renderer.SectionBufferBuilderPack;
 import net.minecraft.client.renderer.chunk.RenderSectionRegion;
@@ -34,8 +32,8 @@ public abstract class SectionCompilerMixin {
         MinecraftCompiledGeometryStore.Snapshot snapshot =
                 MinecraftCompiledGeometryStore.capture(sectionPos, cir.getReturnValue());
         if (snapshot != null) {
-            // SectionCompiler runs on worker threads. Queue GPU allocation on the render thread.
-            RenderSystem.recordRenderCall(() -> RadeoniumClient.compiledGeometryGpuCache().upload(snapshot));
+            // SectionCompiler runs on workers; the client tick drains this queue on the render thread.
+            dev.radeonium.client.RadeoniumClient.queueCompiledGeometryUpload(snapshot);
         }
     }
 }

@@ -18,6 +18,7 @@ import net.minecraft.client.KeyMapping;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,6 +31,21 @@ public final class RadeoniumClient implements ClientModInitializer {
     private static final MinecraftCompiledGeometryGpuCache COMPILED_GEOMETRY_GPU_CACHE =
             new MinecraftCompiledGeometryGpuCache();
     private static ClientLevel trackedWorld;
+    private static final ConcurrentLinkedQueue<MinecraftCompiledGeometryStore.Snapshot> PENDING_GEOMETRY_UPLOADS =
+            new ConcurrentLinkedQueue<>();
+
+    public static void queueCompiledGeometryUpload(MinecraftCompiledGeometryStore.Snapshot snapshot) {
+        if (snapshot != null) PENDING_GEOMETRY_UPLOADS.add(snapshot);
+    }
+
+    private static void drainCompiledGeometryUploads() {
+        // Bound per-tick work so a burst of chunk compilation cannot monopolize a frame.
+        for (int i = 0; i < 4; i++) {
+            MinecraftCompiledGeometryStore.Snapshot snapshot = PENDING_GEOMETRY_UPLOADS.poll();
+            if (snapshot == null) break;
+            COMPILED_GEOMETRY_GPU_CACHE.upload(snapshot);
+        }
+    }
 
     public static MinecraftCompiledGeometryGpuCache compiledGeometryGpuCache() {
         return COMPILED_GEOMETRY_GPU_CACHE;
@@ -69,10 +85,12 @@ public final class RadeoniumClient implements ClientModInitializer {
         ClientLifecycleEvents.CLIENT_STOPPING.register(client -> {
             MINECRAFT_GPU_CACHE.close();
             COMPILED_GEOMETRY_GPU_CACHE.close();
+            PENDING_GEOMETRY_UPLOADS.clear();
             MinecraftCompiledGeometryStore.clear();
             RendererSectionTracker.reset();
         });
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
+            drainCompiledGeometryUploads();
             // Fabric API versions used by this project do not expose a world-unload event.
             // Detect level identity changes on the client tick instead.
             if (client.level != trackedWorld) {
@@ -80,6 +98,7 @@ public final class RadeoniumClient implements ClientModInitializer {
                     RendererSectionTracker.reset();
                     MINECRAFT_GPU_CACHE.clear();
                     COMPILED_GEOMETRY_GPU_CACHE.clear();
+                    PENDING_GEOMETRY_UPLOADS.clear();
                     MinecraftCompiledGeometryStore.clear();
                 }
                 trackedWorld = client.level;
