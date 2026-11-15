@@ -5,9 +5,8 @@ import java.util.List;
 /**
  * Stable description of Radeonium's terrain shader inputs and resources.
  *
- * Pipeline creation is deliberately left to the following render-pipeline
- * milestone; this class is the single source of truth for shader resource
- * names and the vertex layout consumed by those pipelines.
+ * The active SOLID and CUTOUT RenderPearl pipelines select these shader
+ * resources. This class documents their shared Minecraft 26.3 interface.
  */
 public final class TerrainShaderContract {
     public static final String VERTEX_SHADER =
@@ -29,10 +28,11 @@ public final class TerrainShaderContract {
     public static final int VERTEX_STRIDE_BYTES = MinecraftMeshGpuUpload.VERTEX_STRIDE_BYTES;
 
     public static final List<String> VERTEX_UNIFORMS =
-            List.of("ModelViewMat", "ProjMat", "ChunkPosition", "CameraBlockPos", "CameraOffset");
+            List.of("ModelViewMat", "ProjMat", "CameraBlockPos", "CameraOffset", "Sampler2");
     public static final List<String> FRAGMENT_UNIFORMS =
             List.of("Sampler0", "FogColor", "FogEnvironmentalStart", "FogEnvironmentalEnd",
-                    "FogRenderDistanceStart", "FogRenderDistanceEnd", "ChunkVisibility");
+                    "FogRenderDistanceStart", "FogRenderDistanceEnd", "TextureSize", "UseRgss",
+                    "ChunkVisibility");
 
     private TerrainShaderContract() {}
 
