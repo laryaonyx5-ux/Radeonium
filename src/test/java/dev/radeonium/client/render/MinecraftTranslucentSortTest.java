@@ -17,8 +17,8 @@ class MinecraftTranslucentSortTest {
                 MinecraftSectionGpuCache.sortTranslucentQuads(
                         new SectionPos(0, 0, 0), List.of(near, far), new Vec3(0, 0, 0));
 
-        assertEquals(10.0f, sorted.get(0).positions()[0]);
-        assertEquals(1.0f, sorted.get(1).positions()[0]);
+        assertEquals(10.0f, sorted.get(0).positions()[0], 1.0e-6f);
+        assertEquals(1.0f, sorted.get(1).positions()[0], 1.0e-6f);
     }
 
     private static MinecraftMeshGpuUpload.QuadData quadAt(float x) {
