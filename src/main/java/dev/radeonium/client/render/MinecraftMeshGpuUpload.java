@@ -15,12 +15,13 @@ import java.nio.ByteOrder;
  * buffer. Call upload on Minecraft's render thread: GPU resources are owned by
  * the active RenderPearl device and must not be created by meshing workers.
  *
- * Vertex format (20-byte stride): float3 model position, then the low and high
- * 32-bit words of Minecraft's packed UV value. Material/shader binding and
+ * Vertex format (24-byte stride): float3 model position, the low and high 32-bit
+ * words of Minecraft's packed UV value, then the captured ARGB block tint.
+ * Material/shader binding and
  * terrain draw submission are intentionally separate later stages.
  */
 public final class MinecraftMeshGpuUpload implements AutoCloseable {
-    public static final int VERTEX_STRIDE_BYTES = 20;
+    public static final int VERTEX_STRIDE_BYTES = 24;
 
     private final GpuBuffer vertexBuffer;
     private final int vertexCount;
