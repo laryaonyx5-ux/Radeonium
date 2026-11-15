@@ -147,10 +147,16 @@ public final class FluidSectionMesher {
                             float normalX, float normalY, float normalZ,
                             float[] positions) {
         public FluidQuad {
+            if (fluidId == 0) throw new IllegalArgumentException("Fluid quad needs a non-empty fluid ID");
+            if (positions == null || positions.length != 12) {
+                throw new IllegalArgumentException("Fluid quad needs four finite vertices");
+            }
             positions = positions.clone();
-            if (positions.length != 12) throw new IllegalArgumentException("Fluid quad needs 4 vertices");
-            if (!Float.isFinite(normalX) || !Float.isFinite(normalY) || !Float.isFinite(normalZ)) {
-                throw new IllegalArgumentException("Fluid normal must be finite");
+            if (!Float.isFinite(normalX) || !Float.isFinite(normalY) || !Float.isFinite(normalZ)
+                    || Math.abs(normalX) > 1.0f || Math.abs(normalY) > 1.0f
+                    || Math.abs(normalZ) > 1.0f
+                    || Math.abs(normalX) + Math.abs(normalY) + Math.abs(normalZ) != 1.0f) {
+                throw new IllegalArgumentException("Fluid normal must be a unit axis vector");
             }
             for (float value : positions) if (!Float.isFinite(value)) {
                 throw new IllegalArgumentException("Fluid geometry must be finite");
