@@ -232,6 +232,16 @@ These counters do not measure frame time, GPU execution, bytes transferred or FP
 - Confirm no-mesh counts fall as visible sections compile, and no stale/missing terrain appears during movement, edits, unload/reload or resource-pack changes.
 - Run the visual/backend/resource-pack/mod compatibility matrix and collect frame-time/memory measurements separately; no performance claim follows from draw counters alone.
 
+## Step 12 — advanced section culling
+
+**Status: conservative culling core and automated tests implemented; live renderer integration and occlusion data feed pending.**
+
+- Adds a six-plane positive-vertex AABB test for 16×16×16 sections; rejects only sections wholly outside a plane.
+- Adds in-place list filtering and a pipeline API combining portal-graph reachability with frustum intersection.
+- Tests cover plane validation, inside/boundary/outside sections, list filtering, portal connectivity and combined visibility.
+- The active draw-list builder still uses Minecraft's already-frustum/occlusion-filtered visible-section list. Radeonium does not yet extract its own runtime frustum planes or derive trusted open-face masks from compiled section occlusion data. Its graph masks default to closed until a reliable feed is connected.
+- No runtime draw-count or FPS improvement is claimed. In-game checks are required before replacing Minecraft's visibility decisions.
+
 ## What "Radeonium owns the renderer" means
 
 Radeonium must eventually own these responsibilities:
