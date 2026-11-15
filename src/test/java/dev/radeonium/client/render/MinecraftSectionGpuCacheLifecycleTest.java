@@ -238,6 +238,60 @@ class MinecraftSectionGpuCacheLifecycleTest {
         assertEquals(0, owner.allocationCount());
     }
 
+
+    @Test
+    void leastRecentlyUsedSectionIsEvictedAfterAnOlderSectionIsAccessed() {
+        MinecraftGpuResourceOwner owner = new MinecraftGpuResourceOwner(() -> {});
+        MinecraftSectionGpuCache cache =
+                new MinecraftSectionGpuCache(owner, () -> {});
+        SectionPos recentlyUsed = new SectionPos(0, 0, 0);
+        MinecraftMeshGpuUpload first = null;
+
+        for (int index = 0; index < 64; index++) {
+            MinecraftMeshGpuUpload upload =
+                    MinecraftMeshGpuUpload.forTesting(4, 16L, () -> {});
+            if (index == 0) first = upload;
+            owner.track(upload, null);
+            cache.installPreparedEntry(new SectionPos(index, 0, 0), entry(upload));
+        }
+
+        assertTrue(cache.mesh(recentlyUsed) != null); // refresh the LRU position
+        MinecraftMeshGpuUpload newest =
+                MinecraftMeshGpuUpload.forTesting(4, 16L, () -> {});
+        owner.track(newest, null);
+        cache.installPreparedEntry(new SectionPos(64, 0, 0), entry(newest));
+
+        assertFalse(first.isClosed());
+        assertTrue(owner.allocationCount() == 64);
+        assertEquals(64, cache.sectionCount());
+        assertEquals(64L * 16L, cache.uploadedBytes());
+        cache.clear();
+        assertEquals(0, owner.allocationCount());
+    }
+
+    @Test
+    void byteBudgetEvictsOldestSectionsUntilUniqueGpuBytesAreWithinLimit() {
+        MinecraftGpuResourceOwner owner = new MinecraftGpuResourceOwner(() -> {});
+        MinecraftSectionGpuCache cache =
+                new MinecraftSectionGpuCache(owner, () -> {});
+        long allocationBytes = 40L * 1024L * 1024L;
+        MinecraftMeshGpuUpload oldest =
+                MinecraftMeshGpuUpload.forTesting(4, allocationBytes, () -> {});
+        MinecraftMeshGpuUpload newest =
+                MinecraftMeshGpuUpload.forTesting(4, allocationBytes, () -> {});
+        owner.track(oldest, null);
+        cache.installPreparedEntry(new SectionPos(0, 0, 0), entry(oldest));
+        owner.track(newest, null);
+        cache.installPreparedEntry(new SectionPos(1, 0, 0), entry(newest));
+
+        assertTrue(oldest.isClosed());
+        assertFalse(newest.isClosed());
+        assertEquals(1, cache.sectionCount());
+        assertEquals(allocationBytes, cache.uploadedBytes());
+        assertEquals(1, owner.allocationCount());
+        cache.clear();
+    }
+
     @Test
     void closeClearsCacheAndClosesGpuOwner() {
         MinecraftGpuResourceOwner owner = new MinecraftGpuResourceOwner(() -> {});
