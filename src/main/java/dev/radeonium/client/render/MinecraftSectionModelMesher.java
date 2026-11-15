@@ -43,62 +43,38 @@ public final class MinecraftSectionModelMesher {
     public SectionModelMesh captureAndBuild(
             SectionPos sectionPos, RenderSectionRegion region, BlockStateModelSet modelSet
     ) {
+        CapturedSectionInput captured = captureInputs(sectionPos, region, modelSet);
+        return buildResolved(captured.blocks()).withUnsupportedBlockEntityCount(captured.unsupportedBlockEntityCount());
+    }
+
+    /** Capture all world-dependent data on Minecraft's compiler thread before asynchronous meshing. */
+    public CapturedSectionInput captureInputs(
+            SectionPos sectionPos, RenderSectionRegion region, BlockStateModelSet modelSet
+    ) {
         if (sectionPos == null || region == null || modelSet == null) {
             throw new IllegalArgumentException("sectionPos, region and modelSet are required");
         }
-
         List<ResolvedBlockInput> resolved = new ArrayList<>(4096);
-        int unsupportedBlockEntityCount = 0;
-        int baseX = sectionPos.minBlockX();
-        int baseY = sectionPos.minBlockY();
-        int baseZ = sectionPos.minBlockZ();
-
-        // RenderSectionRegion is a 3x3x3 immutable section copy. Capture its
-        // one-block halo once, rather than asking the region for seven states
-        // for every interior block.
+        int blockEntities = 0;
+        int baseX = sectionPos.minBlockX(), baseY = sectionPos.minBlockY(), baseZ = sectionPos.minBlockZ();
         BlockState[] states = new BlockState[18 * 18 * 18];
-        for (int y = -1; y <= 16; y++) {
-            for (int z = -1; z <= 16; z++) {
-                for (int x = -1; x <= 16; x++) {
-                    BlockPos position = new BlockPos(baseX + x, baseY + y, baseZ + z);
-                    states[haloIndex(x, y, z)] = region.getBlockState(position);
-                }
-            }
+        for (int y = -1; y <= 16; y++) for (int z = -1; z <= 16; z++) for (int x = -1; x <= 16; x++) {
+            states[haloIndex(x, y, z)] = region.getBlockState(new BlockPos(baseX + x, baseY + y, baseZ + z));
         }
-
-        for (int localY = 0; localY < 16; localY++) {
-            for (int localZ = 0; localZ < 16; localZ++) {
-                for (int localX = 0; localX < 16; localX++) {
-                    BlockState state = states[haloIndex(localX, localY, localZ)];
-                    BlockPos position = new BlockPos(
-                            baseX + localX, baseY + localY, baseZ + localZ);
-                    if (region.getBlockEntity(position) != null) {
-                        unsupportedBlockEntityCount++;
-                    }
-                    if (state.isAir() || state.getRenderShape() != RenderShape.MODEL) continue;
-
-                    BlockStateModel model = modelSet.get(state);
-                    boolean down = state.skipRendering(
-                            states[haloIndex(localX, localY - 1, localZ)], Direction.DOWN);
-                    boolean up = state.skipRendering(
-                            states[haloIndex(localX, localY + 1, localZ)], Direction.UP);
-                    boolean north = state.skipRendering(
-                            states[haloIndex(localX, localY, localZ - 1)], Direction.NORTH);
-                    boolean south = state.skipRendering(
-                            states[haloIndex(localX, localY, localZ + 1)], Direction.SOUTH);
-                    boolean west = state.skipRendering(
-                            states[haloIndex(localX - 1, localY, localZ)], Direction.WEST);
-                    boolean east = state.skipRendering(
-                            states[haloIndex(localX + 1, localY, localZ)], Direction.EAST);
-
-                    resolved.add(ResolvedBlockInput.capture(
-                            model, state.getSeed(position), localX, localY, localZ,
-                            down, up, north, south, west, east));
-                }
-            }
+        for (int y = 0; y < 16; y++) for (int z = 0; z < 16; z++) for (int x = 0; x < 16; x++) {
+            BlockState state = states[haloIndex(x, y, z)];
+            BlockPos pos = new BlockPos(baseX + x, baseY + y, baseZ + z);
+            if (region.getBlockEntity(pos) != null) blockEntities++;
+            if (state.isAir() || state.getRenderShape() != RenderShape.MODEL) continue;
+            resolved.add(ResolvedBlockInput.capture(modelSet.get(state), state.getSeed(pos), x, y, z,
+                    state.skipRendering(states[haloIndex(x, y - 1, z)], Direction.DOWN),
+                    state.skipRendering(states[haloIndex(x, y + 1, z)], Direction.UP),
+                    state.skipRendering(states[haloIndex(x, y, z - 1)], Direction.NORTH),
+                    state.skipRendering(states[haloIndex(x, y, z + 1)], Direction.SOUTH),
+                    state.skipRendering(states[haloIndex(x - 1, y, z)], Direction.WEST),
+                    state.skipRendering(states[haloIndex(x + 1, y, z)], Direction.EAST)));
         }
-        SectionModelMesh mesh = buildResolved(resolved);
-        return new SectionModelMesh(mesh.layers(), unsupportedBlockEntityCount);
+        return new CapturedSectionInput(resolved, blockEntities);
     }
 
     /**
@@ -185,6 +161,14 @@ public final class MinecraftSectionModelMesher {
             }
         }
         return true;
+    }
+
+    /** Immutable, worker-safe result of section input capture. */
+    public record CapturedSectionInput(List<ResolvedBlockInput> blocks, int unsupportedBlockEntityCount) {
+        public CapturedSectionInput {
+            if (blocks == null || unsupportedBlockEntityCount < 0) throw new IllegalArgumentException("invalid capture");
+            blocks = List.copyOf(blocks);
+        }
     }
 
     /**
@@ -308,6 +292,10 @@ public final class MinecraftSectionModelMesher {
 
         /** Block entities require their dedicated renderer and are not baked into these block meshes. */
         public int unsupportedBlockEntityCount() { return unsupportedBlockEntityCount; }
+
+        public SectionModelMesh withUnsupportedBlockEntityCount(int count) {
+            return new SectionModelMesh(layers, count);
+        }
 
         public int quadCount() {
             int total = 0;
