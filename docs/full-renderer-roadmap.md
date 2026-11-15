@@ -59,7 +59,7 @@ Milestone A establishes the API boundary before replacing any Minecraft terrain 
 - [x] The code contract exposes explicit per-layer vanilla fallback.
 - [x] Ownership and vanilla fallback rules are documented.
 - [x] Automated tests cover the contract invariants.
-- [ ] GitHub Actions build and test job completes successfully for the commit containing this milestone.
+- [x] GitHub Actions build, JUnit tests and mod JAR packaging complete successfully for the milestone implementation commit (5f205df).
 
 Milestone B must not begin until the final CI item is green. This milestone does not yet implement Minecraft model resolution, a new terrain mesher, GPU uploads, shaders, pipelines or transparency; those belong to later milestones.
 
