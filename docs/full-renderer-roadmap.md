@@ -8,6 +8,57 @@ The target is a renderer that owns the complete terrain path while preserving Mi
 
 A full replacement is a long-term target. The current implementation is only an intermediate bridge and must continue to use safe vanilla fallbacks until each replacement stage is complete and validated.
 
+
+## Milestone A — renderer contract (implementation)
+
+**Status: implementation complete; automated CI verification pending.**
+
+Milestone A establishes the API boundary before replacing any Minecraft terrain behavior.
+
+### Code delivered
+
+- `RendererContract` defines backend-neutral terrain layers, fallback reasons, world/generation-scoped section build tickets, immutable mesh payloads, opaque GPU mesh handles, frame context and draw descriptors.
+- `SectionSnapshot` is the boundary for immutable data captured from Minecraft. It must not expose live world, chunk or mutable game objects to worker threads.
+- `SectionMesher` is the CPU-only worker contract.
+- `GpuResourceOwner` is the Radeonium GPU allocation/release contract.
+- `TerrainPassSubmitter` is the terrain draw submission contract.
+- `TerrainRenderer` defines the renderer lifecycle and section invalidation entry points.
+- `RendererThreadGuard` binds GPU-facing operations to one render thread and rejects calls from other threads.
+- Mesh payload constructors validate vertex/index byte counts and defensively copy their arrays, preventing callers from mutating submitted CPU mesh data after construction.
+- JUnit 5 tests cover defensive copying, invalid mesh metadata, invalid generation tokens and render-thread ownership.
+
+### Thread and ownership rules
+
+| Data or operation | Owner / permitted thread |
+|---|---|
+| Read Minecraft world, block, biome and lighting state | Minecraft-approved game/build thread only |
+| Immutable section snapshot after capture | Radeonium-owned; safe to hand to workers |
+| Model resolution and CPU mesh generation | Worker-safe only when operating on immutable snapshot data |
+| Radeonium CPU mesh payload | Radeonium-owned immutable data |
+| GPU buffer creation, upload, replacement and release | Radeonium GPU owner on the bound render thread |
+| Render pipeline binding and draw submission | Render thread, inside the host-provided frame/pass lifecycle |
+| Minecraft mesh buffers, frame graph, shaders and live render state | Minecraft-owned unless a later milestone explicitly replaces that responsibility |
+
+### Vanilla hand-off and fallback boundary
+
+- Until a later milestone explicitly takes ownership, Minecraft continues to compile terrain and owns its original mesh buffers.
+- Radeonium must never close, mutate or retain a borrowed Minecraft GPU buffer beyond the documented lifetime supplied by its adapter.
+- Radeonium may release only GPU resources created by its own `GpuResourceOwner`.
+- A missing, stale, unsupported or invalid Radeonium mesh must select the corresponding vanilla section/layer path; it must never silently omit terrain.
+- Radeonium and vanilla must not both submit the same terrain layer for the same section in one pass.
+- World changes and resource reloads invalidate outstanding build tickets so stale worker results cannot be installed into a new world lifetime.
+
+### Acceptance checklist
+
+- [x] Backend-neutral renderer interfaces and data contracts exist.
+- [x] Thread-affinity guard exists for GPU-facing operations.
+- [x] Immutable mesh payloads validate metadata and copy mutable arrays.
+- [x] Ownership and vanilla fallback rules are documented.
+- [x] Automated tests cover the contract invariants.
+- [ ] GitHub Actions build and test job completes successfully for the commit containing this milestone.
+
+Milestone B must not begin until the final CI item is green. This milestone does not yet implement Minecraft model resolution, a new terrain mesher, GPU uploads, shaders, pipelines or transparency; those belong to later milestones.
+
 ## What "Radeonium owns the renderer" means
 
 Radeonium must eventually own these responsibilities:
@@ -75,7 +126,7 @@ The milestones below are architectural targets, not claims that these systems al
 
 | Milestone | Target | Completion condition |
 |---|---|---|
-| A — renderer contract | Define renderer-owned data types, thread rules, ownership and vanilla hand-off boundaries | Documented interfaces and tests |
+| A — renderer contract | Define renderer-owned data types, thread rules, ownership and vanilla hand-off boundaries | Interfaces, invariant tests and green CI |
 | B — complete Minecraft mesher | Replace the geometry mirror with Radeonium-generated section meshes while preserving model and lighting semantics | Model/layer parity tests and visual comparison |
 | C — GPU resource owner | Radeonium owns mesh allocation, uploads, reuse and disposal | No dependence on vanilla mesh buffers for Radeonium draws |
 | D — terrain shader/material system | Radeonium binds its own terrain shaders and materials | Visual parity for opaque/cutout terrain, tint, light, fog and emissive content |
