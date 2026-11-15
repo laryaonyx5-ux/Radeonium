@@ -256,7 +256,7 @@ class MinecraftSectionGpuCacheLifecycleTest {
     private static MinecraftSectionGpuCache.Entry entry(MinecraftMeshGpuUpload upload) {
         EnumMap<ChunkSectionLayer, MinecraftMeshGpuUpload> uploads =
                 new EnumMap<>(ChunkSectionLayer.class);
-        uploads.put(ChunkSectionLayer.SOLID, upload);
+        uploads.put(ChunkSectionLayer.values()[0], upload);
         return new MinecraftSectionGpuCache.Entry(
                 new MinecraftBlockModelMesh(List.of()),
                 MinecraftFluidSectionMesher.SectionFluidMesh.empty(),
