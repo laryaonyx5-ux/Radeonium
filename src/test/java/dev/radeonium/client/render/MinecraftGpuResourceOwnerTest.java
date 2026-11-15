@@ -5,6 +5,8 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class MinecraftGpuResourceOwnerTest {
     @Test
@@ -37,9 +39,10 @@ class MinecraftGpuResourceOwnerTest {
         assertEquals(2, allocation.referenceCount());
         assertFalse(allocation.releaseReference());
         assertEquals(1, allocation.referenceCount());
-        org.junit.jupiter.api.Assertions.assertTrue(allocation.releaseReference());
+        assertTrue(allocation.releaseReference());
         assertEquals(0, allocation.referenceCount());
-        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class, allocation::retain);
+        assertThrows(IllegalStateException.class, allocation::retain);
+        assertThrows(IllegalStateException.class, allocation::releaseReference);
     }
 
 }
