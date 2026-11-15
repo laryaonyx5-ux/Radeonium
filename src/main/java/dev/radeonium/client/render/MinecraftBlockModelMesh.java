@@ -152,6 +152,7 @@ public final class MinecraftBlockModelMesh {
                 target.putFloat(positions[offset + 2]);
                 target.putInt((int) packedUv[vertex]);
                 target.putInt((int) (packedUv[vertex] >>> 32));
+                target.putInt(tintColor);
             }
         }
     }
