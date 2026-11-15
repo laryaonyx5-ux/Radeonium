@@ -94,6 +94,23 @@ class FluidSectionMesherTest {
     }
 
     @Test
+    void interpolatesSideWallTopAlongSlopedFluidSurface() {
+        short[] ids = new short[4096]; byte[] heights = new byte[4096];
+        int[] tints = new int[4096], lights = new int[4096];
+        int low = 1 + 16 * (1 + 16 * 1);
+        int high = 1 + 16 * (2 + 16 * 1);
+        ids[low] = ids[high] = 8;
+        heights[low] = 4;
+        heights[high] = 8;
+
+        var mesh = new FluidSectionMesher().build(new FluidSectionSnapshot(ids, heights, tints, lights));
+        var west = mesh.quads().stream().filter(q -> q.normalX() == -1.0f).findFirst().orElseThrow();
+        float[] positions = west.positions();
+        assertNotEquals(positions[7], positions[10],
+                "the side wall's upper edge should follow the interpolated surface slope");
+    }
+
+    @Test
     void usesNeighborHaloToInterpolateSurfaceAtSectionEdge() {
         short[] ids = new short[18 * 18 * 18]; byte[] heights = new byte[18 * 18 * 18];
         int[] tints = new int[18 * 18 * 18], lights = new int[18 * 18 * 18];
@@ -142,7 +159,7 @@ class FluidSectionMesherTest {
         heights[haloIndex(0, 1, 1)] = 8;
 
         var mesh = new FluidSectionMesher().build(FluidSectionSnapshot.withHalo(ids, heights, tints, lights));
-        assertEquals(0, mesh.quads().stream().filter(q -> q.normalX() == -1.0f).count());
+        assertEquals(0L, mesh.quads().stream().filter(q -> q.normalX() == -1.0f).count());
     }
 
     private static int haloIndex(int x, int y, int z) {
