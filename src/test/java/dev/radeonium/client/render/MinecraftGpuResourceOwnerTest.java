@@ -84,6 +84,23 @@ class MinecraftGpuResourceOwnerTest {
         assertEquals(0L, owner.allocatedBytes());
     }
 
+
+    @Test
+    void externallyClosedSharedUploadIsRemovedFromAccounting() {
+        MinecraftGpuResourceOwner owner = new MinecraftGpuResourceOwner(() -> {});
+        MinecraftMeshGpuUpload upload =
+                MinecraftMeshGpuUpload.forTesting(4, 96L, () -> {});
+        owner.track(upload, new MinecraftGpuResourceOwner.ByteArrayKey(new byte[] {3}));
+        assertTrue(owner.retain(upload));
+
+        upload.close();
+        assertTrue(owner.release(upload));
+        assertEquals(0, owner.allocationCount());
+        assertEquals(0L, owner.allocatedBytes());
+        assertFalse(owner.retain(upload));
+        assertFalse(owner.release(upload));
+    }
+
     @Test
     void duplicateTrackingDoesNotCloseAnAlreadyOwnedUpload() {
         AtomicInteger closeCalls = new AtomicInteger();
