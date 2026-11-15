@@ -36,7 +36,8 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
             for (ChunkSectionLayer layer : ChunkSectionLayer.values()) {
                 MinecraftBlockModelMesh layerMesh = mesh.forLayer(layer);
                 if (layerMesh.quadCount() > 0) {
-                    layerUploads.put(layer, MinecraftMeshGpuUpload.upload(layerMesh));
+                    int[] layerMaterialIndices = materials.register(layerMesh);
+                    layerUploads.put(layer, MinecraftMeshGpuUpload.upload(layerMesh, layerMaterialIndices));
                 }
             }
             int[] materialIndices = materials.register(mesh);
