@@ -35,7 +35,7 @@ public final class MinecraftBlockModelMesher {
 
         List<BlockStateModelPart> parts = new ArrayList<>();
         model.collectParts(RandomSource.create(seed), parts);
-        return build(parts, java.util.Map.of(), -1);
+        return build(parts, java.util.Map.of(), -1, java.util.Map.of());
     }
 
     /**
@@ -44,15 +44,25 @@ public final class MinecraftBlockModelMesher {
      * level/position/state snapshot to select their parts.
      */
     public MinecraftBlockModelMesh build(List<BlockStateModelPart> modelParts) {
-        return build(modelParts, java.util.Map.of(), -1);
+        return build(modelParts, java.util.Map.of(), -1, java.util.Map.of());
     }
 
     /** Copies resolved parts with per-tint-index colors captured on the compiler thread. */
     public MinecraftBlockModelMesh build(
             List<BlockStateModelPart> modelParts, java.util.Map<Integer, Integer> tintColors,
-            int packedLightCoords
+            int packedLightCoords,
+            java.util.Map<BakedQuad, MinecraftSectionModelMesher.CapturedQuadLighting> quadLighting
     ) {
-        return build(modelParts, tintColors, -1);
+        return build(modelParts, tintColors, packedLightCoords, java.util.Map.of());
+    }
+
+    /** Copies precomputed Minecraft per-vertex lighting without retaining the live region. */
+    public MinecraftBlockModelMesh build(
+            List<BlockStateModelPart> modelParts, java.util.Map<Integer, Integer> tintColors,
+            int packedLightCoords,
+            java.util.Map<BakedQuad, MinecraftSectionModelMesher.CapturedQuadLighting> quadLighting
+    ) {
+        return build(modelParts, tintColors, -1, java.util.Map.of());
     }
 
     /** Copies resolved geometry with captured tint and packed light inputs. */
@@ -60,7 +70,7 @@ public final class MinecraftBlockModelMesher {
             List<BlockStateModelPart> modelParts, java.util.Map<Integer, Integer> tintColors,
             int packedLightCoords
     ) {
-        if (modelParts == null || tintColors == null) {
+        if (modelParts == null || tintColors == null || quadLighting == null) {
             throw new IllegalArgumentException("modelParts cannot be null");
         }
 
@@ -68,7 +78,7 @@ public final class MinecraftBlockModelMesher {
         for (BlockStateModelPart part : modelParts) {
             if (part == null) continue;
 
-            appendQuads(quads, part.getQuads(null), part.useAmbientOcclusion(), tintColors, packedLightCoords);
+            appendQuads(quads, part.getQuads(null), part.useAmbientOcclusion(), tintColors, packedLightCoords, quadLighting);
             for (Direction direction : Direction.values()) {
                 appendQuads(quads, part.getQuads(direction), part.useAmbientOcclusion(), tintColors);
             }
@@ -115,7 +125,9 @@ public final class MinecraftBlockModelMesher {
                     quad,
                     partAmbientOcclusion,
                     tintColors.getOrDefault(material.tintIndex(), -1),
-                    packedLightCoords
+                    packedLightCoords,
+                    quadLighting.containsKey(quad) ? quadLighting.get(quad).colors() : new int[]{-1, -1, -1, -1},
+                    quadLighting.containsKey(quad) ? quadLighting.get(quad).lightCoords() : new int[]{packedLightCoords, packedLightCoords, packedLightCoords, packedLightCoords}
             ));
         }
     }
