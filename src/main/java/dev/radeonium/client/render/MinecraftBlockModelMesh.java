@@ -166,7 +166,11 @@ public final class MinecraftBlockModelMesh {
                 target.putFloat(positions[offset]);
                 target.putFloat(positions[offset + 1]);
                 target.putFloat(positions[offset + 2]);
-                target.putInt(multiplyArgb(vertexColors[vertex], tintColor));
+                int color = multiplyArgb(vertexColors[vertex], tintColor);
+                target.put((byte) (color >>> 16));
+                target.put((byte) (color >>> 8));
+                target.put((byte) color);
+                target.put((byte) (color >>> 24));
                 target.putFloat(Float.intBitsToFloat((int) packedUv[vertex]));
                 target.putFloat(Float.intBitsToFloat((int) (packedUv[vertex] >>> 32)));
                 target.putShort((short) (vertexLightCoords[vertex] & 0xffff));
