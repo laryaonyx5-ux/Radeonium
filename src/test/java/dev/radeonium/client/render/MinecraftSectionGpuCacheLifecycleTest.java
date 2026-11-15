@@ -137,8 +137,8 @@ class MinecraftSectionGpuCacheLifecycleTest {
                 new MinecraftSectionGpuCache(owner, () -> {});
         SectionPos position = new SectionPos(5, 0, 0);
         MinecraftMeshGpuUpload upload = MinecraftMeshGpuUpload.forTesting(4, 40L, () -> {
-            if (closeAttempts.incrementAndGet() == 1) {
-                throw new IllegalStateException("first disposal attempt fails");
+            if (closeAttempts.incrementAndGet() <= 2) {
+                throw new IllegalStateException("first two disposal attempts fail");
             }
         });
         owner.track(upload, null);
