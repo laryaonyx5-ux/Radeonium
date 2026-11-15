@@ -27,8 +27,17 @@ public final class FluidSectionMesher {
                     int light = snapshot.packedLight(x, y, z);
 
                     if (y == 15 || snapshot.fluidId(x, y + 1, z) != id) {
+                        float northWest = cornerHeight(snapshot, id, x, y, z);
+                        float northEast = cornerHeight(snapshot, id, x + 1, y, z);
+                        float southEast = cornerHeight(snapshot, id, x + 1, y, z + 1);
+                        float southWest = cornerHeight(snapshot, id, x, y, z + 1);
                         add(quads, id, tint, light, 0, 1, 0,
-                                x, top, z, x + 1, top, z + 1);
+                                new float[]{
+                                        x, y + northWest, z,
+                                        x + 1, y + northEast, z,
+                                        x + 1, y + southEast, z + 1,
+                                        x, y + southWest, z + 1
+                                });
                     }
                     int westHeight = x == 0 || snapshot.fluidId(x - 1, y, z) != id
                             ? 0 : snapshot.heightEighths(x - 1, y, z);
@@ -61,11 +70,50 @@ public final class FluidSectionMesher {
         return new FluidMesh(quads);
     }
 
+    /**
+     * Estimates a fluid surface corner from the four same-fluid cells sharing
+     * that corner. Tall samples receive the stronger weight used by Minecraft's
+     * fluid corner averaging; a same-fluid block above makes the corner full.
+     * At section borders, only available in-section samples are used until a
+     * neighbor halo is captured.
+     */
+    private static float cornerHeight(FluidSectionSnapshot snapshot, short id,
+                                      int cornerX, int y, int cornerZ) {
+        if (y < 15 && snapshot.fluidId(
+                clamp(cornerX, 0, 15), y + 1, clamp(cornerZ, 0, 15)) == id) {
+            return 1.0f;
+        }
+        float weightedHeight = 0.0f;
+        int totalWeight = 0;
+        for (int dx = -1; dx <= 0; dx++) {
+            for (int dz = -1; dz <= 0; dz++) {
+                int x = cornerX + dx;
+                int z = cornerZ + dz;
+                if (x < 0 || x >= 16 || z < 0 || z >= 16
+                        || snapshot.fluidId(x, y, z) != id) continue;
+                float height = snapshot.heightEighths(x, y, z) / 8.0f;
+                int weight = height >= 0.8f ? 10 : 1;
+                weightedHeight += height * weight;
+                totalWeight += weight;
+            }
+        }
+        return totalWeight == 0 ? 0.0f : weightedHeight / totalWeight;
+    }
+
+    private static int clamp(int value, int min, int max) {
+        return Math.max(min, Math.min(max, value));
+    }
+
     private static void add(List<FluidQuad> out, short id, int tint, int light,
                             float nx, float ny, float nz,
                             float x0, float y0, float z0, float x1, float y1, float z1) {
-        out.add(new FluidQuad(id, tint, light, nx, ny, nz,
-                new float[]{x0,y0,z0, x1,y0,z1, x1,y1,z1, x0,y1,y0}));
+        add(out, id, tint, light, nx, ny, nz,
+                new float[]{x0,y0,z0, x1,y0,z1, x1,y1,z1, x0,y1,y0});
+    }
+
+    private static void add(List<FluidQuad> out, short id, int tint, int light,
+                            float nx, float ny, float nz, float[] positions) {
+        out.add(new FluidQuad(id, tint, light, nx, ny, nz, positions));
     }
 
     public static final class FluidMesh {
