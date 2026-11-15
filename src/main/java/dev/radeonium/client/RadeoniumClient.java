@@ -97,7 +97,8 @@ public final class RadeoniumClient implements ClientModInitializer {
             MinecraftSectionModelCaptureStore.Snapshot snapshot = PENDING_MODEL_UPLOADS.poll();
             if (snapshot == null) break;
             if (MinecraftSectionModelCaptureStore.get(snapshot.position()) == snapshot) {
-                MINECRAFT_GPU_CACHE.rebuild(snapshot.position(), snapshot.mesh());
+                MINECRAFT_GPU_CACHE.rebuild(new dev.radeonium.client.render.SectionPos(
+                        snapshot.position().x(), snapshot.position().y(), snapshot.position().z()), snapshot.mesh());
             }
         }
     }
