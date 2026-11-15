@@ -102,6 +102,8 @@ The greedy voxel prototype is deliberately not used as a substitute for Minecraf
 - Adds `MinecraftGpuResourceOwner` as the single owner for Radeonium-created terrain vertex uploads.
 - Routes section-cache allocations, translucent re-uploads, replacement and eviction through that owner.
 - Tracks active upload count and allocated GPU bytes by upload identity.
+- Reuses identical immutable section-layer vertex payloads through content keys and reference-counted GPU allocations.
+- Releases a shared allocation only after its final section reference is removed.
 - Rejects attempts to release a live upload not owned by this manager and makes repeated release safe.
 - Provides a render-thread-only bulk release path and deterministic shutdown.
 - Keeps Minecraft-owned buffers outside Radeonium's ownership boundary.
