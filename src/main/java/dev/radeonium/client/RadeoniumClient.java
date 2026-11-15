@@ -7,6 +7,7 @@ import dev.radeonium.client.gpu.GpuDetector;
 import dev.radeonium.client.memory.MemoryPressureMonitor;
 import dev.radeonium.client.render.ChunkRenderPipeline;
 import dev.radeonium.client.render.MinecraftSectionGpuCache;
+import dev.radeonium.client.render.MinecraftCompiledGeometryStore;
 import dev.radeonium.client.render.RendererSectionTracker;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
@@ -60,6 +61,7 @@ public final class RadeoniumClient implements ClientModInitializer {
         ClientLifecycleEvents.CLIENT_STARTED.register(client -> GpuDetector.detectAndLog());
         ClientLifecycleEvents.CLIENT_STOPPING.register(client -> {
             MINECRAFT_GPU_CACHE.close();
+            MinecraftCompiledGeometryStore.clear();
             RendererSectionTracker.reset();
         });
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
@@ -69,6 +71,7 @@ public final class RadeoniumClient implements ClientModInitializer {
                 if (trackedWorld != null) {
                     RendererSectionTracker.reset();
                     MINECRAFT_GPU_CACHE.clear();
+                    MinecraftCompiledGeometryStore.clear();
                 }
                 trackedWorld = client.level;
             }
