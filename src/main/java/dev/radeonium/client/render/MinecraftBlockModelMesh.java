@@ -156,8 +156,8 @@ public final class MinecraftBlockModelMesh {
         public int[] copyVertexLightCoords() { return vertexLightCoords.clone(); }
 
         /**
-         * Writes two triangles in the vertex format used by
-         * MinecraftMeshGpuUpload: float3 position + packed UV split into ints.
+         * Writes two triangles using the full Radeonium vertex layout: position,
+         * packed UV, tint, packed light, per-vertex color/light and material ID.
          */
         void writeTriangleVertices(ByteBuffer target, int materialIndex) {
             int[] order = {0, 1, 2, 0, 2, 3};
