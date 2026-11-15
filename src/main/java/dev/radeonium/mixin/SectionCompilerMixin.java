@@ -5,6 +5,8 @@ import dev.radeonium.client.render.MinecraftCompiledGeometryStore;
 import dev.radeonium.client.render.MinecraftSectionModelCaptureStore;
 import dev.radeonium.client.render.MinecraftSectionModelMesher;
 import dev.radeonium.client.chunk.ChunkBuildBudget;
+import java.util.HashMap;
+import java.util.Map;
 import net.minecraft.client.renderer.block.BlockStateModelSet;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Shadow;
@@ -27,6 +29,11 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public abstract class SectionCompilerMixin {
     @Shadow @Final private BlockStateModelSet blockModelSet;
 
+    private static final ThreadLocal<Map<SectionPos, AsyncCapture>> RADEONIUM_CAPTURE =
+            ThreadLocal.withInitial(HashMap::new);
+    private record AsyncCapture(MinecraftSectionModelCaptureStore.CaptureTicket ticket,
+                                MinecraftSectionModelMesher.CapturedSectionInput input) {}
+
     @Inject(
             method = "compile(Lnet/minecraft/core/SectionPos;Lnet/minecraft/client/renderer/chunk/RenderSectionRegion;Lcom/mojang/blaze3d/vertex/VertexSorting;Lnet/minecraft/client/renderer/SectionBufferBuilderPack;)Lnet/minecraft/client/renderer/chunk/SectionCompiler$Results;",
             at = @At("HEAD")
@@ -39,21 +46,17 @@ public abstract class SectionCompilerMixin {
             CallbackInfoReturnable<SectionCompiler.Results> cir
     ) {
         MinecraftCompiledGeometryStore.beginCapture(sectionPos);
-        MinecraftSectionModelCaptureStore.abort(sectionPos);
+        RADEONIUM_CAPTURE.get().remove(sectionPos);
         MinecraftSectionModelCaptureStore.remove(sectionPos);
         if (ChunkBuildBudget.isEnabled() && MinecraftSectionModelCaptureStore.captureEnabled()) {
-            MinecraftSectionModelCaptureStore.beginCapture(sectionPos);
+            var ticket = MinecraftSectionModelCaptureStore.beginAsyncCapture(sectionPos);
             try {
-                var mesh = new MinecraftSectionModelMesher()
-                        .captureAndBuild(sectionPos, region, blockModelSet);
-                MinecraftSectionModelCaptureStore.stage(sectionPos, mesh);
+                var input = new MinecraftSectionModelMesher().captureInputs(sectionPos, region, blockModelSet);
+                RADEONIUM_CAPTURE.get().put(sectionPos, new AsyncCapture(ticket, input));
+                if (RADEONIUM_CAPTURE.get().size() > 32) RADEONIUM_CAPTURE.get().clear();
             } catch (RuntimeException exception) {
-                // Unsupported modded model behavior must never break vanilla compilation.
-                MinecraftSectionModelCaptureStore.abort(sectionPos);
-                MinecraftSectionModelCaptureStore.remove(sectionPos);
+                MinecraftSectionModelCaptureStore.abortAsync(ticket);
             }
-        } else {
-            MinecraftSectionModelCaptureStore.remove(sectionPos);
         }
     }
 
@@ -68,7 +71,15 @@ public abstract class SectionCompilerMixin {
             SectionBufferBuilderPack builders,
             CallbackInfoReturnable<SectionCompiler.Results> cir
     ) {
-        MinecraftSectionModelCaptureStore.complete(sectionPos);
+        AsyncCapture capture = RADEONIUM_CAPTURE.get().remove(sectionPos);
+        if (capture != null) {
+            dev.radeonium.client.RadeoniumClient.sectionMeshingExecutor()
+                    .buildMinecraftAsync(capture.input())
+                    .whenComplete((mesh, error) -> {
+                        if (error != null) MinecraftSectionModelCaptureStore.abortAsync(capture.ticket());
+                        else MinecraftSectionModelCaptureStore.publishAsync(capture.ticket(), mesh);
+                    });
+        }
         MinecraftCompiledGeometryStore.Snapshot snapshot =
                 MinecraftCompiledGeometryStore.captureCurrent(sectionPos, cir.getReturnValue());
         if (snapshot != null) {
