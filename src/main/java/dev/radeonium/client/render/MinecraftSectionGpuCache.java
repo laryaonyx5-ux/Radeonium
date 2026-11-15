@@ -248,6 +248,10 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
         sections.remove(position);
         translucentSortCameras.remove(position);
         translucentSortOrders.remove(position);
+        if (sections.isEmpty() && gpuResources.allocationCount() > 0) {
+            gpuResources.releaseAll();
+            materials.clear();
+        }
     }
 
     public synchronized void clear() {
