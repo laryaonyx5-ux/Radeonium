@@ -59,28 +59,40 @@ public final class MinecraftMaterialTable {
      */
     public synchronized void retain(int[] materialIndices) {
         if (materialIndices == null) throw new IllegalArgumentException("materialIndices cannot be null");
-        for (int index : distinct(materialIndices)) {
+        Set<Integer> unique = distinct(materialIndices);
+        Map<Integer, Integer> nextCounts = new HashMap<>();
+        // Validate and calculate every transition before mutating the table.
+        for (int index : unique) {
             if (index < 0 || index >= materials.size() || materials.get(index) == null) {
                 throw new IllegalArgumentException("Unknown material index: " + index);
             }
-            referenceCounts.set(index, Math.addExact(referenceCounts.get(index), 1));
+            nextCounts.put(index, Math.addExact(referenceCounts.get(index), 1));
         }
+        nextCounts.forEach(referenceCounts::set);
     }
 
     /** Releases one section's material references and recycles now-unused slots. */
     public synchronized void release(int[] materialIndices) {
         if (materialIndices == null) throw new IllegalArgumentException("materialIndices cannot be null");
-        for (int index : distinct(materialIndices)) {
+        Set<Integer> unique = distinct(materialIndices);
+        Map<Integer, Integer> nextCounts = new HashMap<>();
+        // Check all decrements first so an invalid slot cannot partially release a section.
+        for (int index : unique) {
             if (index < 0 || index >= materials.size() || materials.get(index) == null) continue;
             int references = referenceCounts.get(index);
             if (references <= 0) throw new IllegalStateException("Material reference underflow: " + index);
-            if (references == 1) {
+            nextCounts.put(index, references - 1);
+        }
+        for (Map.Entry<Integer, Integer> entry : nextCounts.entrySet()) {
+            int index = entry.getKey();
+            int references = entry.getValue();
+            if (references == 0) {
                 Material removed = materials.set(index, null);
                 indices.remove(removed.minecraftInfo());
                 referenceCounts.set(index, 0);
                 freeIndices.addLast(index);
             } else {
-                referenceCounts.set(index, references - 1);
+                referenceCounts.set(index, references);
             }
         }
     }
