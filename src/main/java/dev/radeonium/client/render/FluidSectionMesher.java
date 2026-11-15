@@ -112,8 +112,11 @@ public final class FluidSectionMesher {
     private static void add(List<FluidQuad> out, short id, int tint, int light,
                             float nx, float ny, float nz,
                             float x0, float y0, float z0, float x1, float y1, float z1) {
+        // The arguments describe the two lower edge endpoints. Build a
+        // vertical quad by raising both endpoints; do not mix the first
+        // endpoint's Y coordinate into its final Z coordinate.
         add(out, id, tint, light, nx, ny, nz,
-                new float[]{x0,y0,z0, x1,y0,z1, x1,y1,z1, x0,y1,y0});
+                new float[]{x0,y0,z0, x1,y0,z1, x1,y1,z1, x0,y1,z0});
     }
 
     private static void add(List<FluidQuad> out, short id, int tint, int light,
@@ -139,6 +142,9 @@ public final class FluidSectionMesher {
         public FluidQuad {
             positions = positions.clone();
             if (positions.length != 12) throw new IllegalArgumentException("Fluid quad needs 4 vertices");
+            if (!Float.isFinite(normalX) || !Float.isFinite(normalY) || !Float.isFinite(normalZ)) {
+                throw new IllegalArgumentException("Fluid normal must be finite");
+            }
             for (float value : positions) if (!Float.isFinite(value)) {
                 throw new IllegalArgumentException("Fluid geometry must be finite");
             }
