@@ -72,10 +72,10 @@ public final class MinecraftSectionParityChecker {
         return new ParityReport(results);
     }
 
-    private static Map<String, Integer> quadMultiset(byte[] bytes) {
+    private static Map<QuadSlice, Integer> quadMultiset(byte[] bytes) {
         int quadBytes = MinecraftMeshGpuUpload.VERTEX_STRIDE_BYTES * 4;
         if (bytes.length % quadBytes != 0) return Map.of();
-        Map<String, Integer> counts = new HashMap<>();
+        Map<QuadSlice, Integer> counts = new HashMap<>();
         for (int offset = 0; offset < bytes.length; offset += quadBytes) {
             counts.merge(new QuadSlice(bytes, offset, quadBytes), 1, Integer::sum);
         }
