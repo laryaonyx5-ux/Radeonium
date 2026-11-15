@@ -9,6 +9,7 @@ import com.mojang.renderpearl.api.device.GpuDevice;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.Arrays;
 
 /**
  * Uploads extracted Minecraft block-model geometry into a RenderPearl vertex
@@ -21,7 +22,7 @@ import java.nio.ByteOrder;
  * terrain draw submission are intentionally separate later stages.
  */
 public final class MinecraftMeshGpuUpload implements AutoCloseable {
-    public static final int VERTEX_STRIDE_BYTES = 36;
+    public static final int VERTEX_STRIDE_BYTES = 40;
 
     private final GpuBuffer vertexBuffer;
     private final int vertexCount;
@@ -47,8 +48,20 @@ public final class MinecraftMeshGpuUpload implements AutoCloseable {
             GpuDevice device,
             MinecraftBlockModelMesh mesh
     ) {
-        if (device == null) throw new IllegalArgumentException("device cannot be null");
         if (mesh == null) throw new IllegalArgumentException("mesh cannot be null");
+        int[] defaultMaterials = new int[mesh.quadCount()];
+        Arrays.fill(defaultMaterials, -1);
+        return upload(device, mesh, defaultMaterials);
+    }
+
+    /** Uploads one material-table index per quad into every emitted vertex. */
+    public static MinecraftMeshGpuUpload upload(
+            GpuDevice device, MinecraftBlockModelMesh mesh, int[] materialIndices
+    ) {
+        if (device == null) throw new IllegalArgumentException("device cannot be null");
+        if (mesh == null || materialIndices == null || materialIndices.length != mesh.quadCount()) {
+            throw new IllegalArgumentException("mesh and one material index per quad are required");
+        }
 
         int vertexCount = Math.multiplyExact(mesh.quadCount(), 6);
         if (vertexCount == 0) {
@@ -58,8 +71,8 @@ public final class MinecraftMeshGpuUpload implements AutoCloseable {
         int byteCount = Math.multiplyExact(vertexCount, VERTEX_STRIDE_BYTES);
         ByteBuffer data = ByteBuffer.allocateDirect(byteCount).order(ByteOrder.nativeOrder());
 
-        for (MinecraftBlockModelMesh.Quad quad : mesh.quads()) {
-            quad.writeTriangleVertices(data);
+        for (int i = 0; i < mesh.quadCount(); i++) {
+            mesh.quads().get(i).writeTriangleVertices(data, materialIndices[i]);
         }
 
         data.flip();
