@@ -10,6 +10,7 @@ import com.mojang.renderpearl.api.vertex.VertexFormat;
 import dev.radeonium.client.RadeoniumClient;
 import dev.radeonium.mixin.LevelRendererAccessor;
 import net.minecraft.client.Minecraft;
+import net.minecraft.world.phys.Vec3;
 import net.minecraft.client.renderer.DynamicGpuData;
 import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
@@ -91,6 +92,7 @@ public final class RadeoniumChunkSectionsToRender {
             boolean respectTranslucentOrder
     ) {
         LevelRendererAccessor access = (LevelRendererAccessor) renderer;
+        Vec3 cameraPosition = Minecraft.getInstance().gameRenderer.mainCamera().getPosition();
         SectionRenderDispatcher dispatcher = access.radeonium$getSectionRenderDispatcher();
 
         EnumMap<ChunkSectionLayer, List<RenderPass.Draw<GpuBufferSlice[]>>> draws =
@@ -145,9 +147,8 @@ public final class RadeoniumChunkSectionsToRender {
                         SectionPos radeoniumPosition = new SectionPos(
                                 minecraftPosition.x(), minecraftPosition.y(), minecraftPosition.z());
                         MinecraftSectionGpuCache.LayerBuffers modelOwned =
-                                layer == ChunkSectionLayer.TRANSLUCENT
-                                        ? null
-                                        : RadeoniumClient.minecraftGpuCache().layerBuffers(radeoniumPosition, layer);
+                                RadeoniumClient.minecraftGpuCache().layerBuffers(
+                                        radeoniumPosition, layer, cameraPosition);
                         MinecraftCompiledGeometryGpuCache.LayerBuffers owned =
                                 RadeoniumClient.compiledGeometryGpuCache().layerBuffers(minecraftPosition, layer);
 
