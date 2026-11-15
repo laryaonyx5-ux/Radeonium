@@ -14,11 +14,20 @@ import net.minecraft.resources.Identifier;
  * replace its OIT/depth-bounds integration without changing transparency.
  */
 public final class RadeoniumTerrainPipelines {
+    private static final Identifier VERTEX_SHADER =
+            Identifier.fromNamespaceAndPath("radeonium", "core/terrain");
+    private static final Identifier FRAGMENT_SHADER =
+            Identifier.fromNamespaceAndPath("radeonium", "core/terrain");
+
     private static final RenderPipeline SOLID = RenderPipeline.builder(RenderPipelines.TERRAIN_SNIPPET)
+            .withVertexShader(VERTEX_SHADER)
+            .withFragmentShader(FRAGMENT_SHADER)
             .withLocation(Identifier.fromNamespaceAndPath("radeonium", "pipeline/terrain_solid"))
             .build();
 
     private static final RenderPipeline CUTOUT = RenderPipeline.builder(RenderPipelines.TERRAIN_SNIPPET)
+            .withVertexShader(VERTEX_SHADER)
+            .withFragmentShader(FRAGMENT_SHADER)
             .withShaderDefine("ALPHA_CUTOUT", 0.1F)
             .withLocation(Identifier.fromNamespaceAndPath("radeonium", "pipeline/terrain_cutout"))
             .build();
