@@ -300,8 +300,18 @@ public final class MinecraftFluidSectionMesher {
             return new SectionFluidMesh(empty);
         }
 
-        private SectionFluidMesh(Map<ChunkSectionLayer, FluidLayerMesh> layers) {
-            this.layers = Map.copyOf(layers);
+        public SectionFluidMesh(Map<ChunkSectionLayer, FluidLayerMesh> layers) {
+            if (layers == null) throw new IllegalArgumentException("layers cannot be null");
+            EnumMap<ChunkSectionLayer, FluidLayerMesh> complete =
+                    new EnumMap<>(ChunkSectionLayer.class);
+            for (ChunkSectionLayer layer : ChunkSectionLayer.values()) {
+                FluidLayerMesh mesh = layers.getOrDefault(layer, new FluidLayerMesh(layer, List.of()));
+                if (mesh.layer() != layer) {
+                    throw new IllegalArgumentException("Fluid mesh stored under the wrong layer key");
+                }
+                complete.put(layer, mesh);
+            }
+            this.layers = Map.copyOf(complete);
         }
 
         public FluidLayerMesh layer(ChunkSectionLayer layer) {
