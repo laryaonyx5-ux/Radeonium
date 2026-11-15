@@ -197,10 +197,13 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
     ) {
         if (position == null || layer == null) return null;
         Entry entry = sections.get(position);
-        if (entry == null || entry.sourceSnapshot == null || !entry.parityVerified.contains(layer)
+        if (entry == null) return null;
+        if (entry.sourceSnapshot == null
                 || MinecraftSectionModelCaptureStore.get(entry.sourceSnapshot.position()) != entry.sourceSnapshot) {
+            remove(position);
             return null;
         }
+        if (!entry.parityVerified.contains(layer)) return null;
 
         if (layer == ChunkSectionLayer.TRANSLUCENT && cameraPosition != null) {
             Vec3 previousCamera = translucentSortCameras.get(position);
