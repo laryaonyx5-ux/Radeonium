@@ -20,6 +20,14 @@ public final class MinecraftSectionModelCaptureStore {
 
     private MinecraftSectionModelCaptureStore() {}
 
+    /**
+     * The duplicate CPU model pass is deliberately opt-in until visual parity
+     * and its frame-time cost have been measured in-game.
+     */
+    public static boolean captureEnabled() {
+        return Boolean.getBoolean("radeonium.captureModelMeshes");
+    }
+
     public static synchronized Snapshot put(
             SectionPos position, MinecraftSectionModelMesher.SectionModelMesh mesh
     ) {
