@@ -47,7 +47,7 @@ public abstract class SectionCompilerMixin {
     ) {
         MinecraftCompiledGeometryStore.beginCapture(sectionPos);
         RADEONIUM_CAPTURE.get().remove(sectionPos);
-        MinecraftSectionModelCaptureStore.remove(sectionPos);
+        MinecraftSectionModelCaptureStore.invalidateSectionAndNeighbors(sectionPos);
         if (ChunkBuildBudget.isEnabled() && MinecraftSectionModelCaptureStore.captureEnabled()) {
             var ticket = MinecraftSectionModelCaptureStore.beginAsyncCapture(sectionPos);
             try {
