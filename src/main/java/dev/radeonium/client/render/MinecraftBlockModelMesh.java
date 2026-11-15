@@ -35,6 +35,16 @@ public final class MinecraftBlockModelMesh {
         return quads.size() * 4;
     }
 
+    /** Returns an immutable mesh containing only quads for the requested vanilla render layer. */
+    public MinecraftBlockModelMesh forLayer(ChunkSectionLayer layer) {
+        if (layer == null) throw new IllegalArgumentException("layer cannot be null");
+        List<Quad> selected = new ArrayList<>();
+        for (Quad quad : quads) {
+            if (quad.layer() == layer) selected.add(quad);
+        }
+        return new MinecraftBlockModelMesh(selected);
+    }
+
     public int quadCount(ChunkSectionLayer layer) {
         int count = 0;
         for (Quad quad : quads) {
