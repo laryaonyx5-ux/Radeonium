@@ -161,6 +161,24 @@ class MinecraftGpuResourceOwnerTest {
         assertTrue(overflow.isClosed());
     }
 
+
+    @Test
+    void accountingOverflowKeepsDisposalFailureAsSuppressed() {
+        MinecraftGpuResourceOwner owner = new MinecraftGpuResourceOwner(() -> {});
+        owner.track(MinecraftMeshGpuUpload.forTesting(4, Long.MAX_VALUE, () -> {}), null);
+        MinecraftMeshGpuUpload overflow = MinecraftMeshGpuUpload.forTesting(4, 1L, () -> {
+            throw new IllegalStateException("simulated cleanup failure");
+        });
+
+        ArithmeticException failure =
+                assertThrows(ArithmeticException.class, () -> owner.track(overflow, null));
+
+        assertEquals(1, failure.getSuppressed().length);
+        assertTrue(failure.getSuppressed()[0] instanceof IllegalStateException);
+        assertEquals(1, owner.allocationCount());
+        assertEquals(Long.MAX_VALUE, owner.allocatedBytes());
+    }
+
     @Test
     void failedDisposalRemainsTrackedAndCanBeRetried() {
         AtomicInteger closeAttempts = new AtomicInteger();
