@@ -10,6 +10,7 @@ import com.mojang.renderpearl.api.device.GpuDevice;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
+import java.util.List;
 
 /**
  * Uploads extracted Minecraft block-model geometry into a RenderPearl vertex
@@ -74,31 +75,71 @@ public final class MinecraftMeshGpuUpload implements AutoCloseable {
     public static MinecraftMeshGpuUpload upload(
             GpuDevice device, MinecraftBlockModelMesh mesh, int[] materialIndices
     ) {
+        return upload(device, mesh, materialIndices, List.of());
+    }
+
+    /**
+     * Uploads block-model and Minecraft-FluidRenderer geometry into one
+     * layer buffer. Fluid vertices already contain vanilla's UV, tint and
+     * light results, so they use the reserved material index -1.
+     */
+    public static MinecraftMeshGpuUpload upload(
+            GpuDevice device,
+            MinecraftBlockModelMesh mesh,
+            int[] materialIndices,
+            List<MinecraftFluidSectionMesher.FluidQuad> fluidQuads
+    ) {
         RenderSystem.assertOnRenderThread();
         if (device == null) throw new IllegalArgumentException("device cannot be null");
-        if (mesh == null || materialIndices == null || materialIndices.length != mesh.quadCount()) {
-            throw new IllegalArgumentException("mesh and one material index per quad are required");
+        if (mesh == null || materialIndices == null || materialIndices.length != mesh.quadCount()
+                || fluidQuads == null) {
+            throw new IllegalArgumentException("mesh, material indices and fluid quads are required");
         }
 
-        int vertexCount = Math.multiplyExact(mesh.quadCount(), 6);
-        if (vertexCount == 0) {
-            return new MinecraftMeshGpuUpload(null, 0);
-        }
+        int totalQuads = Math.addExact(mesh.quadCount(), fluidQuads.size());
+        int vertexCount = Math.multiplyExact(totalQuads, 6);
+        if (vertexCount == 0) return new MinecraftMeshGpuUpload(null, 0);
 
         int byteCount = Math.multiplyExact(vertexCount, VERTEX_STRIDE_BYTES);
         ByteBuffer data = ByteBuffer.allocateDirect(byteCount).order(ByteOrder.nativeOrder());
-
         for (int i = 0; i < mesh.quadCount(); i++) {
             mesh.quads().get(i).writeTriangleVertices(data, materialIndices[i]);
+        }
+        for (MinecraftFluidSectionMesher.FluidQuad quad : fluidQuads) {
+            writeFluidTriangleVertices(data, quad);
         }
 
         data.flip();
         GpuBuffer buffer = device.createBuffer(
-                () -> "Radeonium Minecraft block-model vertices",
+                () -> "Radeonium Minecraft block and fluid section vertices",
                 GpuBuffer.USAGE_VERTEX,
                 data
         );
         return new MinecraftMeshGpuUpload(buffer, vertexCount);
+    }
+
+    private static void writeFluidTriangleVertices(
+            ByteBuffer target, MinecraftFluidSectionMesher.FluidQuad quad
+    ) {
+        float[] positions = quad.positions();
+        float[] uv = quad.uv();
+        int[] colors = quad.colors();
+        int[] light = quad.lightCoords();
+        int[] order = {0, 1, 2, 0, 2, 3};
+        for (int vertex : order) {
+            int positionOffset = vertex * 3;
+            int uvOffset = vertex * 2;
+            target.putFloat(positions[positionOffset]);
+            target.putFloat(positions[positionOffset + 1]);
+            target.putFloat(positions[positionOffset + 2]);
+            target.putInt(Float.floatToRawIntBits(uv[uvOffset]));
+            target.putInt(Float.floatToRawIntBits(uv[uvOffset + 1]));
+            target.putInt(-1);
+            target.putInt(light[vertex]);
+            target.putInt(colors[vertex]);
+            target.putInt(light[vertex]);
+            target.putInt(-1);
+        }
     }
 
     public boolean isEmpty() {
