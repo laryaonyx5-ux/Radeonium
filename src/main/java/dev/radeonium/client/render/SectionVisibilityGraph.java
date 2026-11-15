@@ -2,75 +2,81 @@ package dev.radeonium.client.render;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 /**
- * Section-level portal traversal graph.
- *
- * A connection is traversable only when the source section exposes the
- * outgoing face and the neighboring section exposes the opposite face.
- * Face masks are supplied by the meshing/occlusion stage; this class does
- * not guess visibility from chunk coordinates.
+ * Section portal graph populated from Minecraft's compiled VisibilitySet.
+ * Connectivity is directional by entry/exit face pair, not a guessed
+ * six-bit "open face" approximation.
  */
 public final class SectionVisibilityGraph {
-    private final Map<SectionPos, Integer> openFaces = new HashMap<>();
+    private record Visit(SectionPos section, SectionFace entryFace) {}
 
-    public synchronized void put(SectionPos position, int openFaceMask) {
-        openFaces.put(position, openFaceMask & 0x3f);
+    private final Map<SectionPos, Long> connections = new HashMap<>();
+
+    private static int bit(SectionFace entry, SectionFace exit) {
+        return entry.ordinal() * 6 + exit.ordinal();
+    }
+
+    /** Stores the exact 6x6 face-connectivity matrix for a compiled section. */
+    public synchronized void putConnections(SectionPos position, long connectionMask) {
+        if (position == null) throw new IllegalArgumentException("position cannot be null");
+        connections.put(position, connectionMask & ((1L << 36) - 1L));
+    }
+
+    public synchronized boolean containsAll(Collection<SectionPos> sections) {
+        return sections != null && connections.keySet().containsAll(sections);
     }
 
     public synchronized void remove(SectionPos position) {
-        openFaces.remove(position);
+        connections.remove(position);
     }
 
     public synchronized void clear() {
-        openFaces.clear();
+        connections.clear();
     }
 
     public synchronized int sectionCount() {
-        return openFaces.size();
+        return connections.size();
     }
 
     /**
-     * Returns sections reachable from the camera section through mutually
-     * open section faces. The result is a snapshot and can be consumed
-     * without holding this graph's monitor.
+     * Traverses exact portal connectivity. A camera starts inside its section,
+     * so its first exit may use any face; subsequent exits must be connected
+     * to the face through which the traversal entered the section.
      */
     public synchronized List<SectionPos> collectVisible(SectionPos cameraSection) {
-        if (!openFaces.containsKey(cameraSection)) {
-            return List.of();
-        }
+        if (!connections.containsKey(cameraSection)) return List.of();
 
-        ArrayDeque<SectionPos> pending = new ArrayDeque<>();
-        Set<SectionPos> visited = new HashSet<>();
-        List<SectionPos> visible = new ArrayList<>();
-
-        pending.add(cameraSection);
-        visited.add(cameraSection);
+        ArrayDeque<Visit> pending = new ArrayDeque<>();
+        Set<Visit> visited = new HashSet<>();
+        LinkedHashSet<SectionPos> visible = new LinkedHashSet<>();
+        Visit start = new Visit(cameraSection, null);
+        pending.add(start);
+        visited.add(start);
 
         while (!pending.isEmpty()) {
-            SectionPos current = pending.removeFirst();
+            Visit visit = pending.removeFirst();
+            SectionPos current = visit.section();
             visible.add(current);
-            int currentMask = openFaces.getOrDefault(current, 0);
+            long mask = connections.getOrDefault(current, 0L);
 
-            for (SectionFace face : SectionFace.values()) {
-                if ((currentMask & face.bit()) == 0) {
+            for (SectionFace exit : SectionFace.values()) {
+                if (visit.entryFace() != null
+                        && (mask & (1L << bit(visit.entryFace(), exit))) == 0L) {
                     continue;
                 }
 
-                SectionPos neighbor = current.offset(face);
-                Integer neighborMask = openFaces.get(neighbor);
-                if (neighborMask == null
-                        || (neighborMask & face.opposite().bit()) == 0
-                        || !visited.add(neighbor)) {
-                    continue;
-                }
-
-                pending.addLast(neighbor);
+                SectionPos neighbor = current.offset(exit);
+                if (!connections.containsKey(neighbor)) continue;
+                Visit next = new Visit(neighbor, exit.opposite());
+                if (visited.add(next)) pending.addLast(next);
             }
         }
 
