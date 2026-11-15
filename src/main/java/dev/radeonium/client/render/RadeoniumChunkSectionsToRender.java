@@ -25,6 +25,8 @@ import org.joml.Matrix4fc;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * Builds Radeonium's terrain submission list from the live visible section set.
@@ -113,7 +115,32 @@ public final class RadeoniumChunkSectionsToRender {
 
             dispatcher.lock();
             try {
-                for (SectionRenderDispatcher.RenderSection section : access.radeonium$getVisibleSections()) {
+                List<SectionRenderDispatcher.RenderSection> visibleSections =
+                        new ArrayList<>(access.radeonium$getVisibleSections());
+                Set<SectionPos> currentVisible = new HashSet<>();
+                for (SectionRenderDispatcher.RenderSection visible : visibleSections) {
+                    net.minecraft.core.SectionPos position =
+                            net.minecraft.core.SectionPos.of(visible.getSectionNode());
+                    currentVisible.add(new SectionPos(position.x(), position.y(), position.z()));
+                }
+                net.minecraft.core.BlockPos cameraBlock = net.minecraft.core.BlockPos.containing(
+                        cameraPosition.x, cameraPosition.y, cameraPosition.z);
+                net.minecraft.core.SectionPos cameraMinecraftSection =
+                        net.minecraft.core.SectionPos.of(cameraBlock);
+                Set<SectionPos> portalVisible = RadeoniumClient.rendererPipeline()
+                        .collectPortalVisibleSections(new SectionPos(
+                                cameraMinecraftSection.x(), cameraMinecraftSection.y(),
+                                cameraMinecraftSection.z()), currentVisible);
+
+                for (SectionRenderDispatcher.RenderSection section : visibleSections) {
+                    net.minecraft.core.SectionPos candidateMinecraftPosition =
+                            net.minecraft.core.SectionPos.of(section.getSectionNode());
+                    SectionPos candidatePosition = new SectionPos(
+                            candidateMinecraftPosition.x(), candidateMinecraftPosition.y(),
+                            candidateMinecraftPosition.z());
+                    // If any section's compiled visibility is unavailable, retain
+                    // the complete Minecraft list rather than risk missing terrain.
+                    if (portalVisible != null && !portalVisible.contains(candidatePosition)) continue;
                     SectionMesh mesh = section.getSectionMesh();
                     if (mesh == null) {
                         RadeoniumClient.terrainRenderDiagnostics().recordSectionWithoutMesh();
