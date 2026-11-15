@@ -224,6 +224,32 @@ class MinecraftSectionModelCaptureStoreTest {
         assertNotNull(published);
     }
 
+
+    @Test
+    void removingSectionRejectsAnOutstandingAsyncWorkerResult() {
+        SectionPos position = SectionPos.of(25, 2, 1);
+        var ticket = MinecraftSectionModelCaptureStore.beginAsyncCapture(position);
+        MinecraftSectionModelCaptureStore.remove(position);
+
+        assertNull(MinecraftSectionModelCaptureStore.publishAsync(
+                ticket, new MinecraftSectionModelMesher().buildResolved(List.of())));
+        assertNull(MinecraftSectionModelCaptureStore.get(position));
+    }
+
+    @Test
+    void activeAsyncCaptureRegistryIsBoundedAndEvictedTicketsCannotPublish() {
+        var mesher = new MinecraftSectionModelMesher();
+        var first = MinecraftSectionModelCaptureStore.beginAsyncCapture(SectionPos.of(100, 0, 0));
+        MinecraftSectionModelCaptureStore.beginAsyncCapture(SectionPos.of(101, 0, 0));
+        MinecraftSectionModelCaptureStore.beginAsyncCapture(SectionPos.of(102, 0, 0));
+        for (int i = 3; i <= 256; i++) {
+            MinecraftSectionModelCaptureStore.beginAsyncCapture(SectionPos.of(100 + i, 0, 0));
+        }
+
+        assertNull(MinecraftSectionModelCaptureStore.publishAsync(first, mesher.buildResolved(List.of())));
+        assertEquals(0, MinecraftSectionModelCaptureStore.sectionCount());
+    }
+
     @Test
     void removeAndClearReleaseCapturedSections() {
         SectionPos position = SectionPos.of(5, 6, 7);
