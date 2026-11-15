@@ -156,24 +156,31 @@ public final class MinecraftBlockModelMesh {
         public int[] copyVertexLightCoords() { return vertexLightCoords.clone(); }
 
         /**
-         * Writes two triangles using the full Radeonium vertex layout: position,
-         * packed UV, tint, packed light, per-vertex color/light and material ID.
+         * Writes one quad in Minecraft's DefaultVertexFormat.BLOCK layout:
+         * position (RGB32F), multiplied AO/tint color (RGBA8), atlas UV (RG32F),
+         * and per-vertex packed block/sky light (RG16_SINT).
          */
-        void writeTriangleVertices(ByteBuffer target, int materialIndex) {
-            int[] order = {0, 1, 2, 0, 2, 3};
-            for (int vertex : order) {
+        void writeBlockVertices(ByteBuffer target) {
+            for (int vertex = 0; vertex < 4; vertex++) {
                 int offset = vertex * 3;
                 target.putFloat(positions[offset]);
                 target.putFloat(positions[offset + 1]);
                 target.putFloat(positions[offset + 2]);
-                target.putInt((int) packedUv[vertex]);
-                target.putInt((int) (packedUv[vertex] >>> 32));
-                target.putInt(tintColor);
-                target.putInt(packedLightCoords);
-                target.putInt(vertexColors[vertex]);
-                target.putInt(vertexLightCoords[vertex]);
-                target.putInt(materialIndex);
+                target.putInt(multiplyArgb(vertexColors[vertex], tintColor));
+                target.putFloat(Float.intBitsToFloat((int) packedUv[vertex]));
+                target.putFloat(Float.intBitsToFloat((int) (packedUv[vertex] >>> 32)));
+                target.putShort((short) (vertexLightCoords[vertex] & 0xffff));
+                target.putShort((short) ((vertexLightCoords[vertex] >>> 16) & 0xffff));
             }
+        }
+
+        private static int multiplyArgb(int color, int tint) {
+            if (tint == -1) return color;
+            int a = ((color >>> 24) & 255) * ((tint >>> 24) & 255) / 255;
+            int r = ((color >>> 16) & 255) * ((tint >>> 16) & 255) / 255;
+            int g = ((color >>> 8) & 255) * ((tint >>> 8) & 255) / 255;
+            int b = (color & 255) * (tint & 255) / 255;
+            return (a << 24) | (r << 16) | (g << 8) | b;
         }
     }
 }
