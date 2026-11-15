@@ -152,7 +152,7 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
      * Installs a fully prepared cache entry. Kept separate from meshing/upload
      * so replacement, eviction and disposal lifecycle can be tested independently.
      */
-    void installPreparedEntry(SectionPos position, Entry replacement) {
+    synchronized void installPreparedEntry(SectionPos position, Entry replacement) {
         renderThreadCheck.run();
         if (position == null || replacement == null) {
             throw new IllegalArgumentException("position and replacement are required");
