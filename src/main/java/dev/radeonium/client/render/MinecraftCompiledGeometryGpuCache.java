@@ -133,7 +133,7 @@ public final class MinecraftCompiledGeometryGpuCache implements AutoCloseable {
             throw new IllegalArgumentException("pass, position and layer are required");
         }
         SectionUpload section = sections.get(position);
-        if (section == null) return false;
+        if (section == null || !MinecraftCompiledGeometryStore.isCurrent(section.snapshot)) return false;
         LayerUpload upload = section.layers.get(layer);
         if (upload == null || upload.isEmpty() || (upload.indexCount > 0 && upload.indices == null)) return false;
         upload.drawInto(pass);
