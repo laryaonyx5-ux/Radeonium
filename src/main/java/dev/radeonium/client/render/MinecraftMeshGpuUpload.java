@@ -134,6 +134,13 @@ public final class MinecraftMeshGpuUpload implements AutoCloseable {
         }
     }
 
+    public GpuBuffer vertexBuffer() {
+        if (vertexBuffer == null || vertexBuffer.isClosed()) {
+            throw new IllegalStateException("GPU vertex buffer is not available");
+        }
+        return vertexBuffer;
+    }
+
     public boolean isEmpty() {
         return vertexCount == 0;
     }
