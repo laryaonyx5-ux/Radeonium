@@ -6,6 +6,7 @@ import net.minecraft.client.renderer.block.BlockStateModelSet;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.SectionPos;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.client.renderer.block.dispatch.BlockStateModel;
 import net.minecraft.client.renderer.block.dispatch.BlockStateModelPart;
 import net.minecraft.core.Direction;
@@ -57,7 +58,7 @@ public final class MinecraftSectionModelMesher {
                     BlockPos position = new BlockPos(
                             baseX + localX, baseY + localY, baseZ + localZ);
                     BlockState state = region.getBlockState(position);
-                    if (state.isAir()) continue;
+                    if (state.isAir() || state.getRenderShape() != RenderShape.MODEL) continue;
 
                     BlockStateModel model = modelSet.get(state);
                     boolean down = state.skipRendering(
