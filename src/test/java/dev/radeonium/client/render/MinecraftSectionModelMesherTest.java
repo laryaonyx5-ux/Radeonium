@@ -47,7 +47,7 @@ class MinecraftSectionModelMesherTest {
     void resolvedInputsRejectCoordinatesOutsideTheirSection() {
         assertThrows(IllegalArgumentException.class, () ->
                 new MinecraftSectionModelMesher.ResolvedBlockInput(
-                        List.of(), 16, 0, 0, false, false, false, false, false, false, java.util.Map.of()));
+                        List.of(), 16, 0, 0, false, false, false, false, false, false, java.util.Map.of(), -1));
     }
 
 
