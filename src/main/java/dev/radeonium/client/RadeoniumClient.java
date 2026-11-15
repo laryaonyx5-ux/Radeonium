@@ -25,6 +25,7 @@ import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,6 +43,10 @@ public final class RadeoniumClient implements ClientModInitializer {
     private static final int MAX_PENDING_GEOMETRY_UPLOADS = 128;
     private static final ArrayBlockingQueue<MinecraftCompiledGeometryStore.Snapshot> PENDING_GEOMETRY_UPLOADS =
             new ArrayBlockingQueue<>(MAX_PENDING_GEOMETRY_UPLOADS);
+    private static final int MAX_PENDING_MODEL_UPLOADS = 128;
+    private static final ArrayBlockingQueue<MinecraftSectionModelCaptureStore.Snapshot> PENDING_MODEL_UPLOADS =
+            new ArrayBlockingQueue<>(MAX_PENDING_MODEL_UPLOADS);
+    private static final AtomicBoolean INVALIDATE_MODEL_GPU_CACHE = new AtomicBoolean();
 
     public static void queueCompiledGeometryUpload(MinecraftCompiledGeometryStore.Snapshot snapshot) {
         if (snapshot == null) return;
@@ -57,6 +62,24 @@ public final class RadeoniumClient implements ClientModInitializer {
             MinecraftCompiledGeometryStore.Snapshot snapshot = PENDING_GEOMETRY_UPLOADS.poll();
             if (snapshot == null) break;
             COMPILED_GEOMETRY_GPU_CACHE.upload(snapshot);
+        }
+    }
+
+
+    public static void queueSectionModelUpload(MinecraftSectionModelCaptureStore.Snapshot snapshot) {
+        if (snapshot == null) return;
+        while (!PENDING_MODEL_UPLOADS.offer(snapshot)) {
+            PENDING_MODEL_UPLOADS.poll();
+        }
+    }
+
+    private static void drainSectionModelUploads() {
+        for (int i = 0; i < 4; i++) {
+            MinecraftSectionModelCaptureStore.Snapshot snapshot = PENDING_MODEL_UPLOADS.poll();
+            if (snapshot == null) break;
+            if (MinecraftSectionModelCaptureStore.get(snapshot.position()) == snapshot) {
+                MINECRAFT_GPU_CACHE.rebuild(snapshot.position(), snapshot.mesh());
+            }
         }
     }
 
@@ -107,6 +130,8 @@ public final class RadeoniumClient implements ClientModInitializer {
                     public void onResourceManagerReload(ResourceManager resourceManager) {
                         // Baked quads and materials are tied to the current model/atlas reload.
                         MinecraftSectionModelCaptureStore.clear();
+                        PENDING_MODEL_UPLOADS.clear();
+                        INVALIDATE_MODEL_GPU_CACHE.set(true);
                     }
                 }
         );
@@ -117,12 +142,15 @@ public final class RadeoniumClient implements ClientModInitializer {
             MINECRAFT_GPU_CACHE.close();
             COMPILED_GEOMETRY_GPU_CACHE.close();
             PENDING_GEOMETRY_UPLOADS.clear();
+            PENDING_MODEL_UPLOADS.clear();
             MinecraftCompiledGeometryStore.clear();
             MinecraftSectionModelCaptureStore.clear();
             RendererSectionTracker.reset();
         });
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
+            if (INVALIDATE_MODEL_GPU_CACHE.getAndSet(false)) MINECRAFT_GPU_CACHE.clear();
             drainCompiledGeometryUploads();
+            drainSectionModelUploads();
             // Fabric API versions used by this project do not expose a world-unload event.
             // Detect level identity changes on the client tick instead.
             if (client.level != trackedWorld) {
@@ -131,6 +159,7 @@ public final class RadeoniumClient implements ClientModInitializer {
                     MINECRAFT_GPU_CACHE.clear();
                     COMPILED_GEOMETRY_GPU_CACHE.clear();
                     PENDING_GEOMETRY_UPLOADS.clear();
+                    PENDING_MODEL_UPLOADS.clear();
                     MinecraftCompiledGeometryStore.clear();
                     MinecraftSectionModelCaptureStore.clear();
                 }
