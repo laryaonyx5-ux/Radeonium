@@ -60,7 +60,18 @@ class RendererContractTest {
         worker.join();
 
         assertInstanceOf(IllegalStateException.class, failure.get());
-        assertThrows(IllegalStateException.class, guard::bindCurrentThread);
+
+        AtomicReference<Throwable> bindFailure = new AtomicReference<>();
+        Thread secondBinder = new Thread(() -> {
+            try {
+                guard.bindCurrentThread();
+            } catch (Throwable throwable) {
+                bindFailure.set(throwable);
+            }
+        });
+        secondBinder.start();
+        secondBinder.join();
+        assertInstanceOf(IllegalStateException.class, bindFailure.get());
     }
 
     @Test
