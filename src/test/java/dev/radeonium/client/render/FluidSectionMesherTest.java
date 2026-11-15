@@ -212,6 +212,20 @@ class FluidSectionMesherTest {
     }
 
     @Test
+    void fluidQuadRejectsEmptyIDsAndNonAxisNormals() {
+        float[] positions = {0,0,0, 0,0,1, 0,1,1, 0,1,0};
+        assertThrows(IllegalArgumentException.class,
+                () -> new FluidSectionMesher.FluidQuad(
+                        (short) 0, 0, 0, -1, 0, 0, positions));
+        assertThrows(IllegalArgumentException.class,
+                () -> new FluidSectionMesher.FluidQuad(
+                        (short) 1, 0, 0, -0.5f, 0.5f, 0, positions));
+        assertThrows(IllegalArgumentException.class,
+                () -> new FluidSectionMesher.FluidQuad(
+                        (short) 1, 0, 0, -1, 0, 0, null));
+    }
+
+    @Test
     void copiesCaptureArraysAndRejectsInvalidHeights() {
         short[] ids = new short[4096]; byte[] heights = new byte[4096];
         int[] tints = new int[4096], lights = new int[4096];
