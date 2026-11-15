@@ -59,13 +59,17 @@ public final class MinecraftBlockModelMesh {
         private final Direction direction;
         private final ChunkSectionLayer layer;
         private final BakedQuad.MaterialInfo material;
+        private final BakedQuad sourceQuad;
+        private final boolean partAmbientOcclusion;
 
         Quad(
                 float[] positions,
                 long[] packedUv,
                 Direction direction,
                 ChunkSectionLayer layer,
-                BakedQuad.MaterialInfo material
+                BakedQuad.MaterialInfo material,
+                BakedQuad sourceQuad,
+                boolean partAmbientOcclusion
         ) {
             if (positions.length != 12 || packedUv.length != 4) {
                 throw new IllegalArgumentException("A baked quad needs four positions and four UV pairs");
@@ -75,6 +79,8 @@ public final class MinecraftBlockModelMesh {
             this.direction = direction;
             this.layer = layer;
             this.material = material;
+            this.sourceQuad = sourceQuad;
+            this.partAmbientOcclusion = partAmbientOcclusion;
         }
 
         public float[] copyPositions() {
@@ -95,6 +101,28 @@ public final class MinecraftBlockModelMesh {
 
         public BakedQuad.MaterialInfo material() {
             return material;
+        }
+
+        /** Original immutable baked quad, retaining precomputed normals and colors. */
+        public BakedQuad sourceQuad() {
+            return sourceQuad;
+        }
+
+        /** Effective AO combines the quad material flag with its model-part flag. */
+        public boolean ambientOcclusion() {
+            return partAmbientOcclusion && material.ambientOcclusion();
+        }
+
+        public int tintIndex() {
+            return material.tintIndex();
+        }
+
+        public int lightEmission() {
+            return material.lightEmission();
+        }
+
+        public boolean isTinted() {
+            return material.isTinted();
         }
 
         /**
