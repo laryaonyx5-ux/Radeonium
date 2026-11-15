@@ -70,8 +70,11 @@ class MinecraftFluidSectionMesherTest {
         layers.put(ChunkSectionLayer.CUTOUT,
                 new MinecraftFluidSectionMesher.FluidLayerMesh(ChunkSectionLayer.CUTOUT, List.of(cutout)));
 
-        // Exercise the public empty factory and immutable per-layer contract;
-        // non-empty captures are produced only by Minecraft's FluidRenderer.
-        assertEquals(0, MinecraftFluidSectionMesher.SectionFluidMesh.empty().quadCount());
+        var mesh = new MinecraftFluidSectionMesher.SectionFluidMesh(layers);
+        assertEquals(2, mesh.quadCount());
+        assertEquals(1, mesh.layer(ChunkSectionLayer.TRANSLUCENT).quads().size());
+        assertEquals(1, mesh.layer(ChunkSectionLayer.CUTOUT).quads().size());
+        assertThrows(UnsupportedOperationException.class,
+                () -> mesh.layer(ChunkSectionLayer.TRANSLUCENT).quads().clear());
     }
 }
