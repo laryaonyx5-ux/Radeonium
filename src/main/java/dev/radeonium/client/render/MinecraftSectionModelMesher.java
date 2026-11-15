@@ -2,6 +2,7 @@ package dev.radeonium.client.render;
 
 import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
 import net.minecraft.client.renderer.block.dispatch.BlockStateModel;
+import net.minecraft.client.renderer.block.dispatch.BlockStateModelPart;
 import net.minecraft.core.Direction;
 
 import java.util.ArrayList;
@@ -12,21 +13,42 @@ import java.util.Map;
 /**
  * Builds a section from immutable, already-captured block inputs.
  *
- * Model variant and multipart selection is delegated to BlockStateModel.collectParts
- * through MinecraftBlockModelMesher. Inputs must be captured on Minecraft's
- * permitted build thread; this class never reads a Level, Chunk or BlockEntity.
+ * The preferred worker input is ResolvedBlockInput: model variant selection
+ * and multipart collection have already happened on Minecraft's build thread.
+ * The worker then only reads the baked parts and copies their quad data.
  *
- * Face removal is deliberately conservative: only a quad lying exactly on a
- * block boundary can be culled, and only when the capture layer explicitly
- * marks the adjacent face as fully occluding. Inset, crossed and partial model
- * geometry is never removed by this test.
+ * Face removal is conservative: only a quad lying exactly on a block boundary
+ * can be culled, and only when the captured adjacent face fully occludes it.
  */
 public final class MinecraftSectionModelMesher {
     private static final float EDGE_EPSILON = 1.0e-5f;
 
     private final MinecraftBlockModelMesher blockMesher = new MinecraftBlockModelMesher();
 
+    /**
+     * Compatibility entry point. This performs collectParts while building and
+     * should only be used where the caller has established model thread safety.
+     */
     public SectionModelMesh build(List<BlockInput> blocks) {
+        if (blocks == null) throw new IllegalArgumentException("blocks cannot be null");
+        List<ResolvedBlockInput> resolved = new ArrayList<>(blocks.size());
+        for (BlockInput input : blocks) {
+            if (input == null) continue;
+            List<BlockStateModelPart> parts = new ArrayList<>();
+            input.model().collectParts(net.minecraft.util.RandomSource.create(input.modelSeed()), parts);
+            resolved.add(new ResolvedBlockInput(parts, input.localX(), input.localY(), input.localZ(),
+                    input.downOccluded(), input.upOccluded(), input.northOccluded(),
+                    input.southOccluded(), input.westOccluded(), input.eastOccluded()));
+        }
+        return buildResolved(resolved);
+    }
+
+    /**
+     * Builds from pre-resolved baked parts. Resolve each block state's actual
+     * variant/multipart parts and its position-dependent random choice on the
+     * Minecraft-approved build thread, then pass this immutable list to workers.
+     */
+    public SectionModelMesh buildResolved(List<ResolvedBlockInput> blocks) {
         if (blocks == null) throw new IllegalArgumentException("blocks cannot be null");
 
         Map<ChunkSectionLayer, List<MinecraftBlockModelMesh.Quad>> byLayer =
@@ -35,9 +57,9 @@ public final class MinecraftSectionModelMesher {
             byLayer.put(layer, new ArrayList<>());
         }
 
-        for (BlockInput input : blocks) {
+        for (ResolvedBlockInput input : blocks) {
             if (input == null) continue;
-            MinecraftBlockModelMesh blockMesh = blockMesher.build(input.model(), input.modelSeed());
+            MinecraftBlockModelMesh blockMesh = blockMesher.build(input.parts());
             for (MinecraftBlockModelMesh.Quad quad : blockMesh.quads()) {
                 Direction face = quad.direction();
                 if (face != null && input.neighborOccludes(face)
@@ -55,14 +77,9 @@ public final class MinecraftSectionModelMesher {
 
                 byLayer.computeIfAbsent(quad.layer(), ignored -> new ArrayList<>())
                         .add(new MinecraftBlockModelMesh.Quad(
-                                positions,
-                                quad.copyPackedUv(),
-                                quad.direction(),
-                                quad.layer(),
-                                quad.material(),
-                                quad.sourceQuad(),
-                                quad.ambientOcclusion()
-                        ));
+                                positions, quad.copyPackedUv(), quad.direction(),
+                                quad.layer(), quad.material(), quad.sourceQuad(),
+                                quad.ambientOcclusion()));
             }
         }
 
@@ -74,10 +91,6 @@ public final class MinecraftSectionModelMesher {
         return new SectionModelMesh(result);
     }
 
-    /**
-     * True only when all four vertices lie on the outward boundary plane
-     * indicated by the baked quad's cull direction.
-     */
     public static boolean liesOnBlockBoundary(float[] positions, Direction face) {
         if (positions == null || positions.length != 12 || face == null) return false;
         int axis = switch (face.getAxis()) {
@@ -99,28 +112,38 @@ public final class MinecraftSectionModelMesher {
     }
 
     /**
-     * Immutable block input. The six booleans describe full-face occlusion
-     * from the corresponding adjacent block, captured before worker dispatch.
+     * Input for callers that have not separated model resolution from meshing.
+     * Prefer ResolvedBlockInput for asynchronous section builds.
      */
     public record BlockInput(
             BlockStateModel model,
-            int localX,
-            int localY,
-            int localZ,
+            int localX, int localY, int localZ,
             long modelSeed,
-            boolean downOccluded,
-            boolean upOccluded,
-            boolean northOccluded,
-            boolean southOccluded,
-            boolean westOccluded,
-            boolean eastOccluded
+            boolean downOccluded, boolean upOccluded,
+            boolean northOccluded, boolean southOccluded,
+            boolean westOccluded, boolean eastOccluded
     ) {
         public BlockInput {
             if (model == null) throw new IllegalArgumentException("model cannot be null");
-            if (localX < 0 || localX > 15 || localY < 0 || localY > 15
-                    || localZ < 0 || localZ > 15) {
-                throw new IllegalArgumentException("local block coordinates must be in [0, 15]");
-            }
+            validateCoordinates(localX, localY, localZ);
+        }
+    }
+
+    /**
+     * Immutable snapshot of already-selected baked model parts and face
+     * occlusion. No Level, BlockState, BlockEntity or live chunk is retained.
+     */
+    public record ResolvedBlockInput(
+            List<BlockStateModelPart> parts,
+            int localX, int localY, int localZ,
+            boolean downOccluded, boolean upOccluded,
+            boolean northOccluded, boolean southOccluded,
+            boolean westOccluded, boolean eastOccluded
+    ) {
+        public ResolvedBlockInput {
+            if (parts == null) throw new IllegalArgumentException("parts cannot be null");
+            parts = List.copyOf(parts);
+            validateCoordinates(localX, localY, localZ);
         }
 
         boolean neighborOccludes(Direction direction) {
@@ -135,7 +158,24 @@ public final class MinecraftSectionModelMesher {
         }
     }
 
-    /** Immutable, independent meshes for each Minecraft terrain layer. */
+    private static void validateCoordinates(int x, int y, int z) {
+        if (x < 0 || x > 15 || y < 0 || y > 15 || z < 0 || z > 15) {
+            throw new IllegalArgumentException("local block coordinates must be in [0, 15]");
+        }
+    }
+
+    private static boolean neighborOccludes(BlockInput input, Direction direction) {
+        return switch (direction) {
+            case DOWN -> input.downOccluded();
+            case UP -> input.upOccluded();
+            case NORTH -> input.northOccluded();
+            case SOUTH -> input.southOccluded();
+            case WEST -> input.westOccluded();
+            case EAST -> input.eastOccluded();
+        };
+    }
+
+    /** Independent meshes for every Minecraft terrain layer. */
     public static final class SectionModelMesh {
         private final Map<ChunkSectionLayer, MinecraftBlockModelMesh> layers;
 
@@ -148,9 +188,7 @@ public final class MinecraftSectionModelMesher {
             return layers.getOrDefault(layer, new MinecraftBlockModelMesh(List.of()));
         }
 
-        public Map<ChunkSectionLayer, MinecraftBlockModelMesh> layers() {
-            return layers;
-        }
+        public Map<ChunkSectionLayer, MinecraftBlockModelMesh> layers() { return layers; }
 
         public int quadCount() {
             int total = 0;
