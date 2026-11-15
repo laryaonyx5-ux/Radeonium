@@ -15,8 +15,8 @@ import java.util.Map;
  * Owns layer-separated GPU uploads and material indices produced from baked models.
  *
  * GPU creation and destruction must run on Minecraft's render thread. This
- * cache remains an integration boundary: it does not yet discover live
- * LevelChunkSection model parts or replace vanilla frame-graph submission.
+ * The section compiler feeds this cache through a bounded render-thread upload
+ * queue. Terrain draw submission remains owned by the caller's frame graph.
  */
 public final class MinecraftSectionGpuCache implements AutoCloseable {
     private final MinecraftBlockModelMesher mesher = new MinecraftBlockModelMesher();
@@ -44,6 +44,7 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
             Entry replacement = new Entry(mesh, layerUploads, materialIndices);
             Entry previous = sections.put(position, replacement);
             if (previous != null) previous.close();
+            evictExcessSections();
         } catch (RuntimeException | Error failure) {
             for (MinecraftMeshGpuUpload upload : layerUploads.values()) upload.close();
             throw failure;
