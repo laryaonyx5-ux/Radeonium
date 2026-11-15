@@ -110,7 +110,7 @@ public final class MinecraftBlockModelMesh {
 
         /** Effective AO combines the quad material flag with its model-part flag. */
         public boolean ambientOcclusion() {
-            return partAmbientOcclusion && material.ambientOcclusion();
+            return partAmbientOcclusion;
         }
 
         public int tintIndex() {
