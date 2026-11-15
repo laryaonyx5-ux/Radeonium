@@ -52,27 +52,40 @@ public final class MinecraftSectionModelMesher {
         int baseY = sectionPos.minBlockY();
         int baseZ = sectionPos.minBlockZ();
 
+        // RenderSectionRegion is a 3x3x3 immutable section copy. Capture its
+        // one-block halo once, rather than asking the region for seven states
+        // for every interior block.
+        BlockState[] states = new BlockState[18 * 18 * 18];
+        for (int y = -1; y <= 16; y++) {
+            for (int z = -1; z <= 16; z++) {
+                for (int x = -1; x <= 16; x++) {
+                    BlockPos position = new BlockPos(baseX + x, baseY + y, baseZ + z);
+                    states[haloIndex(x, y, z)] = region.getBlockState(position);
+                }
+            }
+        }
+
         for (int localY = 0; localY < 16; localY++) {
             for (int localZ = 0; localZ < 16; localZ++) {
                 for (int localX = 0; localX < 16; localX++) {
-                    BlockPos position = new BlockPos(
-                            baseX + localX, baseY + localY, baseZ + localZ);
-                    BlockState state = region.getBlockState(position);
+                    BlockState state = states[haloIndex(localX, localY, localZ)];
                     if (state.isAir() || state.getRenderShape() != RenderShape.MODEL) continue;
 
+                    BlockPos position = new BlockPos(
+                            baseX + localX, baseY + localY, baseZ + localZ);
                     BlockStateModel model = modelSet.get(state);
                     boolean down = state.skipRendering(
-                            region.getBlockState(position.relative(Direction.DOWN)), Direction.DOWN);
+                            states[haloIndex(localX, localY - 1, localZ)], Direction.DOWN);
                     boolean up = state.skipRendering(
-                            region.getBlockState(position.relative(Direction.UP)), Direction.UP);
+                            states[haloIndex(localX, localY + 1, localZ)], Direction.UP);
                     boolean north = state.skipRendering(
-                            region.getBlockState(position.relative(Direction.NORTH)), Direction.NORTH);
+                            states[haloIndex(localX, localY, localZ - 1)], Direction.NORTH);
                     boolean south = state.skipRendering(
-                            region.getBlockState(position.relative(Direction.SOUTH)), Direction.SOUTH);
+                            states[haloIndex(localX, localY, localZ + 1)], Direction.SOUTH);
                     boolean west = state.skipRendering(
-                            region.getBlockState(position.relative(Direction.WEST)), Direction.WEST);
+                            states[haloIndex(localX - 1, localY, localZ)], Direction.WEST);
                     boolean east = state.skipRendering(
-                            region.getBlockState(position.relative(Direction.EAST)), Direction.EAST);
+                            states[haloIndex(localX + 1, localY, localZ)], Direction.EAST);
 
                     resolved.add(ResolvedBlockInput.capture(
                             model, state.getSeed(position), localX, localY, localZ,
@@ -235,6 +248,13 @@ public final class MinecraftSectionModelMesher {
                 case EAST -> eastOccluded;
             };
         }
+    }
+
+    private static int haloIndex(int x, int y, int z) {
+        if (x < -1 || x > 16 || y < -1 || y > 16 || z < -1 || z > 16) {
+            throw new IndexOutOfBoundsException("Section capture halo coordinates must be in [-1, 16]");
+        }
+        return (x + 1) + 18 * ((z + 1) + 18 * (y + 1));
     }
 
     private static void validateCoordinates(int x, int y, int z) {
