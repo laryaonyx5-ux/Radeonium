@@ -2,7 +2,11 @@ package dev.radeonium.client.render;
 
 import org.junit.jupiter.api.Test;
 
+import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
+
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -58,6 +62,124 @@ class MinecraftSectionGpuCacheLifecycleTest {
         assertEquals(0, cache.sectionCount());
     }
 
+
+    @Test
+    void replacementDisposesOldUploadAndRetainsOnlyTheNewOne() {
+        MinecraftGpuResourceOwner owner = new MinecraftGpuResourceOwner(() -> {});
+        MinecraftSectionGpuCache cache =
+                new MinecraftSectionGpuCache(owner, () -> {});
+        SectionPos position = new SectionPos(1, 2, 3);
+        MinecraftMeshGpuUpload oldUpload =
+                MinecraftMeshGpuUpload.forTesting(4, 28L, () -> {});
+        MinecraftMeshGpuUpload newUpload =
+                MinecraftMeshGpuUpload.forTesting(4, 56L, () -> {});
+        owner.track(oldUpload, null);
+        cache.installPreparedEntry(position, entry(oldUpload));
+        owner.track(newUpload, null);
+
+        cache.installPreparedEntry(position, entry(newUpload));
+
+        assertTrue(oldUpload.isClosed());
+        assertFalse(newUpload.isClosed());
+        assertEquals(1, cache.sectionCount());
+        assertEquals(1, owner.allocationCount());
+        assertEquals(56L, owner.allocatedBytes());
+
+        cache.remove(position);
+        assertTrue(newUpload.isClosed());
+        assertEquals(0, owner.allocationCount());
+    }
+
+    @Test
+    void failedReplacementRollsBackNewUploadAndKeepsOldEntryRetryable() {
+        AtomicInteger oldCloseAttempts = new AtomicInteger();
+        MinecraftGpuResourceOwner owner = new MinecraftGpuResourceOwner(() -> {});
+        MinecraftSectionGpuCache cache =
+                new MinecraftSectionGpuCache(owner, () -> {});
+        SectionPos position = new SectionPos(4, 0, 0);
+        MinecraftMeshGpuUpload oldUpload = MinecraftMeshGpuUpload.forTesting(4, 32L, () -> {
+            if (oldCloseAttempts.incrementAndGet() == 1) {
+                throw new IllegalStateException("old upload disposal fails once");
+            }
+        });
+        owner.track(oldUpload, null);
+        cache.installPreparedEntry(position, entry(oldUpload));
+
+        MinecraftMeshGpuUpload rejectedReplacement =
+                MinecraftMeshGpuUpload.forTesting(4, 48L, () -> {});
+        owner.track(rejectedReplacement, null);
+        assertThrows(IllegalStateException.class,
+                () -> cache.installPreparedEntry(position, entry(rejectedReplacement)));
+
+        assertEquals(1, cache.sectionCount());
+        assertFalse(oldUpload.isClosed());
+        assertTrue(rejectedReplacement.isClosed());
+        assertEquals(1, owner.allocationCount());
+        assertEquals(32L, owner.allocatedBytes());
+
+        MinecraftMeshGpuUpload retry =
+                MinecraftMeshGpuUpload.forTesting(4, 64L, () -> {});
+        owner.track(retry, null);
+        cache.installPreparedEntry(position, entry(retry));
+        assertTrue(oldUpload.isClosed());
+        assertFalse(retry.isClosed());
+        cache.clear();
+        assertEquals(0, owner.allocationCount());
+    }
+
+    @Test
+    void failedRemoveAndClearKeepEntriesForDisposalRetry() {
+        AtomicInteger closeAttempts = new AtomicInteger();
+        MinecraftGpuResourceOwner owner = new MinecraftGpuResourceOwner(() -> {});
+        MinecraftSectionGpuCache cache =
+                new MinecraftSectionGpuCache(owner, () -> {});
+        SectionPos position = new SectionPos(5, 0, 0);
+        MinecraftMeshGpuUpload upload = MinecraftMeshGpuUpload.forTesting(4, 40L, () -> {
+            if (closeAttempts.incrementAndGet() == 1) {
+                throw new IllegalStateException("first disposal attempt fails");
+            }
+        });
+        owner.track(upload, null);
+        cache.installPreparedEntry(position, entry(upload));
+
+        assertThrows(IllegalStateException.class, () -> cache.remove(position));
+        assertEquals(1, cache.sectionCount());
+        assertEquals(1, owner.allocationCount());
+        assertFalse(upload.isClosed());
+
+        assertThrows(IllegalStateException.class, cache::clear);
+        assertEquals(1, cache.sectionCount());
+        assertFalse(upload.isClosed());
+
+        cache.clear();
+        assertEquals(0, cache.sectionCount());
+        assertEquals(0, owner.allocationCount());
+        assertEquals(3, closeAttempts.get());
+    }
+
+    @Test
+    void evictionReleasesOldestGpuAllocation() {
+        MinecraftGpuResourceOwner owner = new MinecraftGpuResourceOwner(() -> {});
+        MinecraftSectionGpuCache cache =
+                new MinecraftSectionGpuCache(owner, () -> {});
+        MinecraftMeshGpuUpload oldest = null;
+
+        for (int index = 0; index < 65; index++) {
+            MinecraftMeshGpuUpload upload =
+                    MinecraftMeshGpuUpload.forTesting(4, 28L, () -> {});
+            if (index == 0) oldest = upload;
+            owner.track(upload, null);
+            cache.installPreparedEntry(new SectionPos(index, 0, 0), entry(upload));
+        }
+
+        assertTrue(oldest != null && oldest.isClosed());
+        assertEquals(64, cache.sectionCount());
+        assertEquals(64, owner.allocationCount());
+        assertEquals(64L * 28L, owner.allocatedBytes());
+        cache.clear();
+        assertEquals(0, owner.allocationCount());
+    }
+
     @Test
     void closeClearsCacheAndClosesGpuOwner() {
         MinecraftGpuResourceOwner owner = new MinecraftGpuResourceOwner(() -> {});
@@ -71,5 +193,19 @@ class MinecraftSectionGpuCacheLifecycleTest {
         assertEquals(0, cache.materialCount());
         assertTrue(owner.isClosed());
         assertEquals(0, owner.allocationCount());
+    }
+
+    private static MinecraftSectionGpuCache.Entry entry(MinecraftMeshGpuUpload upload) {
+        EnumMap<ChunkSectionLayer, MinecraftMeshGpuUpload> uploads =
+                new EnumMap<>(ChunkSectionLayer.class);
+        uploads.put(ChunkSectionLayer.SOLID, upload);
+        return new MinecraftSectionGpuCache.Entry(
+                new MinecraftBlockModelMesh(List.of()),
+                MinecraftFluidSectionMesher.SectionFluidMesh.empty(),
+                null,
+                Set.of(),
+                uploads,
+                new int[0]
+        );
     }
 }
