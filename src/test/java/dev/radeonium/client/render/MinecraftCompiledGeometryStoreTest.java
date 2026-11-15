@@ -40,6 +40,12 @@ class MinecraftCompiledGeometryStoreTest {
         assertThrows(IllegalArgumentException.class, () ->
                 new MinecraftCompiledGeometryStore.LayerData(
                         new byte[]{1}, new byte[0], "format", "QUADS", null, 0, 1));
+        assertThrows(IllegalArgumentException.class, () ->
+                new MinecraftCompiledGeometryStore.LayerData(
+                        new byte[]{1}, new byte[]{1}, "format", "QUADS", IndexType.SHORT, 1, 2));
+        assertThrows(IllegalArgumentException.class, () ->
+                new MinecraftCompiledGeometryStore.LayerData(
+                        new byte[]{1}, new byte[]{1}, "format", "QUADS", null, 1, 0));
     }
 
     @Test
