@@ -79,14 +79,12 @@ public final class FluidSectionMesher {
      */
     private static float cornerHeight(FluidSectionSnapshot snapshot, short id,
                                       int cornerX, int y, int cornerZ) {
-        if (y < 15) {
-            for (int dx = -1; dx <= 0; dx++) {
-                for (int dz = -1; dz <= 0; dz++) {
-                    int x = cornerX + dx;
-                    int z = cornerZ + dz;
-                    if (snapshot.fluidIdWithHalo(x, y + 1, z) == id) {
-                        return 1.0f;
-                    }
+        for (int dx = -1; dx <= 0; dx++) {
+            for (int dz = -1; dz <= 0; dz++) {
+                int x = cornerX + dx;
+                int z = cornerZ + dz;
+                if (snapshot.fluidIdWithHalo(x, y + 1, z) == id) {
+                    return 1.0f;
                 }
             }
         }
