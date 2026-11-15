@@ -5,6 +5,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -65,6 +67,37 @@ class MinecraftSectionModelCaptureStoreTest {
         MinecraftSectionModelCaptureStore.clear();
 
         assertNull(MinecraftSectionModelCaptureStore.complete(position));
+        assertNull(MinecraftSectionModelCaptureStore.get(position));
+    }
+
+    @Test
+    void worldClearInvalidatesCaptureStagedOnAnotherWorkerThread() throws Exception {
+        SectionPos position = SectionPos.of(10, 2, 1);
+        var mesh = new MinecraftSectionModelMesher().buildResolved(List.of());
+        CountDownLatch staged = new CountDownLatch(1);
+        CountDownLatch continueWorker = new CountDownLatch(1);
+        AtomicReference<MinecraftSectionModelCaptureStore.Snapshot> completed =
+                new AtomicReference<>();
+
+        Thread worker = new Thread(() -> {
+            MinecraftSectionModelCaptureStore.stage(position, mesh);
+            staged.countDown();
+            try {
+                continueWorker.await();
+            } catch (InterruptedException exception) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+            completed.set(MinecraftSectionModelCaptureStore.complete(position));
+        }, "Radeonium-Capture-Store-Test");
+        worker.start();
+        staged.await();
+
+        MinecraftSectionModelCaptureStore.clear();
+        continueWorker.countDown();
+        worker.join();
+
+        assertNull(completed.get());
         assertNull(MinecraftSectionModelCaptureStore.get(position));
     }
 
