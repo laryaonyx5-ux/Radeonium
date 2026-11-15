@@ -79,9 +79,12 @@ public final class MinecraftGpuResourceOwner implements AutoCloseable {
     }
 
     MinecraftMeshGpuUpload track(MinecraftMeshGpuUpload upload, ByteArrayKey key) {
+        if (upload == null) throw new IllegalArgumentException("upload cannot be null");
         if (upload.isEmpty()) return upload;
+        if (upload.isClosed()) throw new IllegalArgumentException("cannot track a closed GPU upload");
         if (allocations.containsKey(upload)) {
-            upload.close();
+            // Never close an object that is already owned: doing so would invalidate
+            // every section currently sharing this allocation.
             throw new IllegalStateException("GPU upload is already owned");
         }
         long bytes = upload.byteSize();
@@ -90,7 +93,11 @@ public final class MinecraftGpuResourceOwner implements AutoCloseable {
             nextAllocatedBytes = Math.addExact(allocatedBytes, bytes);
         } catch (ArithmeticException overflow) {
             // The GPU buffer already exists; dispose it if accounting cannot accept it.
-            upload.close();
+            try {
+                upload.close();
+            } catch (RuntimeException | Error cleanupFailure) {
+                overflow.addSuppressed(cleanupFailure);
+            }
             throw overflow;
         }
         Allocation allocation = new Allocation(bytes, key);
@@ -215,6 +222,7 @@ public final class MinecraftGpuResourceOwner implements AutoCloseable {
         private final int hash;
 
         ByteArrayKey(byte[] bytes) {
+            if (bytes == null) throw new IllegalArgumentException("payload bytes cannot be null");
             this.bytes = bytes.clone();
             this.hash = Arrays.hashCode(this.bytes);
         }
