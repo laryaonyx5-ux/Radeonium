@@ -92,6 +92,31 @@ class MinecraftSectionGpuCacheLifecycleTest {
         assertEquals(0, owner.allocationCount());
     }
 
+
+    @Test
+    void sharedUploadSurvivesRemovalOfOnlyOneSection() {
+        MinecraftGpuResourceOwner owner = new MinecraftGpuResourceOwner(() -> {});
+        MinecraftSectionGpuCache cache =
+                new MinecraftSectionGpuCache(owner, () -> {});
+        MinecraftMeshGpuUpload shared =
+                MinecraftMeshGpuUpload.forTesting(4, 48L, () -> {});
+        owner.track(shared, new MinecraftGpuResourceOwner.ByteArrayKey(new byte[] {2, 4}));
+        assertTrue(owner.retain(shared));
+        cache.installPreparedEntry(new SectionPos(8, 0, 0), entry(shared));
+        cache.installPreparedEntry(new SectionPos(9, 0, 0), entry(shared));
+
+        cache.remove(new SectionPos(8, 0, 0));
+
+        assertFalse(shared.isClosed());
+        assertEquals(1, owner.allocationCount());
+        assertEquals(48L, owner.allocatedBytes());
+
+        cache.remove(new SectionPos(9, 0, 0));
+        assertTrue(shared.isClosed());
+        assertEquals(0, owner.allocationCount());
+        assertEquals(0L, owner.allocatedBytes());
+    }
+
     @Test
     void failedReplacementRollsBackNewUploadAndKeepsOldEntryRetryable() {
         AtomicInteger oldCloseAttempts = new AtomicInteger();
