@@ -25,6 +25,13 @@ public final class RendererSectionTracker {
     private RendererSectionTracker() {
     }
 
+    /** Drops cached section identities when Minecraft unloads the current world. */
+    public static void reset() {
+        previous.clear();
+        working.clear();
+        RadeoniumClient.rendererPipeline().clear();
+    }
+
     public static void captureVisibleSections(
             Iterable<SectionRenderDispatcher.RenderSection> sections
     ) {
@@ -63,16 +70,21 @@ public final class RendererSectionTracker {
     ) {
         for (SectionRenderDispatcher.RenderSection section : sections) {
             net.minecraft.client.renderer.chunk.SectionMesh mesh = section.getSectionMesh();
-            if (mesh == null) continue;
+            long packed = section.getSectionNode();
+            SectionPos position = SectionPos.of(packed);
+            dev.radeonium.client.render.SectionPos radeoniumPosition =
+                    new dev.radeonium.client.render.SectionPos(position.x(), position.y(), position.z());
+            if (mesh == null) {
+                RadeoniumClient.rendererPipeline().forgetVanillaMesh(radeoniumPosition);
+                continue;
+            }
 
             SectionMesh.SectionDraw solid = mesh.getSectionDraw(ChunkSectionLayer.SOLID);
             SectionMesh.SectionDraw cutout = mesh.getSectionDraw(ChunkSectionLayer.CUTOUT);
             SectionMesh.SectionDraw translucent = mesh.getSectionDraw(ChunkSectionLayer.TRANSLUCENT);
 
-            long packed = section.getSectionNode();
-            SectionPos position = SectionPos.of(packed);
             RadeoniumClient.rendererPipeline().observeVanillaMesh(
-                    new dev.radeonium.client.render.SectionPos(position.x(), position.y(), position.z()),
+                    radeoniumPosition,
                     new VanillaSectionMeshSnapshot(
                             solid == null ? 0 : solid.indexCount(),
                             cutout == null ? 0 : cutout.indexCount(),
