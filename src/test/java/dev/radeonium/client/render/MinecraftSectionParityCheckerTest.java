@@ -47,7 +47,7 @@ class MinecraftSectionParityCheckerTest {
                 vanillaVertices, new byte[0], "wrong-format",
                 PrimitiveTopology.QUADS.toString(), null, 4, 0);
         var vanilla = new MinecraftCompiledGeometryStore.Snapshot(
-                new SectionPos(0, 0, 0), Map.of(ChunkSectionLayer.CUTOUT, layer), 1L, 1L);
+                SectionPos.of(0, 0, 0), Map.of(ChunkSectionLayer.CUTOUT, layer), 1L, 1L);
         var mesh = new MinecraftSectionModelMesher().buildResolved(java.util.List.of());
 
         var report = MinecraftSectionParityChecker.compare(mesh, vanilla);
