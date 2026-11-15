@@ -6,8 +6,8 @@ import com.mojang.renderpearl.api.buffers.GpuBufferSlice;
 import com.mojang.renderpearl.api.commands.RenderPass;
 import com.mojang.renderpearl.api.pipeline.IndexType;
 import com.mojang.renderpearl.api.pipeline.PrimitiveTopology;
-import com.mojang.renderpearl.api.pipeline.RenderPipeline;
 import com.mojang.renderpearl.api.vertex.VertexFormat;
+import dev.radeonium.mixin.LevelRendererAccessor;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.DynamicGpuData;
 import net.minecraft.client.renderer.LevelRenderer;
@@ -17,7 +17,6 @@ import net.minecraft.client.renderer.chunk.SectionMesh;
 import net.minecraft.client.renderer.chunk.SectionRenderDispatcher;
 import net.minecraft.client.renderer.state.OptionsRenderState;
 import net.minecraft.client.renderer.texture.TextureAtlas;
-import net.minecraft.core.SectionPos;
 import net.minecraft.util.Util;
 import org.joml.Matrix4fc;
 
@@ -26,29 +25,15 @@ import java.util.EnumMap;
 import java.util.List;
 
 /**
- * Radeonium-owned terrain submission list.
- *
- * It deliberately consumes Minecraft's already-compiled, already-uploaded section
- * buffers for this first replacement stage. Radeonium now owns the visible-section
- * traversal, per-layer draw list, ordering, section uniforms and submission object;
- * Minecraft still owns block meshing and the underlying uber-buffer allocations.
+ * Builds Radeonium's terrain submission list from the live visible section set.
+ * It currently reuses Minecraft's compiled section buffers and vertex formats,
+ * but Radeonium owns the section traversal, layer draw lists, ordering and
+ * terrain/section uniform construction passed into the frame graph.
  */
-public final class RadeoniumChunkSectionsToRender extends ChunkSectionsToRender {
-    private final EnumMap<ChunkSectionLayer, List<RenderPass.Draw<GpuBufferSlice[]>>> draws;
-    private final GpuBufferSlice[] sectionUniforms;
+public final class RadeoniumChunkSectionsToRender {
+    private RadeoniumChunkSectionsToRender() {}
 
-    private RadeoniumChunkSectionsToRender(
-            GpuBufferSlice terrainUniform,
-            int maxIndicesRequired,
-            EnumMap<ChunkSectionLayer, List<RenderPass.Draw<GpuBufferSlice[]>>> draws,
-            GpuBufferSlice[] sectionUniforms
-    ) {
-        super(terrainUniform, maxIndicesRequired);
-        this.draws = draws;
-        this.sectionUniforms = sectionUniforms;
-    }
-
-    public static RadeoniumChunkSectionsToRender create(
+    public static ChunkSectionsToRender create(
             LevelRenderer renderer,
             Matrix4fc modelViewMatrix,
             boolean respectTranslucentOrder
@@ -132,16 +117,13 @@ public final class RadeoniumChunkSectionsToRender extends ChunkSectionsToRender 
         }
 
         if (respectTranslucentOrder) {
-            List<RenderPass.Draw<GpuBufferSlice[]>> translucent = draws.get(ChunkSectionLayer.TRANSLUCENT);
-            java.util.Collections.reverse(translucent);
+            java.util.Collections.reverse(draws.get(ChunkSectionLayer.TRANSLUCENT));
         }
 
+        var atlas = Minecraft.getInstance().getTextureManager()
+                .getTexture(TextureAtlas.LOCATION_BLOCKS).getTextureView();
         GpuBufferSlice terrainUniform = RenderSystem.getDynamicUniforms().writeTerrainTransform(
-                modelViewMatrix,
-                Minecraft.getInstance().getTextureManager()
-                        .getTexture(TextureAtlas.LOCATION_BLOCKS).getTextureView().getWidth(0),
-                Minecraft.getInstance().getTextureManager()
-                        .getTexture(TextureAtlas.LOCATION_BLOCKS).getTextureView().getHeight(0)
+                modelViewMatrix, atlas.getWidth(0), atlas.getHeight(0)
         );
         GpuBufferSlice[] sectionUniforms = RenderSystem.getDynamicUniforms().writeChunkSections(
                 sectionInfos.toArray(new DynamicGpuData.ChunkSectionInfo[0])
@@ -152,32 +134,8 @@ public final class RadeoniumChunkSectionsToRender extends ChunkSectionsToRender 
                     .requestIndexCount(largestDefaultIndexCount);
         }
 
-        return new RadeoniumChunkSectionsToRender(
-                terrainUniform, largestDefaultIndexCount, draws, sectionUniforms
+        return new ChunkSectionsToRender.DrawSeparate(
+                terrainUniform, draws, largestDefaultIndexCount, sectionUniforms
         );
-    }
-
-    @Override
-    protected void render(
-            ChunkSectionLayer layer,
-            RenderPass renderPass,
-            GpuBuffer defaultIndexBuffer,
-            IndexType defaultIndexType,
-            RenderPipeline pipelineOverride,
-            RenderPipeline pipelineOverrideMultidraw
-    ) {
-        RenderPipeline pipeline = pipelineOverride != null ? pipelineOverride : layer.pipeline(false);
-        renderPass.setPipeline(RenderSystem.getCompiledPipeline(pipeline));
-
-        List<RenderPass.Draw<GpuBufferSlice[]>> layerDraws = draws.get(layer);
-        if (layerDraws != null && !layerDraws.isEmpty()) {
-            renderPass.drawMultipleIndexed(
-                    layerDraws,
-                    defaultIndexBuffer,
-                    defaultIndexType,
-                    List.of("ChunkSection"),
-                    sectionUniforms
-            );
-        }
     }
 }
