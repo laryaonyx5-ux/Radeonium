@@ -9,6 +9,7 @@ import dev.radeonium.client.render.ChunkRenderPipeline;
 import dev.radeonium.client.render.MinecraftSectionGpuCache;
 import dev.radeonium.client.render.MinecraftCompiledGeometryStore;
 import dev.radeonium.client.render.MinecraftCompiledGeometryGpuCache;
+import dev.radeonium.client.render.MinecraftSectionModelCaptureStore;
 import dev.radeonium.client.render.RendererSectionTracker;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
@@ -93,6 +94,7 @@ public final class RadeoniumClient implements ClientModInitializer {
             COMPILED_GEOMETRY_GPU_CACHE.close();
             PENDING_GEOMETRY_UPLOADS.clear();
             MinecraftCompiledGeometryStore.clear();
+            MinecraftSectionModelCaptureStore.clear();
             RendererSectionTracker.reset();
         });
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
@@ -106,6 +108,7 @@ public final class RadeoniumClient implements ClientModInitializer {
                     COMPILED_GEOMETRY_GPU_CACHE.clear();
                     PENDING_GEOMETRY_UPLOADS.clear();
                     MinecraftCompiledGeometryStore.clear();
+                    MinecraftSectionModelCaptureStore.clear();
                 }
                 trackedWorld = client.level;
             }
