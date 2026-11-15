@@ -173,6 +173,58 @@ class MinecraftSectionModelCaptureStoreTest {
     }
 
     @Test
+    void asyncCapturePublishesOnlyAfterItsWorkerFinishes() {
+        SectionPos position = SectionPos.of(21, 2, 1);
+        var mesh = new MinecraftSectionModelMesher().buildResolved(List.of());
+        var ticket = MinecraftSectionModelCaptureStore.beginAsyncCapture(position);
+
+        assertNotNull(ticket);
+        assertNull(MinecraftSectionModelCaptureStore.get(position));
+        var published = MinecraftSectionModelCaptureStore.publishAsync(ticket, mesh);
+
+        assertNotNull(published);
+        assertSame(published, MinecraftSectionModelCaptureStore.get(position));
+    }
+
+    @Test
+    void newerAsyncCompileRejectsOlderWorkerResult() {
+        SectionPos position = SectionPos.of(22, 2, 1);
+        var mesher = new MinecraftSectionModelMesher();
+        var oldTicket = MinecraftSectionModelCaptureStore.beginAsyncCapture(position);
+        var newTicket = MinecraftSectionModelCaptureStore.beginAsyncCapture(position);
+        var newest = MinecraftSectionModelCaptureStore.publishAsync(
+                newTicket, mesher.buildResolved(List.of()));
+
+        assertNotNull(newest);
+        assertNull(MinecraftSectionModelCaptureStore.publishAsync(
+                oldTicket, mesher.buildResolved(List.of())));
+        assertSame(newest, MinecraftSectionModelCaptureStore.get(position));
+    }
+
+    @Test
+    void resourceReloadRejectsAsyncWorkerResult() {
+        SectionPos position = SectionPos.of(23, 2, 1);
+        var ticket = MinecraftSectionModelCaptureStore.beginAsyncCapture(position);
+        MinecraftSectionModelCaptureStore.clear();
+
+        assertNull(MinecraftSectionModelCaptureStore.publishAsync(
+                ticket, new MinecraftSectionModelMesher().buildResolved(List.of())));
+        assertNull(MinecraftSectionModelCaptureStore.get(position));
+    }
+
+    @Test
+    void abortingAsyncCaptureDoesNotRemoveNewerGeneration() {
+        SectionPos position = SectionPos.of(24, 2, 1);
+        var oldTicket = MinecraftSectionModelCaptureStore.beginAsyncCapture(position);
+        var newTicket = MinecraftSectionModelCaptureStore.beginAsyncCapture(position);
+        MinecraftSectionModelCaptureStore.abortAsync(oldTicket);
+
+        var published = MinecraftSectionModelCaptureStore.publishAsync(
+                newTicket, new MinecraftSectionModelMesher().buildResolved(List.of()));
+        assertNotNull(published);
+    }
+
+    @Test
     void removeAndClearReleaseCapturedSections() {
         SectionPos position = SectionPos.of(5, 6, 7);
         var mesh = new MinecraftSectionModelMesher().buildResolved(List.of());
