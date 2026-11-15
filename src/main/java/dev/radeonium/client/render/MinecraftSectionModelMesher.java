@@ -70,13 +70,13 @@ public final class MinecraftSectionModelMesher {
             for (int localZ = 0; localZ < 16; localZ++) {
                 for (int localX = 0; localX < 16; localX++) {
                     BlockState state = states[haloIndex(localX, localY, localZ)];
-                    if (state.isAir() || state.getRenderShape() != RenderShape.MODEL) continue;
-
                     BlockPos position = new BlockPos(
                             baseX + localX, baseY + localY, baseZ + localZ);
                     if (region.getBlockEntity(position) != null) {
                         unsupportedBlockEntityCount++;
                     }
+                    if (state.isAir() || state.getRenderShape() != RenderShape.MODEL) continue;
+
                     BlockStateModel model = modelSet.get(state);
                     boolean down = state.skipRendering(
                             states[haloIndex(localX, localY - 1, localZ)], Direction.DOWN);
