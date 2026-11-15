@@ -135,6 +135,39 @@ public final class MinecraftMeshGpuUpload implements AutoCloseable {
     }
 
 
+
+    /** Encodes one layer without touching GPU state, for exact vanilla parity checks. */
+    public static EncodedLayer encodeLayer(
+            MinecraftBlockModelMesh mesh,
+            List<MinecraftFluidSectionMesher.FluidQuad> fluidQuads
+    ) {
+        if (mesh == null || fluidQuads == null) {
+            throw new IllegalArgumentException("mesh and fluidQuads are required");
+        }
+        int totalQuads = Math.addExact(mesh.quadCount(), fluidQuads.size());
+        int vertexCount = Math.multiplyExact(totalQuads, 4);
+        ByteBuffer data = ByteBuffer.allocate(
+                Math.multiplyExact(vertexCount, VERTEX_STRIDE_BYTES)
+        ).order(ByteOrder.nativeOrder());
+        for (MinecraftBlockModelMesh.Quad quad : mesh.quads()) quad.writeBlockVertices(data);
+        for (MinecraftFluidSectionMesher.FluidQuad quad : fluidQuads) writeFluidBlockVertices(data, quad);
+        data.flip();
+        byte[] bytes = new byte[data.remaining()];
+        data.get(bytes);
+        return new EncodedLayer(bytes, vertexCount);
+    }
+
+    public record EncodedLayer(byte[] vertexBytes, int vertexCount) {
+        public EncodedLayer {
+            if (vertexBytes == null || vertexCount < 0
+                    || vertexBytes.length != (long) vertexCount * VERTEX_STRIDE_BYTES) {
+                throw new IllegalArgumentException("encoded layer bytes do not match its vertex count");
+            }
+            vertexBytes = vertexBytes.clone();
+        }
+        @Override public byte[] vertexBytes() { return vertexBytes.clone(); }
+    }
+
     /** Uploads a pre-sorted list of model/fluid quads using native BLOCK vertices. */
     public static MinecraftMeshGpuUpload uploadQuadData(
             GpuDevice device, List<QuadData> quads
