@@ -74,6 +74,41 @@ class MinecraftGpuResourceOwnerTest {
 
 
 
+
+    @Test
+    void identicalPayloadKeysReuseAndRetainTheExistingAllocation() {
+        AtomicInteger closeCalls = new AtomicInteger();
+        MinecraftGpuResourceOwner owner = new MinecraftGpuResourceOwner(() -> {});
+        MinecraftMeshGpuUpload original =
+                MinecraftMeshGpuUpload.forTesting(4, 80L, closeCalls::incrementAndGet);
+        owner.track(original, new MinecraftGpuResourceOwner.ByteArrayKey(new byte[] {4, 5, 6}));
+
+        MinecraftMeshGpuUpload reused =
+                owner.findReusable(new MinecraftGpuResourceOwner.ByteArrayKey(new byte[] {4, 5, 6}));
+        assertTrue(reused == original);
+        assertEquals(1, owner.allocationCount());
+        assertEquals(80L, owner.allocatedBytes());
+
+        assertTrue(owner.release(reused));
+        assertEquals(0, closeCalls.get());
+        assertTrue(owner.release(original));
+        assertEquals(1, closeCalls.get());
+        assertEquals(0, owner.allocationCount());
+    }
+
+    @Test
+    void differentPayloadKeysDoNotReuseAnAllocation() {
+        MinecraftGpuResourceOwner owner = new MinecraftGpuResourceOwner(() -> {});
+        MinecraftMeshGpuUpload original =
+                MinecraftMeshGpuUpload.forTesting(4, 80L, () -> {});
+        owner.track(original, new MinecraftGpuResourceOwner.ByteArrayKey(new byte[] {1, 2}));
+
+        assertEquals(null, owner.findReusable(
+                new MinecraftGpuResourceOwner.ByteArrayKey(new byte[] {1, 3})));
+        assertEquals(1, owner.allocationCount());
+        owner.release(original);
+    }
+
     @Test
     void sharedUploadClosesOnlyAfterEveryOwnerReferenceIsReleased() {
         AtomicInteger closeCalls = new AtomicInteger();
