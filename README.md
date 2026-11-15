@@ -192,3 +192,13 @@ This connects the baked-model mesher to the GPU upload owner through a section c
 
 ### Full renderer direction
 Radeonium's long-term target is a renderer-owned Minecraft terrain pipeline, including model compilation/meshing, GPU resource ownership, shaders, render pipelines, visibility and correct transparency — while preserving vanilla visual quality. The current Step 7.5 bridge is not that complete renderer yet. See [`docs/full-renderer-roadmap.md`](docs/full-renderer-roadmap.md) for the staged architecture and quality gates.
+
+
+### Full renderer — Milestone A: renderer contract
+- Adds backend-neutral contracts for section build tickets, immutable CPU mesh payloads, GPU mesh handles, terrain layers, frame context and terrain draw descriptors.
+- Defines worker-safe section meshing, render-thread GPU resource ownership, terrain-pass submission and renderer lifecycle interfaces without exposing Minecraft or RenderPearl types in the contract.
+- Adds a render-thread guard for GPU-facing operations and validates/copies mesh payload data at construction.
+- Defines the boundary between Minecraft-owned world/frame resources and Radeonium-owned CPU/GPU resources, including per-layer vanilla fallback requirements.
+- Adds JUnit 5 contract tests. Milestone A is complete only after the CI build-and-test job for its final commit is green.
+
+This is the API and ownership foundation only. It does not yet replace Minecraft's block mesher, shaders, pipelines or transparency system. See [the full renderer roadmap](docs/full-renderer-roadmap.md).
