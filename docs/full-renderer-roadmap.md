@@ -110,9 +110,9 @@ The greedy voxel prototype is deliberately not used as a substitute for Minecraf
 
 ### Remaining acceptance work
 
-- Unit tests cover empty-owner accounting, immutable content-key equality and defensive copying, reference-count transitions/underflow, and rejection of negative allocation sizes.
-- Section rebuilds now prepare all replacement uploads and material references before committing the new cache entry. Failures during preparation release only uncommitted uploads; cleanup errors are attached to the original failure instead of masking it.
-- Remaining: add executable integration coverage for successful GPU allocation/reuse, cache replacement, eviction, repeated release and shutdown, including injected upload/disposal failures.
+- Unit tests cover empty-owner accounting, immutable content-key equality and defensive copying, reference-count transitions/underflow, closed and duplicate upload rejection, byte-accounting overflow cleanup, external-close reconciliation, and retryable disposal/shutdown failures. A controlled upload fixture and injectable render-thread guard exercise owner lifecycle behavior without allocating a real GPU buffer.
+- Section rebuilds prepare replacement uploads and material references before committing the new cache entry. Failures during preparation release only uncommitted uploads; cleanup errors are attached to the original failure instead of masking it.
+- Remaining: add cache-level integration coverage for successful device allocation/reuse, replacement, eviction and cache clear, plus an in-game lifecycle check against the active graphics backend.
 - Run the Gradle build and JUnit suite only after implementation and test authoring are complete; then confirm CI compilation, JUnit tests and JAR packaging.
 
 ## What "Radeonium owns the renderer" means
