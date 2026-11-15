@@ -28,4 +28,18 @@ class MinecraftGpuResourceOwnerTest {
         assertEquals(first.hashCode(), same.hashCode());
         assertNotEquals(first, different);
     }
+    @Test
+    void sharedAllocationsReleaseOnlyAfterTheFinalReference() {
+        MinecraftGpuResourceOwner.Allocation allocation =
+                new MinecraftGpuResourceOwner.Allocation(128L, null);
+
+        allocation.retain();
+        assertEquals(2, allocation.referenceCount());
+        assertFalse(allocation.releaseReference());
+        assertEquals(1, allocation.referenceCount());
+        org.junit.jupiter.api.Assertions.assertTrue(allocation.releaseReference());
+        assertEquals(0, allocation.referenceCount());
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class, allocation::retain);
+    }
+
 }
