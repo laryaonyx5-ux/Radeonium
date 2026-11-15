@@ -39,6 +39,35 @@ public final class MinecraftSectionModelCaptureStore {
         return Boolean.getBoolean("radeonium.captureModelMeshes");
     }
 
+    /** Ticket for a mesh job that completes after the SectionCompiler invocation returns. */
+    public record CaptureTicket(SectionPos position, long epoch, long generation) {}
+
+    public static synchronized CaptureTicket beginAsyncCapture(SectionPos position) {
+        if (position == null) return null;
+        long generation = ++nextGeneration;
+        CAPTURE_GENERATIONS.put(position, generation);
+        while (CAPTURE_GENERATIONS.size() > MAX_ACTIVE_CAPTURES) {
+            CAPTURE_GENERATIONS.remove(CAPTURE_GENERATIONS.keySet().iterator().next());
+        }
+        return new CaptureTicket(position, epoch, generation);
+    }
+
+    public static synchronized Snapshot publishAsync(
+            CaptureTicket ticket, MinecraftSectionModelMesher.SectionModelMesh mesh
+    ) {
+        if (ticket == null || mesh == null || ticket.epoch() != epoch
+                || !Objects.equals(CAPTURE_GENERATIONS.get(ticket.position()), ticket.generation())) return null;
+        CAPTURE_GENERATIONS.remove(ticket.position());
+        return put(ticket.position(), mesh);
+    }
+
+    public static synchronized void abortAsync(CaptureTicket ticket) {
+        if (ticket != null && ticket.epoch() == epoch
+                && Objects.equals(CAPTURE_GENERATIONS.get(ticket.position()), ticket.generation())) {
+            CAPTURE_GENERATIONS.remove(ticket.position());
+        }
+    }
+
     /**
      * Starts a generation before reading models. A newer compile for the same
      * section invalidates older workers even if they finish later.
