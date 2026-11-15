@@ -110,8 +110,6 @@ public final class RendererSectionTracker {
     }
 
     public static void markSectionDirty(int sectionX, int sectionY, int sectionZ) {
-        dev.radeonium.client.render.SectionPos dirty =
-                new dev.radeonium.client.render.SectionPos(sectionX, sectionY, sectionZ);
         // A changed section may alter face occlusion in any neighboring section.
         // Invalidate the CPU snapshot as well as its queued GPU upload: otherwise
         // the removal drain would see a still-current snapshot and keep stale GPU data.
