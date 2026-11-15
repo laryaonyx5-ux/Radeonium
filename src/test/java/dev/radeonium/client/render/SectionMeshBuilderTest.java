@@ -41,8 +41,8 @@ class SectionMeshBuilderTest {
         short[] blocks = new short[4096];
         blocks[index(4, 5, 6)] = 7;
         blocks[index(5, 5, 6)] = 8;
-        // Each material keeps its own exterior faces; the internal face is hidden.
-        assertEquals(36, builder.build(new VoxelSectionSnapshot(blocks)).vertexCount());
+        // Ten exterior quads remain (two shared interior faces are culled).
+        assertEquals(60, builder.build(new VoxelSectionSnapshot(blocks)).vertexCount());
     }
 
     @Test
