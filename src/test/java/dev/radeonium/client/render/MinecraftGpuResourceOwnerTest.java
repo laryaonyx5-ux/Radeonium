@@ -35,6 +35,12 @@ class MinecraftGpuResourceOwnerTest {
 
 
     @Test
+    void payloadKeysRejectNullInput() {
+        assertThrows(IllegalArgumentException.class,
+                () -> new MinecraftGpuResourceOwner.ByteArrayKey(null));
+    }
+
+    @Test
     void ownerTracksAndReleasesOnlyItsOwnUpload() {
         AtomicInteger closeCalls = new AtomicInteger();
         MinecraftGpuResourceOwner owner = new MinecraftGpuResourceOwner(() -> {});
@@ -51,6 +57,39 @@ class MinecraftGpuResourceOwnerTest {
         assertEquals(0L, owner.allocatedBytes());
         assertFalse(owner.release(upload));
         assertEquals(1, closeCalls.get());
+    }
+
+
+    @Test
+    void trackingRejectsClosedUploadsWithoutCountingThem() {
+        MinecraftGpuResourceOwner owner = new MinecraftGpuResourceOwner(() -> {});
+        MinecraftMeshGpuUpload upload = MinecraftMeshGpuUpload.forTesting(4, 48L, () -> {});
+        upload.close();
+
+        assertThrows(IllegalArgumentException.class, () -> owner.track(upload, null));
+        assertEquals(0, owner.allocationCount());
+        assertEquals(0L, owner.allocatedBytes());
+    }
+
+    @Test
+    void accountingOverflowDisposesOnlyTheUntrackedUpload() {
+        AtomicInteger firstClose = new AtomicInteger();
+        AtomicInteger overflowClose = new AtomicInteger();
+        MinecraftGpuResourceOwner owner = new MinecraftGpuResourceOwner(() -> {});
+        MinecraftMeshGpuUpload first =
+                MinecraftMeshGpuUpload.forTesting(4, Long.MAX_VALUE, firstClose::incrementAndGet);
+        MinecraftMeshGpuUpload overflow =
+                MinecraftMeshGpuUpload.forTesting(4, 1L, overflowClose::incrementAndGet);
+
+        owner.track(first, null);
+        assertThrows(ArithmeticException.class, () -> owner.track(overflow, null));
+
+        assertEquals(1, owner.allocationCount());
+        assertEquals(Long.MAX_VALUE, owner.allocatedBytes());
+        assertEquals(0, firstClose.get());
+        assertEquals(1, overflowClose.get());
+        assertFalse(first.isClosed());
+        assertTrue(overflow.isClosed());
     }
 
     @Test
