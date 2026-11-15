@@ -62,8 +62,16 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
         // A later disposal/eviction failure must not release buffers already installed.
         Entry replacement = new Entry(mesh, MinecraftFluidSectionMesher.SectionFluidMesh.empty(), null,
                 Set.of(), layerUploads, materialIndices);
-        Entry previous = sections.put(position, replacement);
-        if (previous != null) previous.close(materials, gpuResources);
+        Entry previous = sections.get(position);
+        if (previous != null) {
+            try {
+                previous.close(materials, gpuResources);
+            } catch (RuntimeException | Error failure) {
+                cleanupFailedReplacement(layerUploads, materialIndices, failure);
+                throw failure;
+            }
+        }
+        sections.put(position, replacement);
         translucentSortCameras.remove(position);
         translucentSortOrders.remove(position);
         evictExcessSections();
@@ -132,11 +140,47 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
         // Keep the old section intact until the complete replacement is prepared.
         Entry replacement = new Entry(combined, sectionMesh.fluidMesh(), sourceSnapshot,
                 Set.copyOf(parityVerifiedLayers), layerUploads, materialIndices);
-        Entry previous = sections.put(position, replacement);
-        if (previous != null) previous.close(materials, gpuResources);
+        Entry previous = sections.get(position);
+        if (previous != null) {
+            try {
+                previous.close(materials, gpuResources);
+            } catch (RuntimeException | Error failure) {
+                cleanupFailedReplacement(layerUploads, materialIndices, failure);
+                throw failure;
+            }
+        }
+        sections.put(position, replacement);
         translucentSortCameras.remove(position);
         translucentSortOrders.remove(position);
         evictExcessSections();
+    }
+
+    /**
+     * Rolls back a fully prepared replacement whose old entry could not be
+     * disposed. Its material references were retained before the old entry closed.
+     */
+    private void cleanupFailedReplacement(
+            EnumMap<ChunkSectionLayer, MinecraftMeshGpuUpload> uploads,
+            int[] materialIndices,
+            Throwable originalFailure
+    ) {
+        for (MinecraftMeshGpuUpload upload : uploads.values()) {
+            try {
+                gpuResources.release(upload);
+            } catch (RuntimeException | Error cleanupFailure) {
+                originalFailure.addSuppressed(cleanupFailure);
+            }
+        }
+        try {
+            materials.release(materialIndices);
+        } catch (RuntimeException | Error cleanupFailure) {
+            originalFailure.addSuppressed(cleanupFailure);
+        }
+        try {
+            materials.discardUnreferenced();
+        } catch (RuntimeException | Error cleanupFailure) {
+            originalFailure.addSuppressed(cleanupFailure);
+        }
     }
 
     /**
@@ -163,29 +207,47 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
 
     private void evictExcessSections() {
         while (sections.size() > MAX_CACHED_SECTIONS || uploadedBytes() > MAX_CACHED_BYTES) {
-            SectionPos oldest = sections.keySet().iterator().next();
-            Entry removed = sections.remove(oldest);
-            if (removed != null) removed.close(materials, gpuResources);
-            translucentSortCameras.remove(oldest);
-            translucentSortOrders.remove(oldest);
+            Map.Entry<SectionPos, Entry> oldest = sections.entrySet().iterator().next();
+            // Keep the entry reachable until all of its references have been released.
+            oldest.getValue().close(materials, gpuResources);
+            SectionPos position = oldest.getKey();
+            sections.remove(position);
+            translucentSortCameras.remove(position);
+            translucentSortOrders.remove(position);
         }
     }
 
     public synchronized void remove(SectionPos position) {
         RenderSystem.assertOnRenderThread();
-        Entry removed = sections.remove(position);
+        Entry entry = sections.get(position);
+        if (entry != null) entry.close(materials, gpuResources);
+        sections.remove(position);
         translucentSortCameras.remove(position);
         translucentSortOrders.remove(position);
-        if (removed != null) removed.close(materials, gpuResources);
     }
 
     public synchronized void clear() {
         RenderSystem.assertOnRenderThread();
-        for (Entry entry : sections.values()) entry.close(materials, gpuResources);
-        sections.clear();
+        RuntimeException failure = null;
+        var iterator = sections.entrySet().iterator();
+        while (iterator.hasNext()) {
+            Map.Entry<SectionPos, Entry> section = iterator.next();
+            try {
+                section.getValue().close(materials, gpuResources);
+                translucentSortCameras.remove(section.getKey());
+                translucentSortOrders.remove(section.getKey());
+                iterator.remove();
+            } catch (RuntimeException exception) {
+                if (failure == null) failure = exception;
+                else failure.addSuppressed(exception);
+            }
+        }
+        // Failed entries remain reachable for a later retry. Do not sweep their
+        // uploads or clear their material slots while they still reference them.
+        if (failure != null) throw failure;
         translucentSortCameras.clear();
         translucentSortOrders.clear();
-        // Sweep any owner-tracked allocation left by an interrupted replacement.
+        // Sweep owner-tracked allocations not associated with a cache entry.
         gpuResources.releaseAll();
         materials.clear();
     }
