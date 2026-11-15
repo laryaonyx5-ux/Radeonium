@@ -110,7 +110,7 @@ The greedy voxel prototype is deliberately not used as a substitute for Minecraf
 
 ### Remaining acceptance work
 
-- Unit tests cover empty-owner accounting, immutable content-key equality and defensive copying, reference-count transitions/underflow, closed and duplicate upload rejection, byte-accounting overflow cleanup, external-close reconciliation, retryable disposal/shutdown failures, and bulk-release recovery while keeping the owner reusable. A controlled upload fixture and injectable render-thread guard exercise owner lifecycle behavior without allocating a real GPU buffer.
+- Unit tests cover empty-owner accounting, immutable content-key equality and defensive copying, reference-count transitions/underflow, content-key reuse and cache misses, closed and duplicate upload rejection, byte-accounting overflow cleanup, external-close reconciliation, retryable disposal/shutdown failures, and bulk-release recovery while keeping the owner reusable. A controlled upload fixture and injectable render-thread guard exercise owner lifecycle behavior without allocating a real GPU buffer.
 - Section rebuilds prepare replacement uploads and material references before committing the new cache entry. Failures during preparation release only uncommitted uploads; cleanup errors are attached to the original failure instead of masking it.
 - Cache removal, eviction and clear keep entries reachable until their GPU/material references have been released. Failed disposal remains retryable, and partially disposed uploads are excluded from draw lookup so vanilla can remain the fallback.
 - Material retain/release transitions validate all affected slots before mutating any reference counts, preventing partial updates on overflow or underflow.
