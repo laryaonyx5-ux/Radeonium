@@ -47,7 +47,7 @@ public final class MinecraftGpuResourceOwner implements AutoCloseable {
             int[] materialIndices,
             List<MinecraftFluidSectionMesher.FluidQuad> fluids
     ) {
-        RenderSystem.assertOnRenderThread();
+        renderThreadCheck.run();
         ensureOpen();
         if (device == null || mesh == null || materialIndices == null || fluids == null) {
             throw new IllegalArgumentException("device, mesh, material indices and fluids are required");
@@ -73,7 +73,7 @@ public final class MinecraftGpuResourceOwner implements AutoCloseable {
             GpuDevice device,
             List<MinecraftMeshGpuUpload.QuadData> quads
     ) {
-        RenderSystem.assertOnRenderThread();
+        renderThreadCheck.run();
         ensureOpen();
         return track(MinecraftMeshGpuUpload.uploadQuadData(device, quads), null);
     }
@@ -105,7 +105,7 @@ public final class MinecraftGpuResourceOwner implements AutoCloseable {
      * the final section releases it. Returns false when already released.
      */
     public boolean release(MinecraftMeshGpuUpload upload) {
-        RenderSystem.assertOnRenderThread();
+        renderThreadCheck.run();
         if (upload == null) return false;
         Allocation allocation = allocations.get(upload);
         if (allocation == null) {
@@ -135,7 +135,7 @@ public final class MinecraftGpuResourceOwner implements AutoCloseable {
 
     /** Releases all currently owned allocations but keeps the owner reusable. */
     public void releaseAll() {
-        RenderSystem.assertOnRenderThread();
+        renderThreadCheck.run();
         List<MinecraftMeshGpuUpload> pending = new ArrayList<>(allocations.keySet());
         RuntimeException failure = null;
         for (MinecraftMeshGpuUpload upload : pending) {
@@ -173,7 +173,7 @@ public final class MinecraftGpuResourceOwner implements AutoCloseable {
 
     @Override
     public void close() {
-        RenderSystem.assertOnRenderThread();
+        renderThreadCheck.run();
         if (closed) return;
         releaseAll();
         closed = allocations.isEmpty();
