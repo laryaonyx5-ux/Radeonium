@@ -26,6 +26,7 @@ import java.util.EnumSet;
 public final class MinecraftSectionGpuCache implements AutoCloseable {
     private final MinecraftBlockModelMesher mesher = new MinecraftBlockModelMesher();
     private final MinecraftMaterialTable materials = new MinecraftMaterialTable();
+    private final MinecraftGpuResourceOwner gpuResources = new MinecraftGpuResourceOwner();
     private static final int MAX_CACHED_SECTIONS = 64;
     private static final long MAX_CACHED_BYTES = 64L * 1024L * 1024L;
     private final Map<SectionPos, Entry> sections = new LinkedHashMap<>(16, 0.75f, true);
@@ -46,7 +47,7 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
                 MinecraftBlockModelMesh layerMesh = mesh.forLayer(layer);
                 if (layerMesh.quadCount() > 0) {
                     int[] layerMaterialIndices = materials.register(layerMesh);
-                    layerUploads.put(layer, MinecraftMeshGpuUpload.upload(layerMesh, layerMaterialIndices));
+                    layerUploads.put(layer, gpuResources.upload(layerMesh, layerMaterialIndices));
                 }
             }
             int[] materialIndices = materials.register(mesh);
@@ -54,12 +55,12 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
             Entry replacement = new Entry(mesh, MinecraftFluidSectionMesher.SectionFluidMesh.empty(), null,
                     Set.of(), layerUploads, materialIndices);
             Entry previous = sections.put(position, replacement);
-            if (previous != null) previous.close(materials);
+            if (previous != null) previous.close(materials, gpuResources);
             translucentSortCameras.remove(position);
             translucentSortOrders.remove(position);
             evictExcessSections();
         } catch (RuntimeException | Error failure) {
-            for (MinecraftMeshGpuUpload upload : layerUploads.values()) upload.close();
+            for (MinecraftMeshGpuUpload upload : layerUploads.values()) gpuResources.release(upload);
             materials.discardUnreferenced();
             throw failure;
         }
@@ -110,7 +111,7 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
                 if (layerMesh.quadCount() > 0 || !fluidLayer.quads().isEmpty()) {
                     allQuads.addAll(layerMesh.quads());
                     int[] layerMaterialIndices = materials.register(layerMesh);
-                    layerUploads.put(layer, MinecraftMeshGpuUpload.upload(
+                    layerUploads.put(layer, gpuResources.upload(
                             com.mojang.blaze3d.systems.RenderSystem.getDevice(),
                             layerMesh, layerMaterialIndices, fluidLayer.quads()));
                 }
@@ -136,7 +137,7 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
         while (sections.size() > MAX_CACHED_SECTIONS || uploadedBytes() > MAX_CACHED_BYTES) {
             SectionPos oldest = sections.keySet().iterator().next();
             Entry removed = sections.remove(oldest);
-            if (removed != null) removed.close(materials);
+            if (removed != null) removed.close(materials, gpuResources);
             translucentSortCameras.remove(oldest);
             translucentSortOrders.remove(oldest);
         }
@@ -152,7 +153,7 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
 
     public synchronized void clear() {
         RenderSystem.assertOnRenderThread();
-        for (Entry entry : sections.values()) entry.close(materials);
+        for (Entry entry : sections.values()) entry.close(materials, gpuResources);
         sections.clear();
         translucentSortCameras.clear();
         translucentSortOrders.clear();
@@ -227,14 +228,14 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
                             sorted.stream().map(SortableQuad::quad).toList();
                     MinecraftMeshGpuUpload replacement;
                     try {
-                        replacement = MinecraftMeshGpuUpload.uploadQuadData(RenderSystem.getDevice(), ordered);
+                        replacement = gpuResources.uploadQuadData(RenderSystem.getDevice(), ordered);
                     } catch (RuntimeException uploadFailure) {
                         // Keep the previous valid upload (or let the caller use vanilla)
                         // rather than failing the entire frame on a sort-buffer allocation.
                         return null;
                     }
                     MinecraftMeshGpuUpload previous = entry.layerUploads.put(layer, replacement);
-                    if (previous != null) previous.close();
+                    if (previous != null) gpuResources.release(previous);
                     translucentSortOrders.put(position, nextOrder);
                 }
                 translucentSortCameras.put(position, cameraPosition);
@@ -374,7 +375,10 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
     public synchronized MinecraftMaterialTable materialTable() { return materials; }
 
     @Override
-    public void close() { clear(); }
+    public void close() {
+        clear();
+        gpuResources.close();
+    }
 
     private record Entry(
             MinecraftBlockModelMesh mesh,
@@ -391,8 +395,8 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
             materialIndices = materialIndices.clone();
         }
 
-        private void close(MinecraftMaterialTable materials) {
-            for (MinecraftMeshGpuUpload upload : layerUploads.values()) upload.close();
+        private void close(MinecraftMaterialTable materials, MinecraftGpuResourceOwner gpuResources) {
+            for (MinecraftMeshGpuUpload upload : layerUploads.values()) gpuResources.release(upload);
             materials.release(materialIndices);
         }
     }
