@@ -166,7 +166,7 @@ public final class MinecraftBlockModelMesh {
                 target.putFloat(positions[offset]);
                 target.putFloat(positions[offset + 1]);
                 target.putFloat(positions[offset + 2]);
-                int color = multiplyArgb(vertexColors[vertex], tintColor);
+                int color = net.minecraft.util.ARGB.multiply(vertexColors[vertex], tintColor);
                 target.put((byte) (color >>> 16));
                 target.put((byte) (color >>> 8));
                 target.put((byte) color);
@@ -178,13 +178,6 @@ public final class MinecraftBlockModelMesh {
             }
         }
 
-        private static int multiplyArgb(int color, int tint) {
-            if (tint == -1) return color;
-            int a = ((color >>> 24) & 255) * ((tint >>> 24) & 255) / 255;
-            int r = ((color >>> 16) & 255) * ((tint >>> 16) & 255) / 255;
-            int g = ((color >>> 8) & 255) * ((tint >>> 8) & 255) / 255;
-            int b = (color & 255) * (tint & 255) / 255;
-            return (a << 24) | (r << 16) | (g << 8) | b;
-        }
+
     }
 }
