@@ -2,22 +2,21 @@ package dev.radeonium.client.render;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.Arrays;
 
 /**
- * Greedy voxel mesher for immutable section snapshots.
+ * Greedy mesher for immutable opaque-material section snapshots.
  *
- * Adjacent coplanar faces with the same material are merged into one quad.
- * The output is a private Radeonium vertex format (position, normal, material)
- * and is not yet a Minecraft terrain draw format.
+ * Coplanar faces with the same material are merged. A one-cell neighbor halo
+ * allows faces on section borders to be culled without creating seams.
+ * This is a conservative opaque-voxel path, not a replacement for Minecraft's
+ * baked-model, translucent, fluid, tint or lighting semantics.
  */
 public final class SectionMeshBuilder {
-    private static final int FLOATS_PER_VERTEX = 7;
-
     public SectionMesh build(VoxelSectionSnapshot snapshot) {
         if (snapshot == null) throw new IllegalArgumentException("snapshot cannot be null");
 
         FloatBuilder output = new FloatBuilder(4096);
-        int quadCount = 0;
         short[] mask = new short[16 * 16];
 
         for (int axis = 0; axis < 3; axis++) {
@@ -26,7 +25,7 @@ public final class SectionMeshBuilder {
 
             for (int sign : new int[]{-1, 1}) {
                 for (int slice = 0; slice < 16; slice++) {
-                    java.util.Arrays.fill(mask, (short) 0);
+                    Arrays.fill(mask, (short) 0);
 
                     for (int v = 0; v < 16; v++) {
                         for (int u = 0; u < 16; u++) {
@@ -36,7 +35,7 @@ public final class SectionMeshBuilder {
 
                             int[] neighbor = p.clone();
                             neighbor[axis] += sign;
-                            if (snapshot.materialAt(neighbor[0], neighbor[1], neighbor[2]) == 0) {
+                            if (!snapshot.occludesFace(neighbor[0], neighbor[1], neighbor[2])) {
                                 mask[u + v * 16] = material;
                             }
                         }
@@ -68,7 +67,6 @@ public final class SectionMeshBuilder {
                             float plane = slice + (sign > 0 ? 1.0f : 0.0f);
                             emitQuad(output, axis, uAxis, vAxis, plane, u, v,
                                     width, height, sign, material);
-                            quadCount++;
 
                             for (int dy = 0; dy < height; dy++) {
                                 for (int dx = 0; dx < width; dx++) {
@@ -85,7 +83,7 @@ public final class SectionMeshBuilder {
         ByteBuffer bytes = ByteBuffer.allocate(output.size() * Float.BYTES)
                 .order(ByteOrder.nativeOrder());
         output.writeTo(bytes);
-        return new SectionMesh(bytes.array(), quadCount * 6);
+        return new SectionMesh(bytes.array(), output.size() / SectionMesh.FLOATS_PER_VERTEX);
     }
 
     private static int[] coordinates(int axis, int uAxis, int vAxis,
@@ -131,7 +129,6 @@ public final class SectionMeshBuilder {
         point[vAxis] = v;
     }
 
-    /** Small growable primitive buffer: avoids allocating a worst-case 41 MiB per section. */
     private static final class FloatBuilder {
         private float[] values;
         private int size;
@@ -142,7 +139,7 @@ public final class SectionMeshBuilder {
 
         private void add(float value) {
             if (size == values.length) {
-                values = java.util.Arrays.copyOf(values, Math.max(16, values.length * 2));
+                values = Arrays.copyOf(values, Math.max(16, values.length * 2));
             }
             values[size++] = value;
         }
