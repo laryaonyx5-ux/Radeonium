@@ -20,33 +20,41 @@ class TerrainShaderContractTest {
     }
 
     @Test
-    void shaderResourcesDeclareTheRequiredTerrainInputsAndOutputs() throws IOException {
+    void shaderResourcesMatchTheActiveMinecraftTerrainInterface() throws IOException {
         String vertex = read(TerrainShaderContract.VERTEX_SHADER);
         String fragment = read(TerrainShaderContract.FRAGMENT_SHADER);
         assertAll(
-                () -> assertTrue(vertex.contains("in vec3 Position")),
-                () -> assertTrue(vertex.contains("in vec4 Color")),
-                () -> assertTrue(vertex.contains("in vec2 UV0")),
-                () -> assertTrue(vertex.contains("in ivec2 UV2")),
-                () -> assertTrue(vertex.contains("uniform mat4 ModelViewProjection")),
-                () -> assertTrue(vertex.contains("uniform mat4 ModelView")),
-                () -> assertTrue(fragment.contains("uniform sampler2D BlockAtlas")),
-                () -> assertTrue(fragment.contains("uniform sampler2D LightMap")),
-                () -> assertTrue(fragment.contains("uniform vec4 FogColor")),
-                () -> assertTrue(fragment.contains("uniform float AlphaCutoff")),
-                () -> assertTrue(fragment.contains("discard")),
-                () -> assertTrue(fragment.contains("VertexColor"))
+                () -> assertTrue(vertex.contains("#include <minecraft:globals.glsl>")),
+                () -> assertTrue(vertex.contains("#include <minecraft:chunksection.glsl>")),
+                () -> assertTrue(vertex.contains("#include <minecraft:projection.glsl>")),
+                () -> assertTrue(vertex.contains("#include <minecraft:sample_lightmap.glsl>")),
+                () -> assertTrue(vertex.contains("layout(location = 0) in vec3 Position")),
+                () -> assertTrue(vertex.contains("layout(location = 1) in vec4 Color")),
+                () -> assertTrue(vertex.contains("layout(location = 2) in vec2 UV0")),
+                () -> assertTrue(vertex.contains("layout(location = 3) in ivec2 UV2")),
+                () -> assertTrue(vertex.contains("uniform sampler2D Sampler2")),
+                () -> assertTrue(vertex.contains("fog_spherical_distance")),
+                () -> assertTrue(vertex.contains("sample_lightmap(Sampler2, UV2)")),
+                () -> assertTrue(fragment.contains("#include <minecraft:fog.glsl>")),
+                () -> assertTrue(fragment.contains("#include <minecraft:chunksection.glsl>")),
+                () -> assertTrue(fragment.contains("uniform sampler2D Sampler0")),
+                () -> assertTrue(fragment.contains("ChunkVisibility")),
+                () -> assertTrue(fragment.contains("FogEnvironmentalStart")),
+                () -> assertTrue(fragment.contains("FogRenderDistanceEnd")),
+                () -> assertTrue(fragment.contains("apply_fog(")),
+                () -> assertTrue(fragment.contains("ALPHA_CUTOUT"))
         );
     }
 
     @Test
-    void shaderContractListsAllPipelineUniforms() {
-        assertTrue(TerrainShaderContract.VERTEX_UNIFORMS.contains("ModelViewProjection"));
-        assertTrue(TerrainShaderContract.VERTEX_UNIFORMS.contains("ModelView"));
-        assertTrue(TerrainShaderContract.FRAGMENT_UNIFORMS.contains("BlockAtlas"));
-        assertTrue(TerrainShaderContract.FRAGMENT_UNIFORMS.contains("LightMap"));
+    void shaderContractExposesThePipelineShaderIdentifiersAndBoundUniforms() {
+        assertEquals("radeonium:core/terrain", TerrainShaderContract.VERTEX_SHADER_ID);
+        assertEquals("radeonium:core/terrain", TerrainShaderContract.FRAGMENT_SHADER_ID);
+        assertTrue(TerrainShaderContract.VERTEX_UNIFORMS.contains("ModelViewMat"));
+        assertTrue(TerrainShaderContract.VERTEX_UNIFORMS.contains("ProjMat"));
+        assertTrue(TerrainShaderContract.FRAGMENT_UNIFORMS.contains("Sampler0"));
         assertTrue(TerrainShaderContract.FRAGMENT_UNIFORMS.contains("FogColor"));
-        assertTrue(TerrainShaderContract.FRAGMENT_UNIFORMS.contains("AlphaCutoff"));
+        assertTrue(TerrainShaderContract.FRAGMENT_UNIFORMS.contains("ChunkVisibility"));
     }
 
     private static String read(String path) throws IOException {
