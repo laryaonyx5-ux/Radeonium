@@ -294,7 +294,11 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
         if (entry == null) return null;
         if (entry.sourceSnapshot == null
                 || MinecraftSectionModelCaptureStore.get(entry.sourceSnapshot.position()) != entry.sourceSnapshot) {
-            remove(position);
+            try {
+                remove(position);
+            } catch (RuntimeException disposalFailure) {
+                // Keep the entry reachable for a later disposal retry; vanilla remains the fallback.
+            }
             return null;
         }
         if (!entry.parityVerified.contains(layer)) return null;
@@ -333,7 +337,11 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
                 }
                 translucentSortCameras.put(position, cameraPosition);
                 if (MinecraftSectionModelCaptureStore.get(entry.sourceSnapshot.position()) != entry.sourceSnapshot) {
-                    remove(position);
+                    try {
+                        remove(position);
+                    } catch (RuntimeException disposalFailure) {
+                        // Keep the stale entry reachable for a later disposal retry.
+                    }
                     return null;
                 }
             }
