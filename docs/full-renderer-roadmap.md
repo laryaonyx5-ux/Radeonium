@@ -93,6 +93,26 @@ Milestone B must not begin until the final CI item is green. This milestone does
 
 The greedy voxel prototype is deliberately not used as a substitute for Minecraft's baked-model semantics. Until every acceptance blocker is closed, vanilla terrain remains authoritative and Radeonium must fall back rather than omit or simplify geometry.
 
+## Milestone C — GPU resource owner
+
+**Status: implementation in progress; CI validation and allocation-reuse coverage remain open.**
+
+### Implemented foundation
+
+- Adds `MinecraftGpuResourceOwner` as the single owner for Radeonium-created terrain vertex uploads.
+- Routes section-cache allocations, translucent re-uploads, replacement and eviction through that owner.
+- Tracks active upload count and allocated GPU bytes by upload identity.
+- Rejects attempts to release a live upload not owned by this manager and makes repeated release safe.
+- Provides a render-thread-only bulk release path and deterministic shutdown.
+- Keeps Minecraft-owned buffers outside Radeonium's ownership boundary.
+
+### Remaining acceptance work
+
+- Add and run focused lifecycle/accounting tests for successful allocation, replacement, release, repeated release and shutdown.
+- Implement and verify safe reuse of compatible allocations where the RenderPearl API permits it; do not assume a buffer can be rewritten unless the active API explicitly supports it.
+- Confirm cache eviction and failed rebuilds leave no leaked Radeonium allocations.
+- Confirm CI compilation, JUnit tests and JAR packaging are green after this milestone's final changes.
+
 ## What "Radeonium owns the renderer" means
 
 Radeonium must eventually own these responsibilities:
