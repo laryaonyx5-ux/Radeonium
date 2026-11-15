@@ -44,6 +44,31 @@ class MinecraftSectionModelCaptureStoreTest {
     }
 
     @Test
+    void stagedMeshIsPublishedOnlyAfterSuccessfulCompileCompletion() {
+        SectionPos position = SectionPos.of(8, 2, 1);
+        var mesh = new MinecraftSectionModelMesher().buildResolved(List.of());
+
+        MinecraftSectionModelCaptureStore.stage(position, mesh);
+        assertNull(MinecraftSectionModelCaptureStore.get(position));
+
+        var snapshot = MinecraftSectionModelCaptureStore.complete(position);
+        assertNotNull(snapshot);
+        assertSame(snapshot, MinecraftSectionModelCaptureStore.get(position));
+    }
+
+    @Test
+    void clearInvalidatesUnfinishedWorkerCaptures() {
+        SectionPos position = SectionPos.of(9, 2, 1);
+        var mesh = new MinecraftSectionModelMesher().buildResolved(List.of());
+
+        MinecraftSectionModelCaptureStore.stage(position, mesh);
+        MinecraftSectionModelCaptureStore.clear();
+
+        assertNull(MinecraftSectionModelCaptureStore.complete(position));
+        assertNull(MinecraftSectionModelCaptureStore.get(position));
+    }
+
+    @Test
     void removeAndClearReleaseCapturedSections() {
         SectionPos position = SectionPos.of(5, 6, 7);
         var mesh = new MinecraftSectionModelMesher().buildResolved(List.of());
