@@ -111,6 +111,27 @@ class FluidSectionMesherTest {
     }
 
     @Test
+    void everyFluidQuadWindingAgreesWithItsOutwardNormal() {
+        short[] ids = new short[4096]; byte[] heights = new byte[4096];
+        int[] tints = new int[4096], lights = new int[4096];
+        int cell = 1 + 16 * (1 + 16 * 1);
+        ids[cell] = 1;
+        heights[cell] = 8;
+
+        var mesh = new FluidSectionMesher().build(new FluidSectionSnapshot(ids, heights, tints, lights));
+        for (var quad : mesh.quads()) {
+            float[] p = quad.positions();
+            float ax = p[3] - p[0], ay = p[4] - p[1], az = p[5] - p[2];
+            float bx = p[6] - p[0], by = p[7] - p[1], bz = p[8] - p[2];
+            float nx = ay * bz - az * by;
+            float ny = az * bx - ax * bz;
+            float nz = ax * by - ay * bx;
+            float dot = nx * quad.normalX() + ny * quad.normalY() + nz * quad.normalZ();
+            assertTrue(dot > 0.0f, "quad winding must face its declared outward normal");
+        }
+    }
+
+    @Test
     void usesNeighborHaloToInterpolateSurfaceAtSectionEdge() {
         short[] ids = new short[18 * 18 * 18]; byte[] heights = new byte[18 * 18 * 18];
         int[] tints = new int[18 * 18 * 18], lights = new int[18 * 18 * 18];
