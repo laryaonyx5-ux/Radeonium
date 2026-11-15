@@ -95,7 +95,7 @@ The greedy voxel prototype is deliberately not used as a substitute for Minecraf
 
 ## Milestone C — GPU resource owner
 
-**Status: implementation complete; automated CI validation pending; in-game device validation pending.**
+**Status: implementation complete; Gradle build, JUnit tests and mod JAR packaging green; in-game device validation pending.**
 
 ### Implemented foundation
 
@@ -115,8 +115,8 @@ The greedy voxel prototype is deliberately not used as a substitute for Minecraf
 - Cache removal, eviction and clear keep entries reachable until their GPU/material references have been released. Failed disposal remains retryable, and partially disposed uploads are excluded from draw lookup so vanilla can remain the fallback.
 - Material retain/release transitions validate all affected slots before mutating any reference counts, preventing partial updates on overflow or underflow.
 - Cache lifecycle tests exercise empty-section replacement, removal, LRU and byte-budget eviction, GPU-upload replacement, shared uploads across sections, failed replacement rollback, retryable remove/clear disposal, and shutdown using controlled upload fixtures and an injected render-thread guard.
-- Automated owner tests cover content-key cache hits/misses, reference sharing, accounting overflow, foreign/closed upload rejection, bulk release recovery, and retryable disposal. Actual device allocation and disposal still require an in-game check against the active graphics backend.
-- Implementation and test authoring are complete. The next push triggers the configured Gradle clean build, JUnit suite and mod JAR packaging; CI results will determine whether any code correction is needed.
+- Automated owner tests cover content-key cache hits/misses, reference sharing, accounting overflow, foreign/closed upload rejection, bulk release recovery, and retryable disposal. Cache commits reject foreign or closed uploads before replacing a valid entry. Actual device allocation and disposal still require an in-game check against the active graphics backend.
+- The configured GitHub Actions `clean build` completed successfully for commit `ca2a5f5`; compilation, JUnit tests and mod JAR artifact packaging all passed.
 
 ## What "Radeonium owns the renderer" means
 
