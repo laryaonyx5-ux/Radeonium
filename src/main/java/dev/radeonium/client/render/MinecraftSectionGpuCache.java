@@ -13,6 +13,8 @@ import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.world.phys.Vec3;
 import java.util.Map;
+import java.util.Set;
+import java.util.EnumSet;
 
 /**
  * Owns layer-separated GPU uploads and material indices produced from baked models.
@@ -48,7 +50,8 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
             }
             int[] materialIndices = materials.register(mesh);
             materials.retain(materialIndices);
-            Entry replacement = new Entry(mesh, MinecraftFluidSectionMesher.SectionFluidMesh.empty(), null, layerUploads, materialIndices);
+            Entry replacement = new Entry(mesh, MinecraftFluidSectionMesher.SectionFluidMesh.empty(), null,
+                    Set.of(), layerUploads, materialIndices);
             Entry previous = sections.put(position, replacement);
             if (previous != null) previous.close(materials);
             translucentSortCameras.remove(position);
@@ -68,24 +71,29 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
     public synchronized void rebuild(
             SectionPos position, MinecraftSectionModelMesher.SectionModelMesh sectionMesh
     ) {
-        rebuild(position, sectionMesh, null);
+        rebuild(position, sectionMesh, null, Set.of());
     }
 
-    /** Installs a mesh while retaining its generation token for stale-draw rejection. */
+    /** Installs only layers that passed exact parity against Minecraft's compiled bytes. */
     public synchronized void rebuild(
-            SectionPos position, MinecraftSectionModelCaptureStore.Snapshot snapshot
+            SectionPos position,
+            MinecraftSectionModelCaptureStore.Snapshot snapshot,
+            Set<ChunkSectionLayer> parityVerifiedLayers
     ) {
-        if (snapshot == null) throw new IllegalArgumentException("snapshot cannot be null");
-        rebuild(position, snapshot.mesh(), snapshot);
+        if (snapshot == null || parityVerifiedLayers == null) {
+            throw new IllegalArgumentException("snapshot and parityVerifiedLayers are required");
+        }
+        rebuild(position, snapshot.mesh(), snapshot, parityVerifiedLayers);
     }
 
     private synchronized void rebuild(
             SectionPos position,
             MinecraftSectionModelMesher.SectionModelMesh sectionMesh,
-            MinecraftSectionModelCaptureStore.Snapshot sourceSnapshot
+            MinecraftSectionModelCaptureStore.Snapshot sourceSnapshot,
+            Set<ChunkSectionLayer> parityVerifiedLayers
     ) {
         RenderSystem.assertOnRenderThread();
-        if (position == null || sectionMesh == null) {
+        if (position == null || sectionMesh == null || parityVerifiedLayers == null) {
             throw new IllegalArgumentException("position and sectionMesh are required");
         }
 
@@ -94,6 +102,7 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
         List<MinecraftBlockModelMesh.Quad> allQuads = new ArrayList<>();
         try {
             for (ChunkSectionLayer layer : ChunkSectionLayer.values()) {
+                if (!parityVerifiedLayers.contains(layer)) continue;
                 MinecraftBlockModelMesh layerMesh = sectionMesh.layer(layer);
                 MinecraftFluidSectionMesher.FluidLayerMesh fluidLayer = sectionMesh.fluids(layer);
                 if (layerMesh.quadCount() > 0 || !fluidLayer.quads().isEmpty()) {
@@ -107,7 +116,8 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
             MinecraftBlockModelMesh combined = new MinecraftBlockModelMesh(allQuads);
             int[] materialIndices = materials.register(combined);
             materials.retain(materialIndices);
-            Entry replacement = new Entry(combined, sectionMesh.fluidMesh(), sourceSnapshot, layerUploads, materialIndices);
+            Entry replacement = new Entry(combined, sectionMesh.fluidMesh(), sourceSnapshot,
+                    Set.copyOf(parityVerifiedLayers), layerUploads, materialIndices);
             Entry previous = sections.put(position, replacement);
             if (previous != null) previous.close(materials);
             translucentSortCameras.remove(position);
@@ -181,7 +191,7 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
     ) {
         if (position == null || layer == null) return null;
         Entry entry = sections.get(position);
-        if (entry == null || entry.sourceSnapshot == null
+        if (entry == null || entry.sourceSnapshot == null || !entry.parityVerified.contains(layer)
                 || MinecraftSectionModelCaptureStore.get(entry.sourceSnapshot.position()) != entry.sourceSnapshot) {
             return null;
         }
@@ -344,11 +354,13 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
             MinecraftBlockModelMesh mesh,
             MinecraftFluidSectionMesher.SectionFluidMesh fluids,
             MinecraftSectionModelCaptureStore.Snapshot sourceSnapshot,
+            Set<ChunkSectionLayer> parityVerified,
             EnumMap<ChunkSectionLayer, MinecraftMeshGpuUpload> layerUploads,
             int[] materialIndices
     ) {
         private Entry {
-            if (fluids == null) throw new IllegalArgumentException("fluids cannot be null");
+            if (fluids == null || parityVerified == null) throw new IllegalArgumentException("fluids and parity verification cannot be null");
+            parityVerified = Set.copyOf(parityVerified);
             layerUploads = new EnumMap<>(layerUploads);
             materialIndices = materialIndices.clone();
         }
