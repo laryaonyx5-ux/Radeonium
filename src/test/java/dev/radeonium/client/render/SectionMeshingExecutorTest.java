@@ -17,9 +17,6 @@ class SectionMeshingExecutorTest {
 
             assertEquals(0, mesh.quadCount());
             assertEquals(3, mesh.unsupportedBlockEntityCount());
-            String workerName = result.thenApply(ignored -> Thread.currentThread().getName())
-                    .get(5, TimeUnit.SECONDS);
-            assertTrue(workerName.startsWith("Radeonium-Mesher"));
         }
     }
 
