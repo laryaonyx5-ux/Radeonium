@@ -97,6 +97,36 @@ class MinecraftGpuResourceOwnerTest {
         assertEquals(0, owner.allocationCount());
     }
 
+
+    @Test
+    void getOrCreateInvokesUploadFactoryOnlyForAContentCacheMiss() {
+        AtomicInteger factoryCalls = new AtomicInteger();
+        AtomicInteger closeCalls = new AtomicInteger();
+        MinecraftGpuResourceOwner owner = new MinecraftGpuResourceOwner(() -> {});
+        MinecraftGpuResourceOwner.ByteArrayKey firstKey =
+                new MinecraftGpuResourceOwner.ByteArrayKey(new byte[] {9, 8, 7});
+        MinecraftGpuResourceOwner.ByteArrayKey equalKey =
+                new MinecraftGpuResourceOwner.ByteArrayKey(new byte[] {9, 8, 7});
+
+        MinecraftMeshGpuUpload first = owner.getOrCreate(firstKey, () -> {
+            factoryCalls.incrementAndGet();
+            return MinecraftMeshGpuUpload.forTesting(4, 72L, closeCalls::incrementAndGet);
+        });
+        MinecraftMeshGpuUpload second = owner.getOrCreate(equalKey, () -> {
+            factoryCalls.incrementAndGet();
+            return MinecraftMeshGpuUpload.forTesting(4, 72L, closeCalls::incrementAndGet);
+        });
+
+        assertTrue(first == second);
+        assertEquals(1, factoryCalls.get());
+        assertEquals(1, owner.allocationCount());
+        assertEquals(72L, owner.allocatedBytes());
+        owner.release(first);
+        assertEquals(0, closeCalls.get());
+        owner.release(second);
+        assertEquals(1, closeCalls.get());
+    }
+
     @Test
     void differentPayloadKeysDoNotReuseAnAllocation() {
         MinecraftGpuResourceOwner owner = new MinecraftGpuResourceOwner(() -> {});
