@@ -44,8 +44,11 @@ public final class RadeoniumClient implements ClientModInitializer {
     private static final ArrayBlockingQueue<MinecraftCompiledGeometryStore.Snapshot> PENDING_GEOMETRY_UPLOADS =
             new ArrayBlockingQueue<>(MAX_PENDING_GEOMETRY_UPLOADS);
     private static final int MAX_PENDING_MODEL_UPLOADS = 128;
+    private static final int MAX_PENDING_MODEL_REMOVALS = 256;
     private static final ArrayBlockingQueue<MinecraftSectionModelCaptureStore.Snapshot> PENDING_MODEL_UPLOADS =
             new ArrayBlockingQueue<>(MAX_PENDING_MODEL_UPLOADS);
+    private static final ArrayBlockingQueue<net.minecraft.core.SectionPos> PENDING_MODEL_REMOVALS =
+            new ArrayBlockingQueue<>(MAX_PENDING_MODEL_REMOVALS);
     private static final AtomicBoolean INVALIDATE_MODEL_GPU_CACHE = new AtomicBoolean();
 
     public static void queueCompiledGeometryUpload(MinecraftCompiledGeometryStore.Snapshot snapshot) {
@@ -70,6 +73,22 @@ public final class RadeoniumClient implements ClientModInitializer {
         if (snapshot == null) return;
         while (!PENDING_MODEL_UPLOADS.offer(snapshot)) {
             PENDING_MODEL_UPLOADS.poll();
+        }
+    }
+
+    public static void queueSectionModelRemoval(net.minecraft.core.SectionPos position) {
+        if (position == null) return;
+        if (!PENDING_MODEL_REMOVALS.offer(position)) INVALIDATE_MODEL_GPU_CACHE.set(true);
+    }
+
+    private static void drainSectionModelRemovals() {
+        for (int i = 0; i < 16; i++) {
+            net.minecraft.core.SectionPos position = PENDING_MODEL_REMOVALS.poll();
+            if (position == null) break;
+            if (MinecraftSectionModelCaptureStore.get(position) == null) {
+                MINECRAFT_GPU_CACHE.remove(new dev.radeonium.client.render.SectionPos(
+                        position.x(), position.y(), position.z()));
+            }
         }
     }
 
@@ -131,6 +150,7 @@ public final class RadeoniumClient implements ClientModInitializer {
                         // Baked quads and materials are tied to the current model/atlas reload.
                         MinecraftSectionModelCaptureStore.clear();
                         PENDING_MODEL_UPLOADS.clear();
+                        PENDING_MODEL_REMOVALS.clear();
                         INVALIDATE_MODEL_GPU_CACHE.set(true);
                     }
                 }
@@ -143,6 +163,7 @@ public final class RadeoniumClient implements ClientModInitializer {
             COMPILED_GEOMETRY_GPU_CACHE.close();
             PENDING_GEOMETRY_UPLOADS.clear();
             PENDING_MODEL_UPLOADS.clear();
+            PENDING_MODEL_REMOVALS.clear();
             MinecraftCompiledGeometryStore.clear();
             MinecraftSectionModelCaptureStore.clear();
             RendererSectionTracker.reset();
@@ -150,6 +171,7 @@ public final class RadeoniumClient implements ClientModInitializer {
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             if (INVALIDATE_MODEL_GPU_CACHE.getAndSet(false)) MINECRAFT_GPU_CACHE.clear();
             drainCompiledGeometryUploads();
+            drainSectionModelRemovals();
             drainSectionModelUploads();
             // Fabric API versions used by this project do not expose a world-unload event.
             // Detect level identity changes on the client tick instead.
@@ -160,6 +182,7 @@ public final class RadeoniumClient implements ClientModInitializer {
                     COMPILED_GEOMETRY_GPU_CACHE.clear();
                     PENDING_GEOMETRY_UPLOADS.clear();
                     PENDING_MODEL_UPLOADS.clear();
+                    PENDING_MODEL_REMOVALS.clear();
                     MinecraftCompiledGeometryStore.clear();
                     MinecraftSectionModelCaptureStore.clear();
                 }
