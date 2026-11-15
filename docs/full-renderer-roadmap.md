@@ -114,7 +114,7 @@ The greedy voxel prototype is deliberately not used as a substitute for Minecraf
 - Section rebuilds prepare replacement uploads and material references before committing the new cache entry. Failures during preparation release only uncommitted uploads; cleanup errors are attached to the original failure instead of masking it.
 - Cache removal, eviction and clear keep entries reachable until their GPU/material references have been released. Failed disposal remains retryable, and partially disposed uploads are excluded from draw lookup so vanilla can remain the fallback.
 - Material retain/release transitions validate all affected slots before mutating any reference counts, preventing partial updates on overflow or underflow.
-- Cache lifecycle tests now exercise empty-section replacement, removal, repeated clear and shutdown with an injected render-thread guard. Remaining: add cache-level integration coverage for successful device allocation/reuse, eviction and disposal failures, plus an in-game lifecycle check against the active graphics backend.
+- Cache lifecycle tests exercise empty-section replacement, removal, bounded eviction, GPU-upload replacement, failed replacement rollback, retryable remove/clear disposal, and shutdown using controlled upload fixtures and an injected render-thread guard. Remaining: validate actual device allocation/reuse and disposal against the active graphics backend in-game.
 - Run the Gradle build and JUnit suite only after implementation and test authoring are complete; then confirm CI compilation, JUnit tests and JAR packaging.
 
 ## What "Radeonium owns the renderer" means
