@@ -87,9 +87,10 @@ class FluidSectionMesherTest {
         assertEquals(p[0], p[3], 1.0e-6f);
         assertEquals(p[0], p[6], 1.0e-6f);
         assertEquals(p[0], p[9], 1.0e-6f);
-        assertEquals(1.0f, p[10], 1.0e-6f);
+        assertEquals(2.0f, p[10], 1.0e-6f);
         assertEquals(1.0f, p[4], 1.0e-6f);
         assertEquals(2.0f, p[7], 1.0e-6f);
+        assertEquals(1.0f, p[11], 1.0e-6f);
     }
 
     @Test
