@@ -17,7 +17,7 @@ public final class MinecraftSectionModelCaptureStore {
     private static final LinkedHashMap<SectionPos, Snapshot> SNAPSHOTS =
             new LinkedHashMap<>(32, 0.75f, true);
     private static int retainedQuads;
-    private static long epoch;
+    private static volatile long epoch;
     private static final ThreadLocal<LinkedHashMap<SectionPos, PendingCapture>> PENDING =
             ThreadLocal.withInitial(() -> new LinkedHashMap<>(16, 0.75f, true));
 
