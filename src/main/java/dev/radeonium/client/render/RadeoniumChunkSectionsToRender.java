@@ -102,6 +102,8 @@ public final class RadeoniumChunkSectionsToRender {
         }
 
         ArrayList<DynamicGpuData.ChunkSectionInfo> sectionInfos = new ArrayList<>();
+        List<TranslucentSectionOrder.Entry<RenderPass.Draw<GpuBufferSlice[]>>> translucentDraws =
+                new ArrayList<>();
         int largestDefaultIndexCount = 0;
 
         if (dispatcher != null) {
@@ -190,7 +192,7 @@ public final class RadeoniumChunkSectionsToRender {
                         }
 
                         final int uniformIndex = sectionInfoIndex;
-                        draws.get(layer).add(new RenderPass.Draw<>(
+                        RenderPass.Draw<GpuBufferSlice[]> draw = new RenderPass.Draw<>(
                                 0,
                                 vertexBuffer,
                                 indexBuffer,
@@ -200,7 +202,13 @@ public final class RadeoniumChunkSectionsToRender {
                                 baseVertex,
                                 (uniformSlices, uploader) ->
                                         uploader.setUniform("ChunkSection", uniformSlices[uniformIndex])
-                        ));
+                        );
+                        if (layer == ChunkSectionLayer.TRANSLUCENT) {
+                            translucentDraws.add(new TranslucentSectionOrder.Entry<>(
+                                    radeoniumPosition, draw));
+                        } else {
+                            draws.get(layer).add(draw);
+                        }
                     }
                 }
             } finally {
@@ -209,7 +217,11 @@ public final class RadeoniumChunkSectionsToRender {
         }
 
         if (respectTranslucentOrder) {
-            java.util.Collections.reverse(draws.get(ChunkSectionLayer.TRANSLUCENT));
+            draws.get(ChunkSectionLayer.TRANSLUCENT).addAll(
+                    TranslucentSectionOrder.farToNear(translucentDraws, cameraPosition));
+        } else {
+            translucentDraws.forEach(entry ->
+                    draws.get(ChunkSectionLayer.TRANSLUCENT).add(entry.draw()));
         }
 
         var atlas = Minecraft.getInstance().getTextureManager()
