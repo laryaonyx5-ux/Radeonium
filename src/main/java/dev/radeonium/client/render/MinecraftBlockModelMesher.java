@@ -52,9 +52,9 @@ public final class MinecraftBlockModelMesher {
         for (BlockStateModelPart part : modelParts) {
             if (part == null) continue;
 
-            appendQuads(quads, part.getQuads(null));
+            appendQuads(quads, part.getQuads(null), part.useAmbientOcclusion());
             for (Direction direction : Direction.values()) {
-                appendQuads(quads, part.getQuads(direction));
+                appendQuads(quads, part.getQuads(direction), part.useAmbientOcclusion());
             }
         }
 
@@ -63,7 +63,8 @@ public final class MinecraftBlockModelMesher {
 
     private static void appendQuads(
             List<MinecraftBlockModelMesh.Quad> output,
-            List<BakedQuad> source
+            List<BakedQuad> source,
+            boolean partAmbientOcclusion
     ) {
         if (source == null || source.isEmpty()) return;
 
@@ -93,7 +94,9 @@ public final class MinecraftBlockModelMesher {
                     packedUv,
                     quad.direction(),
                     layer,
-                    material
+                    material,
+                    quad,
+                    partAmbientOcclusion
             ));
         }
     }
