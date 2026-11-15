@@ -67,7 +67,6 @@ public final class MinecraftCompiledGeometryStore {
     ) {
         if (position == null || results == null
                 || !Objects.equals(CAPTURE_GENERATIONS.get(position), generation)) return null;
-        if (position == null || results == null) return null;
 
         EnumMap<ChunkSectionLayer, LayerData> layers =
                 new EnumMap<>(ChunkSectionLayer.class);
