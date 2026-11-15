@@ -190,7 +190,7 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
             Vec3 previousCamera = translucentSortCameras.get(position);
             if (previousCamera == null || previousCamera.distanceToSqr(cameraPosition) > 0.25) {
                 List<MinecraftMeshGpuUpload.QuadData> quads = new ArrayList<>();
-                for (MinecraftBlockModelMesh.Quad quad : entry.mesh.layer(layer).quads()) {
+                for (MinecraftBlockModelMesh.Quad quad : entry.mesh.forLayer(layer).quads()) {
                     quads.add(MinecraftMeshGpuUpload.fromModelQuad(quad));
                 }
                 for (MinecraftFluidSectionMesher.FluidQuad quad : entry.fluids.layer(layer).quads()) {
