@@ -173,14 +173,13 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
         return total;
     }
 
+    /** Counts unique live GPU allocations, not repeated section references. */
     public synchronized long uploadedBytes() {
-        long total = 0L;
-        for (Entry entry : sections.values()) {
-            for (MinecraftMeshGpuUpload upload : entry.layerUploads.values()) {
-                total = Math.addExact(total, upload.byteSize());
-            }
-        }
-        return total;
+        return gpuResources.allocatedBytes();
+    }
+
+    public synchronized int gpuAllocationCount() {
+        return gpuResources.allocationCount();
     }
 
 
