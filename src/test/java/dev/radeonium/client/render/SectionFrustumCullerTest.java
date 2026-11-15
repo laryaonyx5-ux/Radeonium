@@ -55,9 +55,11 @@ class SectionFrustumCullerTest {
         SectionPos adjacent = new SectionPos(1, 0, 0);
         SectionPos disconnected = new SectionPos(4, 0, 0);
         pipeline.syncVisibleSections(List.of(camera, adjacent, disconnected));
-        pipeline.updateOpenFaces(camera, SectionFace.EAST.bit());
-        pipeline.updateOpenFaces(adjacent, SectionFace.WEST.bit());
-        pipeline.updateOpenFaces(disconnected, 0);
+        long cameraConnections = 1L << (SectionFace.NORTH.ordinal() * 6 + SectionFace.EAST.ordinal());
+        long adjacentConnections = 1L << (SectionFace.WEST.ordinal() * 6 + SectionFace.NORTH.ordinal());
+        pipeline.updateVisibilityConnections(camera, cameraConnections);
+        pipeline.updateVisibilityConnections(adjacent, adjacentConnections);
+        pipeline.updateVisibilityConnections(disconnected, 0L);
         assertEquals(Set.of(camera, adjacent), pipeline.collectVisibleSections(camera, boxFrustum()));
     }
 }
