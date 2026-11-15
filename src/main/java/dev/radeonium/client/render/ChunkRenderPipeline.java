@@ -93,7 +93,7 @@ public final class ChunkRenderPipeline {
 
     public synchronized void addSection(SectionPos position, int openFaceMask) {
         SectionState previous = sections.putIfAbsent(position, new SectionState(allocateGeneration()));
-        visibility.put(position, openFaceMask);
+        // The legacy mask is not trusted as compiled occlusion data; visibility is fed after extraction.
         if (previous == null) markDirtyInternal(position);
     }
 
