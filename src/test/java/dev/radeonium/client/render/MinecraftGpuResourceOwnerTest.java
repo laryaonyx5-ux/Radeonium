@@ -322,6 +322,21 @@ class MinecraftGpuResourceOwnerTest {
         assertEquals(0, owner.allocationCount());
     }
 
+
+    @Test
+    void closedOwnerRejectsNewAllocations() {
+        MinecraftGpuResourceOwner owner = new MinecraftGpuResourceOwner(() -> {});
+        owner.close();
+        MinecraftMeshGpuUpload upload =
+                MinecraftMeshGpuUpload.forTesting(4, 16L, () -> {});
+
+        assertThrows(IllegalStateException.class, () -> owner.track(upload, null));
+        assertThrows(IllegalStateException.class, () -> owner.getOrCreate(
+                new MinecraftGpuResourceOwner.ByteArrayKey(new byte[] {1}), () -> upload));
+        assertFalse(upload.isClosed());
+        assertEquals(0, owner.allocationCount());
+    }
+
     @Test
     void allocationsRejectNegativeByteAccounting() {
         assertThrows(IllegalArgumentException.class,
