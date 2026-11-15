@@ -77,10 +77,42 @@ public final class MinecraftSectionParityChecker {
         if (bytes.length % quadBytes != 0) return Map.of();
         Map<String, Integer> counts = new HashMap<>();
         for (int offset = 0; offset < bytes.length; offset += quadBytes) {
-            String key = java.util.HexFormat.of().formatHex(bytes, offset, offset + quadBytes);
-            counts.merge(key, 1, Integer::sum);
+            counts.merge(new QuadSlice(bytes, offset, quadBytes), 1, Integer::sum);
         }
         return counts;
+    }
+
+
+    /** Zero-copy hash key for one quad's 112-byte vertex record sequence. */
+    private static final class QuadSlice {
+        private final byte[] source;
+        private final int offset;
+        private final int length;
+        private final int hash;
+
+        private QuadSlice(byte[] source, int offset, int length) {
+            this.source = source;
+            this.offset = offset;
+            this.length = length;
+            int value = 1;
+            for (int i = 0; i < length; i++) value = 31 * value + source[offset + i];
+            this.hash = value;
+        }
+
+        @Override
+        public int hashCode() {
+            return hash;
+        }
+
+        @Override
+        public boolean equals(Object other) {
+            if (this == other) return true;
+            if (!(other instanceof QuadSlice slice) || hash != slice.hash || length != slice.length) return false;
+            for (int i = 0; i < length; i++) {
+                if (source[offset + i] != slice.source[slice.offset + i]) return false;
+            }
+            return true;
+        }
     }
 
     public record LayerParity(
