@@ -126,6 +126,13 @@ public final class MinecraftGpuResourceOwner implements AutoCloseable {
         return reusable != null && retain(reusable) ? reusable : null;
     }
 
+    /** True only for a live, non-empty upload allocated by this owner. */
+    boolean owns(MinecraftMeshGpuUpload upload) {
+        renderThreadCheck.run();
+        return upload != null && !upload.isEmpty() && !upload.isClosed()
+                && allocations.containsKey(upload);
+    }
+
     /** Adds one section reference to an already tracked live upload. */
     boolean retain(MinecraftMeshGpuUpload upload) {
         renderThreadCheck.run();
