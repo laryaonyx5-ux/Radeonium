@@ -22,6 +22,14 @@ import java.util.Arrays;
  * terrain draw submission are intentionally separate later stages.
  */
 public final class MinecraftMeshGpuUpload implements AutoCloseable {
+    public static final int POSITION_OFFSET_BYTES = 0;
+    public static final int UV_LOW_OFFSET_BYTES = 12;
+    public static final int UV_HIGH_OFFSET_BYTES = 16;
+    public static final int TINT_OFFSET_BYTES = 20;
+    public static final int BLOCK_LIGHT_OFFSET_BYTES = 24;
+    public static final int AO_COLOR_OFFSET_BYTES = 28;
+    public static final int VERTEX_LIGHT_OFFSET_BYTES = 32;
+    public static final int MATERIAL_INDEX_OFFSET_BYTES = 36;
     public static final int VERTEX_STRIDE_BYTES = 40;
 
     private final GpuBuffer vertexBuffer;
