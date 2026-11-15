@@ -30,6 +30,17 @@ class MinecraftGpuResourceOwnerTest {
         assertEquals(first.hashCode(), same.hashCode());
         assertNotEquals(first, different);
     }
+
+    @Test
+    void allocationsRejectNegativeByteAccounting() {
+        assertThrows(IllegalArgumentException.class,
+                () -> new MinecraftGpuResourceOwner.Allocation(-1L, null));
+        MinecraftGpuResourceOwner.Allocation empty =
+                new MinecraftGpuResourceOwner.Allocation(0L, null);
+        assertEquals(0L, empty.bytes());
+        assertEquals(1, empty.referenceCount());
+    }
+
     @Test
     void sharedAllocationsReleaseOnlyAfterTheFinalReference() {
         MinecraftGpuResourceOwner.Allocation allocation =
