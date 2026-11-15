@@ -24,6 +24,7 @@ import java.util.Objects;
  */
 public final class MinecraftCompiledGeometryStore {
     private static final int MAX_SECTIONS = 128;
+    private static final int MAX_ACTIVE_CAPTURES = 256;
     private static final long MAX_BYTES = 64L * 1024L * 1024L;
 
     private static final LinkedHashMap<SectionPos, Snapshot> SNAPSHOTS =
@@ -41,7 +42,22 @@ public final class MinecraftCompiledGeometryStore {
         if (position == null) return;
         long generation = ++nextGeneration;
         CAPTURE_GENERATIONS.put(position, generation);
-        ACTIVE_CAPTURES.get().put(position, generation);
+        Map<SectionPos, Long> active = ACTIVE_CAPTURES.get();
+        active.put(position, generation);
+
+        // Failed/aborted compiler invocations never reach the RETURN injection.
+        // Bound both registries so those abandoned tokens cannot grow forever.
+        while (CAPTURE_GENERATIONS.size() > MAX_ACTIVE_CAPTURES) {
+            SectionPos oldest = CAPTURE_GENERATIONS.keySet().iterator().next();
+            CAPTURE_GENERATIONS.remove(oldest);
+        }
+        while (active.size() > MAX_ACTIVE_CAPTURES) {
+            SectionPos oldest = active.keySet().iterator().next();
+            Long abandonedGeneration = active.remove(oldest);
+            if (Objects.equals(CAPTURE_GENERATIONS.get(oldest), abandonedGeneration)) {
+                CAPTURE_GENERATIONS.remove(oldest);
+            }
+        }
     }
 
     /**
@@ -79,6 +95,11 @@ public final class MinecraftCompiledGeometryStore {
             ByteBuffer indexBuffer = mesh.indexBuffer();
             byte[] indices = indexBuffer == null ? new byte[0] : copy(indexBuffer);
             if (vertices.length == 0) continue;
+            if (draw.vertexCount() < 0 || draw.indexCount() < 0
+                    || draw.vertexCount() == 0
+                    || (draw.indexCount() > 0 && indexBuffer == null)) {
+                continue;
+            }
 
             layers.put(entry.getKey(), new LayerData(
                     vertices,
@@ -177,6 +198,14 @@ public final class MinecraftCompiledGeometryStore {
             int indexCount
     ) {
         public LayerData {
+            if (vertexBytes == null || indexBytes == null
+                    || vertexFormat == null || topology == null
+                    || vertexCount < 0 || indexCount < 0) {
+                throw new IllegalArgumentException("Compiled layer metadata is invalid");
+            }
+            if (vertexCount == 0 && (vertexBytes.length != 0 || indexCount != 0)) {
+                throw new IllegalArgumentException("An empty compiled layer cannot contain geometry");
+            }
             vertexBytes = vertexBytes.clone();
             indexBytes = indexBytes.clone();
         }
