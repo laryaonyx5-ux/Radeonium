@@ -62,7 +62,8 @@ public final class SectionMeshingExecutor implements AutoCloseable {
             workers.execute(() -> {
                 try {
                     result.complete(minecraftMesher.buildResolved(input.blocks())
-                            .withUnsupportedBlockEntityCount(input.unsupportedBlockEntityCount()));
+                            .withUnsupportedBlockEntityCount(input.unsupportedBlockEntityCount())
+                            .withFluids(input.fluids()));
                 } catch (Throwable failure) {
                     result.completeExceptionally(failure);
                 }
