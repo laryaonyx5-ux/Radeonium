@@ -118,6 +118,24 @@ The greedy voxel prototype is deliberately not used as a substitute for Minecraf
 - Automated owner tests cover content-key cache hits/misses, reference sharing, accounting overflow, foreign/closed upload rejection, bulk release recovery, and retryable disposal. Cache commits reject foreign or closed uploads before replacing a valid entry. Actual device allocation and disposal still require an in-game check against the active graphics backend.
 - The configured GitHub Actions `clean build` completed successfully for commit `ca2a5f5`; compilation, JUnit tests and mod JAR artifact packaging all passed.
 
+## Milestone D — terrain shader and material system
+
+**Status: shader/material implementation complete; runtime visual parity validation pending.**
+
+### Implemented foundation
+
+- Replaces the placeholder shader inputs with a vertex contract matching the current 28-byte Minecraft BLOCK upload: position, normalized vertex color, atlas UV and packed block/sky light.
+- The vertex shader transforms section vertices and forwards UV, vertex tint/AO, lightmap coordinates and view-space fog distance.
+- The fragment shader samples the block atlas and lightmap, applies captured vertex color, supports configurable alpha cutout and fog, and preserves sampled alpha for the layer-specific blend state.
+- Adds `TerrainShaderContract` as the authoritative resource, attribute-location, byte-offset, stride and uniform-name contract for later pipeline creation.
+- Adds immutable `TerrainMaterialBinding` plans that classify Minecraft SOLID, CUTOUT, CUTOUT_MIPPED and TRANSLUCENT layers as opaque, cutout or blend materials.
+- Exposes shader-facing binding snapshots from `MinecraftMaterialTable` while retaining the original Minecraft `MaterialInfo`; no guessed sprite coordinates or atlas handles are fabricated.
+- JUnit tests validate shader resource presence and required inputs/uniforms, vertex-layout agreement, material validation and layer-to-alpha-mode mapping.
+
+### Deliberate boundary
+
+This milestone supplies shader sources and material-binding contracts. It does not yet register or bind a live RenderPearl terrain pipeline, descriptor sets, atlas/lightmap textures or per-frame fog uniforms; those are integrated by Milestone E. Shader files have not yet been compiled by the active runtime shader compiler or visually compared in a Minecraft client. Until that validation passes, vanilla remains the authoritative terrain path.
+
 ## What "Radeonium owns the renderer" means
 
 Radeonium must eventually own these responsibilities:
@@ -188,7 +206,7 @@ The milestones below are architectural targets, not claims that these systems al
 | A — renderer contract | Define renderer-owned data types, thread rules, ownership and vanilla hand-off boundaries | Interfaces, invariant tests and green CI |
 | B — complete Minecraft mesher | Replace the geometry mirror with Radeonium-generated section meshes while preserving model and lighting semantics | Model/layer parity tests and visual comparison |
 | C — GPU resource owner | Radeonium owns mesh allocation, uploads, reuse and disposal | No dependence on vanilla mesh buffers for Radeonium draws |
-| D — terrain shader/material system | Radeonium binds its own terrain shaders and materials | Visual parity for opaque/cutout terrain, tint, light, fog and emissive content |
+| D — terrain shader/material system | Define Radeonium terrain shader sources and material bindings | Shader contract/tests complete; runtime visual parity for opaque/cutout terrain, tint, light, fog and emissive content pending |
 | E — independent terrain pipelines | Radeonium owns terrain pipeline state and draw submission | Terrain draws no longer depend on Minecraft's terrain draw pipeline |
 | F — transparency renderer | Radeonium owns translucent terrain ordering/blending | Water, glass and intersecting surfaces pass visual tests |
 | G — visibility and lifecycle | Radeonium owns or explicitly integrates visibility, invalidation and reload handling | No missing/stale geometry under movement and world changes |
