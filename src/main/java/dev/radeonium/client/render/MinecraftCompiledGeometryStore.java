@@ -206,6 +206,16 @@ public final class MinecraftCompiledGeometryStore {
             if (vertexCount == 0 && (vertexBytes.length != 0 || indexCount != 0)) {
                 throw new IllegalArgumentException("An empty compiled layer cannot contain geometry");
             }
+            if (vertexCount > 0 && vertexBytes.length == 0) {
+                throw new IllegalArgumentException("A non-empty compiled layer needs vertex bytes");
+            }
+            if (indexCount > 0 && (indexType == null
+                    || indexBytes.length < (long) indexCount * indexType.bytes)) {
+                throw new IllegalArgumentException("Compiled index bytes do not match index metadata");
+            }
+            if (indexCount == 0 && indexBytes.length != 0) {
+                throw new IllegalArgumentException("Index bytes require a positive index count");
+            }
             vertexBytes = vertexBytes.clone();
             indexBytes = indexBytes.clone();
         }
