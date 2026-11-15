@@ -23,6 +23,17 @@ public final class ChunkRenderPipeline {
     private final Set<SectionPos> visibleSections = new HashSet<>();
     private final Map<SectionPos, VanillaSectionMeshSnapshot> vanillaMeshes = new HashMap<>();
 
+    /** Clears all world-owned section state during a world unload or swap. */
+    public synchronized void clear() {
+        sections.clear();
+        regions.clear();
+        dirtyQueue.clear();
+        queuedDirty.clear();
+        visibleSections.clear();
+        vanillaMeshes.clear();
+        visibility.clear();
+    }
+
     /**
      * Reconciles the currently visible Minecraft sections with Radeonium's
      * CPU-side lifetime tracker. Visibility here mirrors vanilla's frustum /
