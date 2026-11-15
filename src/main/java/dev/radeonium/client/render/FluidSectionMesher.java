@@ -22,15 +22,14 @@ public final class FluidSectionMesher {
                     short id = snapshot.fluidId(x, y, z);
                     if (id == 0) continue;
 
-                    float top = y + snapshot.heightEighths(x, y, z) / 8.0f;
                     int tint = snapshot.tint(x, y, z);
                     int light = snapshot.packedLight(x, y, z);
+                    float northWest = cornerHeight(snapshot, id, x, y, z);
+                    float northEast = cornerHeight(snapshot, id, x + 1, y, z);
+                    float southEast = cornerHeight(snapshot, id, x + 1, y, z + 1);
+                    float southWest = cornerHeight(snapshot, id, x, y, z + 1);
 
                     if (snapshot.fluidIdWithHalo(x, y + 1, z) != id) {
-                        float northWest = cornerHeight(snapshot, id, x, y, z);
-                        float northEast = cornerHeight(snapshot, id, x + 1, y, z);
-                        float southEast = cornerHeight(snapshot, id, x + 1, y, z + 1);
-                        float southWest = cornerHeight(snapshot, id, x, y, z + 1);
                         add(quads, id, tint, light, 0, 1, 0,
                                 new float[]{
                                         x, y + northWest, z,
@@ -49,20 +48,32 @@ public final class FluidSectionMesher {
                             ? 0 : snapshot.heightEighthsWithHalo(x, y, z + 1);
 
                     if (snapshot.heightEighths(x, y, z) > westHeight) {
-                        add(quads, id, tint, light, -1, 0, 0,
-                                x, y + westHeight / 8.0f, z, x, top, z + 1);
+                        float bottom = y + westHeight / 8.0f;
+                        add(quads, id, tint, light, -1, 0, 0, new float[]{
+                                x, bottom, z, x, bottom, z + 1,
+                                x, y + southWest, z + 1, x, y + northWest, z
+                        });
                     }
                     if (snapshot.heightEighths(x, y, z) > eastHeight) {
-                        add(quads, id, tint, light, 1, 0, 0,
-                                x + 1, y + eastHeight / 8.0f, z + 1, x + 1, top, z);
+                        float bottom = y + eastHeight / 8.0f;
+                        add(quads, id, tint, light, 1, 0, 0, new float[]{
+                                x + 1, bottom, z + 1, x + 1, bottom, z,
+                                x + 1, y + northEast, z, x + 1, y + southEast, z + 1
+                        });
                     }
                     if (snapshot.heightEighths(x, y, z) > northHeight) {
-                        add(quads, id, tint, light, 0, 0, -1,
-                                x + 1, y + northHeight / 8.0f, z, x, top, z);
+                        float bottom = y + northHeight / 8.0f;
+                        add(quads, id, tint, light, 0, 0, -1, new float[]{
+                                x + 1, bottom, z, x, bottom, z,
+                                x, y + northWest, z, x + 1, y + northEast, z
+                        });
                     }
                     if (snapshot.heightEighths(x, y, z) > southHeight) {
-                        add(quads, id, tint, light, 0, 0, 1,
-                                x, y + southHeight / 8.0f, z + 1, x + 1, top, z + 1);
+                        float bottom = y + southHeight / 8.0f;
+                        add(quads, id, tint, light, 0, 0, 1, new float[]{
+                                x, bottom, z + 1, x + 1, bottom, z + 1,
+                                x + 1, y + southEast, z + 1, x, y + southWest, z + 1
+                        });
                     }
                 }
             }
