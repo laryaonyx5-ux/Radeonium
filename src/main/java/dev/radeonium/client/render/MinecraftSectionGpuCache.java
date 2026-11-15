@@ -198,8 +198,14 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
                 }
                 List<MinecraftMeshGpuUpload.QuadData> ordered =
                         sortTranslucentQuads(position, quads, cameraPosition);
-                MinecraftMeshGpuUpload replacement =
-                        MinecraftMeshGpuUpload.uploadQuadData(RenderSystem.getDevice(), ordered);
+                MinecraftMeshGpuUpload replacement;
+                try {
+                    replacement = MinecraftMeshGpuUpload.uploadQuadData(RenderSystem.getDevice(), ordered);
+                } catch (RuntimeException uploadFailure) {
+                    // Keep the previous valid upload (or let the caller use vanilla)
+                    // rather than failing the entire frame on a sort-buffer allocation.
+                    return null;
+                }
                 MinecraftMeshGpuUpload previous = entry.layerUploads.put(layer, replacement);
                 if (previous != null) previous.close();
                 translucentSortCameras.put(position, cameraPosition);
