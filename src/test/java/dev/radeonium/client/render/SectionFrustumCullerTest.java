@@ -30,7 +30,7 @@ class SectionFrustumCullerTest {
 
     @Test void filtersListInPlace() {
         var sections = new java.util.ArrayList<>(List.of(
-                new SectionPos(0, 0, 0), new SectionPos(4, 0, 0), new SectionPos(0, 0, 1)));
+                new SectionPos(0, 0, 0), new SectionPos(4, 0, 0), new SectionPos(0, 0, 3)));
         assertEquals(1, boxFrustum().filterInPlace(sections));
         assertEquals(List.of(new SectionPos(0, 0, 0)), sections);
     }
