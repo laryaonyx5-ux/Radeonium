@@ -36,7 +36,6 @@ public final class MinecraftSectionModelMesher {
     private static final float EDGE_EPSILON = 1.0e-5f;
 
     private final MinecraftBlockModelMesher blockMesher = new MinecraftBlockModelMesher();
-    private final BlockModelLighter blockLighter = new BlockModelLighter();
 
     /**
      * Captures the actual 16x16x16 block inputs from Minecraft's immutable
@@ -56,10 +55,10 @@ public final class MinecraftSectionModelMesher {
 
     private static Map<BakedQuad, CapturedQuadLighting> captureQuadLighting(
             BlockState state, BlockPos position, RenderSectionRegion region,
-            List<BlockStateModelPart> parts, int packedLightCoords, boolean ambientOcclusionEnabled
+            List<BlockStateModelPart> parts, int packedLightCoords, boolean ambientOcclusionEnabled,
+            BlockModelLighter lighter
     ) {
         Map<BakedQuad, CapturedQuadLighting> lighting = new java.util.IdentityHashMap<>();
-        BlockModelLighter lighter = new BlockModelLighter();
         for (BlockStateModelPart part : parts) {
             if (part == null) continue;
             captureQuadLighting(lighting, part.getQuads(null), part.useAmbientOcclusion() && ambientOcclusionEnabled,
@@ -140,6 +139,7 @@ public final class MinecraftSectionModelMesher {
         int blockEntities = 0;
         int baseX = sectionPos.minBlockX(), baseY = sectionPos.minBlockY(), baseZ = sectionPos.minBlockZ();
         BlockState[] states = new BlockState[18 * 18 * 18];
+        BlockModelLighter lighter = new BlockModelLighter();
         for (int y = -1; y <= 16; y++) for (int z = -1; z <= 16; z++) for (int x = -1; x <= 16; x++) {
             states[haloIndex(x, y, z)] = region.getBlockState(new BlockPos(baseX + x, baseY + y, baseZ + z));
         }
@@ -152,10 +152,10 @@ public final class MinecraftSectionModelMesher {
             List<BlockStateModelPart> selectedParts = new ArrayList<>();
             blockModel.collectParts(net.minecraft.util.RandomSource.create(state.getSeed(pos)), selectedParts);
             Map<Integer, Integer> tintColors = captureTintColors(state, pos, region, selectedParts);
-            int packedLightCoords = blockLighter.getLightCoords(state, region, pos);
+            int packedLightCoords = lighter.getLightCoords(state, region, pos);
             Map<BakedQuad, CapturedQuadLighting> quadLighting = captureQuadLighting(
                     state, pos, region, selectedParts, packedLightCoords,
-                    Minecraft.getInstance().options.ambientOcclusion().get());
+                    Minecraft.getInstance().options.ambientOcclusion().get(), lighter);
             resolved.add(new ResolvedBlockInput(selectedParts, x, y, z,
                     state.skipRendering(states[haloIndex(x, y - 1, z)], Direction.DOWN),
                     state.skipRendering(states[haloIndex(x, y + 1, z)], Direction.UP),
