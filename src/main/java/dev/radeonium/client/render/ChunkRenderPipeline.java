@@ -59,7 +59,6 @@ public final class ChunkRenderPipeline {
         for (SectionPos position : next) {
             if (visibleSections.add(position)) {
                 sections.putIfAbsent(position, new SectionState(allocateGeneration()));
-                visibility.put(position, 0);
                 markDirtyInternal(position);
             }
         }
@@ -113,8 +112,23 @@ public final class ChunkRenderPipeline {
         }
     }
 
-    public synchronized void updateOpenFaces(SectionPos position, int openFaceMask) {
-        if (sections.containsKey(position)) visibility.put(position, openFaceMask);
+    public synchronized void updateVisibilityConnections(SectionPos position, long connectionMask) {
+        if (sections.containsKey(position)) visibility.putConnections(position, connectionMask);
+    }
+
+    /**
+     * Returns null when the graph lacks any current visible section or the
+     * camera section. Null means callers must retain Minecraft's full list.
+     */
+    public synchronized Set<SectionPos> collectPortalVisibleSections(
+            SectionPos cameraSection, Set<SectionPos> currentVisible
+    ) {
+        if (cameraSection == null || currentVisible == null
+                || !currentVisible.contains(cameraSection)
+                || !visibility.containsAll(currentVisible)) {
+            return null;
+        }
+        return Set.copyOf(visibility.collectVisible(cameraSection));
     }
 
     public synchronized void markDirty(SectionPos position) {
@@ -197,10 +211,9 @@ public final class ChunkRenderPipeline {
             throw new IllegalArgumentException("cameraSection and frustum are required");
         }
         Set<SectionPos> result = new HashSet<>();
+        if (!visibility.containsAll(visibleSections)) return Set.of();
         for (SectionPos position : visibility.collectVisible(cameraSection)) {
-            if (visibleSections.contains(position) && frustum.intersects(position)) {
-                result.add(position);
-            }
+            if (visibleSections.contains(position) && frustum.intersects(position)) result.add(position);
         }
         return Set.copyOf(result);
     }
