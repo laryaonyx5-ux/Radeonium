@@ -3,6 +3,7 @@ package dev.radeonium.client.render;
 import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
 import net.minecraft.client.renderer.chunk.SectionCompiler;
 import net.minecraft.core.SectionPos;
+import com.mojang.renderpearl.api.pipeline.IndexType;
 import com.mojang.blaze3d.vertex.MeshData;
 
 import java.nio.ByteBuffer;
@@ -85,7 +86,7 @@ public final class MinecraftCompiledGeometryStore {
                     indices,
                     draw.format().toString(),
                     draw.primitiveTopology().toString(),
-                    draw.indexType().toString(),
+                    draw.indexType(),
                     draw.vertexCount(),
                     draw.indexCount()
             ));
@@ -172,7 +173,7 @@ public final class MinecraftCompiledGeometryStore {
             byte[] indexBytes,
             String vertexFormat,
             String topology,
-            String indexType,
+            IndexType indexType,
             int vertexCount,
             int indexCount
     ) {
