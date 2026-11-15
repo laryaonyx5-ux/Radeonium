@@ -20,6 +20,8 @@ public final class MinecraftSectionModelCaptureStore {
     private static volatile long epoch;
     private static final ThreadLocal<LinkedHashMap<SectionPos, PendingCapture>> PENDING =
             ThreadLocal.withInitial(() -> new LinkedHashMap<>(16, 0.75f, true));
+    private static final ThreadLocal<LinkedHashMap<SectionPos, Long>> ACTIVE_CAPTURES =
+            ThreadLocal.withInitial(() -> new LinkedHashMap<>(16, 0.75f, true));
 
     private MinecraftSectionModelCaptureStore() {}
 
@@ -31,14 +33,29 @@ public final class MinecraftSectionModelCaptureStore {
         return Boolean.getBoolean("radeonium.captureModelMeshes");
     }
 
+    /** Capture the reload epoch before reading models from the compile region. */
+    public static long beginCapture(SectionPos position) {
+        if (position == null) return -1L;
+        long captureEpoch = epoch;
+        LinkedHashMap<SectionPos, Long> active = ACTIVE_CAPTURES.get();
+        active.remove(position);
+        active.put(position, captureEpoch);
+        while (active.size() > MAX_SECTIONS) {
+            active.remove(active.keySet().iterator().next());
+        }
+        return captureEpoch;
+    }
+
     /** Stage on the compiler worker; publish only after vanilla compile succeeds. */
     public static void stage(
             SectionPos position, MinecraftSectionModelMesher.SectionModelMesh mesh
     ) {
         if (position == null || mesh == null) return;
+        Long captureEpoch = ACTIVE_CAPTURES.get().remove(position);
+        if (captureEpoch == null || captureEpoch != epoch) return;
         LinkedHashMap<SectionPos, PendingCapture> pending = PENDING.get();
         pending.remove(position);
-        pending.put(position, new PendingCapture(mesh, epoch));
+        pending.put(position, new PendingCapture(mesh, captureEpoch));
         while (pending.size() > MAX_SECTIONS) {
             pending.remove(pending.keySet().iterator().next());
         }
@@ -53,7 +70,9 @@ public final class MinecraftSectionModelCaptureStore {
     }
 
     public static void abort(SectionPos position) {
-        if (position != null) PENDING.get().remove(position);
+        if (position == null) return;
+        ACTIVE_CAPTURES.get().remove(position);
+        PENDING.get().remove(position);
     }
 
     public static synchronized Snapshot put(
@@ -94,6 +113,7 @@ public final class MinecraftSectionModelCaptureStore {
         SNAPSHOTS.clear();
         retainedQuads = 0;
         PENDING.remove();
+        ACTIVE_CAPTURES.remove();
     }
 
     public static synchronized int sectionCount() {
