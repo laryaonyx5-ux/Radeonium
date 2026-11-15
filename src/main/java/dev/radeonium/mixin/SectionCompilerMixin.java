@@ -39,6 +39,8 @@ public abstract class SectionCompilerMixin {
             CallbackInfoReturnable<SectionCompiler.Results> cir
     ) {
         MinecraftCompiledGeometryStore.beginCapture(sectionPos);
+        MinecraftSectionModelCaptureStore.abort(sectionPos);
+        MinecraftSectionModelCaptureStore.remove(sectionPos);
         if (ChunkBuildBudget.isEnabled() && MinecraftSectionModelCaptureStore.captureEnabled()) {
             try {
                 var mesh = new MinecraftSectionModelMesher()
