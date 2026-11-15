@@ -104,7 +104,7 @@ public final class RadeoniumClient implements ClientModInitializer {
                         new dev.radeonium.client.render.SectionPos(
                                 snapshot.position().x(), snapshot.position().y(), snapshot.position().z());
                 try {
-                    MINECRAFT_GPU_CACHE.rebuild(position, snapshot.mesh());
+                    MINECRAFT_GPU_CACHE.rebuild(position, snapshot);
                     // Compilation can invalidate this snapshot from another worker
                     // while the render thread is allocating its replacement buffers.
                     if (MinecraftSectionModelCaptureStore.get(snapshot.position()) != snapshot) {
