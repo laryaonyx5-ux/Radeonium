@@ -12,6 +12,7 @@ import dev.radeonium.client.render.MinecraftCompiledGeometryGpuCache;
 import dev.radeonium.client.render.MinecraftSectionModelCaptureStore;
 import dev.radeonium.client.render.RendererSectionTracker;
 import dev.radeonium.client.render.TerrainRenderDiagnostics;
+import dev.radeonium.client.render.TerrainDrawBatchMetrics;
 import dev.radeonium.client.render.SectionMeshingExecutor;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
@@ -37,6 +38,8 @@ public final class RadeoniumClient implements ClientModInitializer {
     private static final ChunkRenderPipeline RENDERER_PIPELINE = new ChunkRenderPipeline();
     private static final TerrainRenderDiagnostics TERRAIN_RENDER_DIAGNOSTICS =
             new TerrainRenderDiagnostics();
+    private static final TerrainDrawBatchMetrics TERRAIN_DRAW_BATCH_METRICS =
+            new TerrainDrawBatchMetrics();
     private static final MinecraftSectionGpuCache MINECRAFT_GPU_CACHE = new MinecraftSectionGpuCache();
     private static final SectionMeshingExecutor SECTION_MESHING_EXECUTOR = new SectionMeshingExecutor();
     private static final MinecraftCompiledGeometryGpuCache COMPILED_GEOMETRY_GPU_CACHE =
@@ -144,6 +147,11 @@ public final class RadeoniumClient implements ClientModInitializer {
         return RENDERER_PIPELINE;
     }
 
+    /** Per-frame measurements of terrain draw batching and vertex-buffer changes. */
+    public static TerrainDrawBatchMetrics terrainDrawBatchMetrics() {
+        return TERRAIN_DRAW_BATCH_METRICS;
+    }
+
     /** Cumulative per-layer counters for Radeonium draws and vanilla fallbacks. */
     public static TerrainRenderDiagnostics terrainRenderDiagnostics() {
         return TERRAIN_RENDER_DIAGNOSTICS;
@@ -205,6 +213,7 @@ public final class RadeoniumClient implements ClientModInitializer {
             MinecraftSectionModelCaptureStore.clear();
             RendererSectionTracker.reset();
             TERRAIN_RENDER_DIAGNOSTICS.reset();
+            TERRAIN_DRAW_BATCH_METRICS.beginFrame();
         });
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             if (INVALIDATE_MODEL_GPU_CACHE.getAndSet(false)) MINECRAFT_GPU_CACHE.clear();
