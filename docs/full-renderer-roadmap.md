@@ -341,11 +341,11 @@ The in-game validation matrix remains required before enabling the opt-in path b
 
 ## Step 14 — GPU optimizations
 
-**Status: first half (50%) implemented; CI validation pending; live-device profiling remains pending.**
+**Status: implementation and focused tests complete; GitHub Actions validation pending; live-device profiling remains pending.**
 
-- Added `TerrainGpuUploadMetrics` to measure Radeonium's compiled-geometry GPU upload attempts, payload bytes, successful uploads, stale-result skips, failures, cumulative CPU-side upload duration and maximum successful upload duration.
-- Connected the metrics to the render-thread compiled-geometry upload queue and exposed a read-only snapshot accessor.
-- Stale snapshots are counted separately from real upload failures; failed allocations are recorded before the existing failure path is rethrown.
-- Added focused tests for aggregation, average/max duration, skipped/failing uploads, reset and invalid measurements.
-- This is profiling groundwork only. The measured duration is CPU-side wall time around the upload call, not GPU execution time, and no FPS gain is claimed.
-- **Second half:** use measured upload size/time and allocation pressure to tune safe upload scheduling or staging/reuse, with bounded memory, render-thread ownership, stale-generation protection, cleanup guarantees and regression tests.
+- Added `TerrainGpuUploadMetrics` to measure compiled-geometry upload attempts, payload bytes, successful uploads, stale-result skips, failures, cumulative CPU-side upload duration and maximum successful upload duration.
+- Connected the metrics to the render-thread upload queue and exposed a read-only snapshot accessor. Stale snapshots are counted separately from real failures.
+- Added `TerrainGpuUploadBudget` and replaced the fixed four-upload loop with a bounded scheduler: at most four sections, 8 MiB of queued payload and 2 ms of CPU wall time per client tick. The first item is always allowed, so one oversized section cannot starve indefinitely; later items remain queued for a following tick when a limit is reached.
+- Uploads remain on the render thread. Existing bounded queue capacity, 64 MiB GPU cache limit, stale-snapshot checks, per-layer allocation cleanup and vanilla fallback are retained.
+- Added focused tests for metrics aggregation/reset/failure/skip accounting and scheduler count/byte/time limits, including oversized-first-item and invalid-input cases.
+- The measured duration is CPU-side wall time around the upload call, not GPU execution time. These limits are conservative starting values, not device-specific tuning; live profiling is still required before claiming an FPS improvement.
