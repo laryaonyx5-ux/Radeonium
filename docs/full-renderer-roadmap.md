@@ -326,3 +326,16 @@ The order may be adjusted when implementation dependencies require it, but visua
 The existing Step 7.5 bridge still captures Minecraft-compiled geometry as a safe fallback. The opt-in Milestone B path separately captures and meshes Minecraft model/fluid inputs, compares its encoded per-layer quads against Minecraft's compiled bytes, and submits only verified Radeonium-owned buffers through the existing terrain hook. Step 8 now binds Radeonium-owned shader stages to the SOLID/CUTOUT pipeline identities while retaining Minecraft's compatible terrain bind groups and fixed state. It does **not** yet own Minecraft block compilation, the frame graph or the complete transparency system; translucent OIT may still use a host override. Therefore it is not yet a fully independent renderer.
 
 The in-game validation matrix remains required before enabling the opt-in path by default. The roadmap above describes the larger renderer project that follows; Milestone B completion does not mark those future milestones complete.
+
+## Step 13 — terrain draw batching (first half: 50%)
+
+**Status: batching measurement foundation implemented; live draw-path integration and actual batching remain for the second half.**
+
+- Added `TerrainDrawBatchMetrics`, a per-frame, per-layer measurement utility.
+- It counts draw entries, unique vertex-buffer identities and contiguous vertex-buffer bind runs in submission order.
+- Buffer identity uses object identity rather than `equals`, avoiding false merges between distinct GPU handles.
+- Frame metrics can be reset independently without changing the cumulative draw-source diagnostics.
+- Tests cover repeated and alternating buffers, per-layer isolation, frame reset, null-buffer handling and invalid input.
+- This first half is instrumentation only: it does not reorder translucent draws, combine GPU allocations or claim fewer actual GPU draw calls.
+
+**Second half:** connect these metrics to the live terrain submission path, use the measurements to choose safe compatible batching groups, preserve per-section uniforms and translucent ordering, then add tests and verify CI. Do not merge draws across incompatible pipelines, index formats, vertex layouts or fallback ownership.
