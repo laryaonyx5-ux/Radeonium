@@ -365,3 +365,15 @@ The in-game validation matrix remains required before enabling the opt-in path b
 - Added focused tests for stale-result rejection, cancellation accounting, closed-pool rejection and idempotent shutdown, alongside the first-half worker metrics tests.
 - The executor accepts only immutable captures and a thread-safe validity predicate; it never reads the live world from a worker. Queue capacity remains bounded at 256.
 - These counters measure CPU-side queue/build time, not GPU time or FPS. No performance gain is claimed until measured in a live Minecraft workload.
+
+
+## Step 16 — Radeonium-owned translucent terrain OIT
+
+**Status: initial OIT pipeline ownership and stage routing implemented; CI and live-client visual validation pending.**
+
+- Adds a Radeonium-owned OIT pipeline set for the three terrain transparency stages: depth bounds, transmittance and accumulation.
+- Builds the stage set from Minecraft's multi-draw terrain interface while selecting Radeonium's own terrain vertex and fragment shaders. The existing shader implements the alpha-only passes and accumulation sampling hooks.
+- Translates the vanilla terrain OIT stage pipeline identities to the corresponding Radeonium-owned stage pipelines at the terrain submission boundary. Both separate and multi-draw vanilla OIT sets are recognized.
+- Preserves unknown third-party pipeline overrides and retains Minecraft's classic non-OIT translucent pipeline as the compatibility fallback. No unverified classic blend-state replacement is forced.
+- Adds focused tests for distinct Radeonium OIT stage identities, both vanilla OIT stage mappings, compatibility fallback and opaque/cutout routing.
+- This is pipeline ownership, not proof of correct OIT shader compilation or visual parity. In-game checks for water, glass, ice, intersecting translucent surfaces, camera movement, resource packs and graphics backends remain mandatory. No FPS gain is claimed.
