@@ -172,6 +172,11 @@ public final class RadeoniumClient implements ClientModInitializer {
 
     public static SectionMeshingExecutor sectionMeshingExecutor() { return SECTION_MESHING_EXECUTOR; }
 
+    /** CPU worker-pool measurements and queue/worker telemetry. */
+    public static dev.radeonium.client.render.SectionMeshingMetrics.Snapshot sectionMeshingMetrics() {
+        return SECTION_MESHING_EXECUTOR.metricsSnapshot();
+    }
+
     public static MinecraftCompiledGeometryGpuCache compiledGeometryGpuCache() {
         return COMPILED_GEOMETRY_GPU_CACHE;
     }
