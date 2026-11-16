@@ -338,3 +338,14 @@ The in-game validation matrix remains required before enabling the opt-in path b
 - Metrics are connected to the live draw-list construction and report the final per-layer submission order.
 - Tests cover grouping stability, identity rather than equality, null handles, invalid input, per-layer metrics and frame resets.
 - No FPS gain or actual draw-call reduction is claimed until measured in a live client. If visible opaque/cutout ordering issues appear, the grouping must be disabled or narrowed.
+
+## Step 14 — GPU optimizations
+
+**Status: first half (50%) implemented; CI validation pending; live-device profiling remains pending.**
+
+- Added `TerrainGpuUploadMetrics` to measure Radeonium's compiled-geometry GPU upload attempts, payload bytes, successful uploads, stale-result skips, failures, cumulative CPU-side upload duration and maximum successful upload duration.
+- Connected the metrics to the render-thread compiled-geometry upload queue and exposed a read-only snapshot accessor.
+- Stale snapshots are counted separately from real upload failures; failed allocations are recorded before the existing failure path is rethrown.
+- Added focused tests for aggregation, average/max duration, skipped/failing uploads, reset and invalid measurements.
+- This is profiling groundwork only. The measured duration is CPU-side wall time around the upload call, not GPU execution time, and no FPS gain is claimed.
+- **Second half:** use measured upload size/time and allocation pressure to tune safe upload scheduling or staging/reuse, with bounded memory, render-thread ownership, stale-generation protection, cleanup guarantees and regression tests.
