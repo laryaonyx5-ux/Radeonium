@@ -3,6 +3,8 @@ package dev.radeonium.client.render;
 import com.mojang.renderpearl.api.pipeline.RenderPipeline;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
+import net.minecraft.client.renderer.oit.OitPipelineSet;
+import net.minecraft.client.renderer.oit.OitStage;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -24,25 +26,73 @@ class RadeoniumTerrainPipelinesTest {
     @Test
     void opaqueAndCutoutNeverUseTheHostPipelineOverride() {
         RenderPipeline hostOverride = RenderPipelines.SOLID_TERRAIN;
-
         assertSame(RadeoniumTerrainPipelines.forLayer(ChunkSectionLayer.SOLID),
-                RadeoniumTerrainPipelines.resolve(ChunkSectionLayer.SOLID, hostOverride));
+                RadeoniumTerrainPipelines.resolve(ChunkSectionLayer.SOLID, hostOverride, null));
         assertSame(RadeoniumTerrainPipelines.forLayer(ChunkSectionLayer.CUTOUT),
-                RadeoniumTerrainPipelines.resolve(ChunkSectionLayer.CUTOUT, hostOverride));
+                RadeoniumTerrainPipelines.resolve(ChunkSectionLayer.CUTOUT, hostOverride, null));
     }
 
     @Test
-    void translucentKeepsHostOverrideOrVanillaFallback() {
-        RenderPipeline hostOverride = RenderPipelines.TRANSLUCENT_TERRAIN;
+    void createsThreeDistinctRadeoniumOwnedOitStages() {
+        OitPipelineSet set = RadeoniumTerrainPipelines.translucentOitPipelines();
+        RenderPipeline depth = set.getPipeline(OitStage.DEPTH_BOUNDS);
+        RenderPipeline transmittance = set.getPipeline(OitStage.TRANSMITTANCE);
+        RenderPipeline accumulate = set.getPipeline(OitStage.ACCUMULATE);
 
-        assertSame(hostOverride,
-                RadeoniumTerrainPipelines.resolve(ChunkSectionLayer.TRANSLUCENT, hostOverride));
+        assertNotSame(depth, transmittance);
+        assertNotSame(depth, accumulate);
+        assertNotSame(transmittance, accumulate);
+        assertTrue(RadeoniumTerrainPipelines.owns(depth));
+        assertTrue(RadeoniumTerrainPipelines.owns(transmittance));
+        assertTrue(RadeoniumTerrainPipelines.owns(accumulate));
+        assertTrue(depth.getLocation().toString().startsWith("radeonium:"));
+        assertTrue(transmittance.getLocation().toString().startsWith("radeonium:"));
+        assertTrue(accumulate.getLocation().toString().startsWith("radeonium:"));
+    }
+
+    @Test
+    void mapsVanillaOitStagesToMatchingRadeoniumStages() {
+        OitPipelineSet vanilla = RenderPipelines.OIT_TERRAIN;
+        OitPipelineSet owned = RadeoniumTerrainPipelines.translucentOitPipelines();
+
+        assertSame(owned.depthBoundsPipeline(),
+                RadeoniumTerrainPipelines.resolve(ChunkSectionLayer.TRANSLUCENT,
+                        vanilla.depthBoundsPipeline(), null));
+        assertSame(owned.transmittancePipeline(),
+                RadeoniumTerrainPipelines.resolve(ChunkSectionLayer.TRANSLUCENT,
+                        vanilla.transmittancePipeline(), null));
+        assertSame(owned.accumulatePipeline(),
+                RadeoniumTerrainPipelines.resolve(ChunkSectionLayer.TRANSLUCENT,
+                        null, vanilla.accumulatePipeline()));
+    }
+
+    @Test
+    void mapsMultidrawOitStagesAndPreservesClassicFallback() {
+        OitPipelineSet vanilla = RenderPipelines.OIT_TERRAIN_MULTIDRAW;
+        OitPipelineSet owned = RadeoniumTerrainPipelines.translucentOitPipelines();
+
+        assertSame(owned.depthBoundsPipeline(),
+                RadeoniumTerrainPipelines.resolve(ChunkSectionLayer.TRANSLUCENT,
+                        null, vanilla.depthBoundsPipeline()));
+        assertSame(owned.transmittancePipeline(),
+                RadeoniumTerrainPipelines.resolve(ChunkSectionLayer.TRANSLUCENT,
+                        null, vanilla.transmittancePipeline()));
+        assertSame(owned.accumulatePipeline(),
+                RadeoniumTerrainPipelines.resolve(ChunkSectionLayer.TRANSLUCENT,
+                        vanilla.accumulatePipeline(), null));
         assertSame(ChunkSectionLayer.TRANSLUCENT.pipeline(false),
-                RadeoniumTerrainPipelines.resolve(ChunkSectionLayer.TRANSLUCENT, null));
+                RadeoniumTerrainPipelines.resolve(ChunkSectionLayer.TRANSLUCENT, null, null));
     }
 
     @Test
-    void translucentPipelineIsNotClaimedAsRadeoniumOwned() {
+    void unknownHostOverrideIsPreservedForCompatibility() {
+        RenderPipeline custom = RenderPipelines.TRANSLUCENT_TERRAIN;
+        assertSame(custom, RadeoniumTerrainPipelines.resolve(
+                ChunkSectionLayer.TRANSLUCENT, custom, null));
+    }
+
+    @Test
+    void translucentPipelineIsNotExposedAsOpaqueLayerPipeline() {
         assertThrows(IllegalArgumentException.class,
                 () -> RadeoniumTerrainPipelines.forLayer(ChunkSectionLayer.TRANSLUCENT));
     }
@@ -52,6 +102,6 @@ class RadeoniumTerrainPipelinesTest {
         assertThrows(IllegalArgumentException.class,
                 () -> RadeoniumTerrainPipelines.forLayer(null));
         assertThrows(IllegalArgumentException.class,
-                () -> RadeoniumTerrainPipelines.resolve(null, null));
+                () -> RadeoniumTerrainPipelines.resolve(null, null, null));
     }
 }
