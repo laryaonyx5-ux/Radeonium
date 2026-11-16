@@ -9,6 +9,7 @@ public final class TerrainGpuUploadMetrics {
             long attempts,
             long successes,
             long failures,
+            long skipped,
             long submittedBytes,
             long totalNanos,
             long maxUploadNanos
@@ -21,6 +22,7 @@ public final class TerrainGpuUploadMetrics {
     private long attempts;
     private long successes;
     private long failures;
+    private long skipped;
     private long submittedBytes;
     private long totalNanos;
     private long maxUploadNanos;
@@ -40,14 +42,24 @@ public final class TerrainGpuUploadMetrics {
         }
     }
 
+    public synchronized void recordSkipped(long payloadBytes, long elapsedNanos) {
+        if (payloadBytes < 0 || elapsedNanos < 0) {
+            throw new IllegalArgumentException("upload bytes and duration cannot be negative");
+        }
+        attempts = Math.addExact(attempts, 1L);
+        skipped = Math.addExact(skipped, 1L);
+        submittedBytes = Math.addExact(submittedBytes, payloadBytes);
+    }
+
     public synchronized Snapshot snapshot() {
-        return new Snapshot(attempts, successes, failures, submittedBytes, totalNanos, maxUploadNanos);
+        return new Snapshot(attempts, successes, failures, skipped, submittedBytes, totalNanos, maxUploadNanos);
     }
 
     public synchronized void reset() {
         attempts = 0L;
         successes = 0L;
         failures = 0L;
+        skipped = 0L;
         submittedBytes = 0L;
         totalNanos = 0L;
         maxUploadNanos = 0L;
