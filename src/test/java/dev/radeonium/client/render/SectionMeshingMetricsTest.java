@@ -18,6 +18,7 @@ class SectionMeshingMetricsTest {
         assertEquals(2, snapshot.completed());
         assertEquals(0, snapshot.failed());
         assertEquals(0, snapshot.rejected());
+        assertEquals(0, snapshot.cancelled());
         assertEquals(30, snapshot.totalQueueWaitNanos());
         assertEquals(400, snapshot.totalBuildNanos());
         assertEquals(300, snapshot.maxBuildNanos());
@@ -47,7 +48,7 @@ class SectionMeshingMetricsTest {
         metrics.recordCompleted(1, 2);
         metrics.reset();
 
-        assertEquals(new SectionMeshingMetrics.Snapshot(0, 0, 0, 0, 0, 0, 0), metrics.snapshot());
+        assertEquals(new SectionMeshingMetrics.Snapshot(0, 0, 0, 0, 0, 0, 0, 0), metrics.snapshot());
     }
 
     @Test
