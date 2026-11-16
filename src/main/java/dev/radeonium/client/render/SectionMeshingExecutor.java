@@ -2,8 +2,10 @@ package dev.radeonium.client.render;
 
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 
 /**
  * Bounded worker pool for CPU section meshing.
@@ -16,6 +18,7 @@ public final class SectionMeshingExecutor implements AutoCloseable {
     private final ThreadPoolExecutor workers;
     private final SectionMeshBuilder builder = new SectionMeshBuilder();
     private final MinecraftSectionModelMesher minecraftMesher = new MinecraftSectionModelMesher();
+    private final SectionMeshingMetrics metrics = new SectionMeshingMetrics();
 
     public SectionMeshingExecutor() {
         int processors = Math.max(1, Runtime.getRuntime().availableProcessors());
@@ -37,19 +40,8 @@ public final class SectionMeshingExecutor implements AutoCloseable {
     }
 
     public CompletableFuture<SectionMesh> buildAsync(VoxelSectionSnapshot snapshot) {
-        CompletableFuture<SectionMesh> result = new CompletableFuture<>();
-        try {
-            workers.execute(() -> {
-                try {
-                    result.complete(builder.build(snapshot));
-                } catch (Throwable throwable) {
-                    result.completeExceptionally(throwable);
-                }
-            });
-        } catch (java.util.concurrent.RejectedExecutionException rejected) {
-            result.completeExceptionally(rejected);
-        }
-        return result;
+        if (snapshot == null) throw new IllegalArgumentException("snapshot cannot be null");
+        return submit(() -> builder.build(snapshot));
     }
 
     /** CPU-mesh an immutable Minecraft capture without accessing world or renderer state. */
@@ -57,18 +49,30 @@ public final class SectionMeshingExecutor implements AutoCloseable {
             MinecraftSectionModelMesher.CapturedSectionInput input
     ) {
         if (input == null) throw new IllegalArgumentException("input cannot be null");
-        CompletableFuture<MinecraftSectionModelMesher.SectionModelMesh> result = new CompletableFuture<>();
+        return submit(() -> minecraftMesher.buildResolved(input.blocks())
+                .withUnsupportedBlockEntityCount(input.unsupportedBlockEntityCount())
+                .withFluids(input.fluids()));
+    }
+
+    private <T> CompletableFuture<T> submit(Supplier<T> build) {
+        CompletableFuture<T> result = new CompletableFuture<>();
+        long submittedAt = System.nanoTime();
         try {
             workers.execute(() -> {
+                long startedAt = System.nanoTime();
+                long queueWait = Math.max(0L, startedAt - submittedAt);
                 try {
-                    result.complete(minecraftMesher.buildResolved(input.blocks())
-                            .withUnsupportedBlockEntityCount(input.unsupportedBlockEntityCount())
-                            .withFluids(input.fluids()));
+                    T value = build.get();
+                    metrics.recordCompleted(queueWait, Math.max(0L, System.nanoTime() - startedAt));
+                    result.complete(value);
                 } catch (Throwable failure) {
+                    metrics.recordFailed(queueWait, Math.max(0L, System.nanoTime() - startedAt));
                     result.completeExceptionally(failure);
                 }
             });
-        } catch (java.util.concurrent.RejectedExecutionException rejected) {
+            metrics.recordSubmitted();
+        } catch (RejectedExecutionException rejected) {
+            metrics.recordRejected();
             result.completeExceptionally(rejected);
         }
         return result;
@@ -80,6 +84,18 @@ public final class SectionMeshingExecutor implements AutoCloseable {
 
     public int activeWorkers() {
         return workers.getActiveCount();
+    }
+
+    public int workerCount() {
+        return workers.getPoolSize();
+    }
+
+    public int maximumWorkerCount() {
+        return workers.getMaximumPoolSize();
+    }
+
+    public SectionMeshingMetrics.Snapshot metricsSnapshot() {
+        return metrics.snapshot();
     }
 
     @Override
