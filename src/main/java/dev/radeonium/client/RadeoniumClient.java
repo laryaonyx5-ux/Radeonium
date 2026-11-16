@@ -13,6 +13,7 @@ import dev.radeonium.client.render.MinecraftSectionModelCaptureStore;
 import dev.radeonium.client.render.RendererSectionTracker;
 import dev.radeonium.client.render.TerrainRenderDiagnostics;
 import dev.radeonium.client.render.TerrainDrawBatchMetrics;
+import dev.radeonium.client.render.TerrainGpuUploadMetrics;
 import dev.radeonium.client.render.SectionMeshingExecutor;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
@@ -40,6 +41,8 @@ public final class RadeoniumClient implements ClientModInitializer {
             new TerrainRenderDiagnostics();
     private static final TerrainDrawBatchMetrics TERRAIN_DRAW_BATCH_METRICS =
             new TerrainDrawBatchMetrics();
+    private static final TerrainGpuUploadMetrics TERRAIN_GPU_UPLOAD_METRICS =
+            new TerrainGpuUploadMetrics();
     private static final MinecraftSectionGpuCache MINECRAFT_GPU_CACHE = new MinecraftSectionGpuCache();
     private static final SectionMeshingExecutor SECTION_MESHING_EXECUTOR = new SectionMeshingExecutor();
     private static final MinecraftCompiledGeometryGpuCache COMPILED_GEOMETRY_GPU_CACHE =
@@ -70,7 +73,16 @@ public final class RadeoniumClient implements ClientModInitializer {
         for (int i = 0; i < 4; i++) {
             MinecraftCompiledGeometryStore.Snapshot snapshot = PENDING_GEOMETRY_UPLOADS.poll();
             if (snapshot == null) break;
-            COMPILED_GEOMETRY_GPU_CACHE.upload(snapshot);
+            long startedAt = System.nanoTime();
+            try {
+                boolean uploaded = COMPILED_GEOMETRY_GPU_CACHE.upload(snapshot);
+                TERRAIN_GPU_UPLOAD_METRICS.record(
+                        snapshot.byteSize(), System.nanoTime() - startedAt, uploaded);
+            } catch (RuntimeException | Error failure) {
+                TERRAIN_GPU_UPLOAD_METRICS.record(
+                        snapshot.byteSize(), System.nanoTime() - startedAt, false);
+                throw failure;
+            }
         }
     }
 
@@ -147,6 +159,11 @@ public final class RadeoniumClient implements ClientModInitializer {
         return RENDERER_PIPELINE;
     }
 
+    /** Render-thread GPU upload timing and payload-byte measurements. */
+    public static TerrainGpuUploadMetrics terrainGpuUploadMetrics() {
+        return TERRAIN_GPU_UPLOAD_METRICS;
+    }
+
     /** Per-frame measurements of terrain draw batching and vertex-buffer changes. */
     public static TerrainDrawBatchMetrics terrainDrawBatchMetrics() {
         return TERRAIN_DRAW_BATCH_METRICS;
@@ -214,6 +231,7 @@ public final class RadeoniumClient implements ClientModInitializer {
             RendererSectionTracker.reset();
             TERRAIN_RENDER_DIAGNOSTICS.reset();
             TERRAIN_DRAW_BATCH_METRICS.beginFrame();
+            TERRAIN_GPU_UPLOAD_METRICS.reset();
         });
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             if (INVALIDATE_MODEL_GPU_CACHE.getAndSet(false)) MINECRAFT_GPU_CACHE.clear();
