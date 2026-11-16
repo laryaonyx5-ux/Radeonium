@@ -93,6 +93,17 @@ class RadeoniumTerrainPipelinesTest {
     }
 
     @Test
+    void thirdPartyOverrideWinsOverVanillaOitStageInOtherSlot() {
+        RenderPipeline custom = RenderPipelines.TRANSLUCENT_TERRAIN;
+        RenderPipeline vanillaStage = RenderPipelines.OIT_TERRAIN.accumulatePipeline();
+
+        assertSame(custom, RadeoniumTerrainPipelines.resolve(
+                ChunkSectionLayer.TRANSLUCENT, custom, vanillaStage));
+        assertSame(custom, RadeoniumTerrainPipelines.resolve(
+                ChunkSectionLayer.TRANSLUCENT, vanillaStage, custom));
+    }
+
+    @Test
     void translucentPipelineIsNotExposedAsOpaqueLayerPipeline() {
         assertThrows(IllegalArgumentException.class,
                 () -> RadeoniumTerrainPipelines.forLayer(ChunkSectionLayer.TRANSLUCENT));
