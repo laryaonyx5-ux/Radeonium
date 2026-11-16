@@ -76,8 +76,12 @@ public final class RadeoniumClient implements ClientModInitializer {
             long startedAt = System.nanoTime();
             try {
                 boolean uploaded = COMPILED_GEOMETRY_GPU_CACHE.upload(snapshot);
-                TERRAIN_GPU_UPLOAD_METRICS.record(
-                        snapshot.byteSize(), System.nanoTime() - startedAt, uploaded);
+                long elapsed = System.nanoTime() - startedAt;
+                if (uploaded) {
+                    TERRAIN_GPU_UPLOAD_METRICS.record(snapshot.byteSize(), elapsed, true);
+                } else {
+                    TERRAIN_GPU_UPLOAD_METRICS.recordSkipped(snapshot.byteSize(), elapsed);
+                }
             } catch (RuntimeException | Error failure) {
                 TERRAIN_GPU_UPLOAD_METRICS.record(
                         snapshot.byteSize(), System.nanoTime() - startedAt, false);
