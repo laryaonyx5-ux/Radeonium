@@ -45,9 +45,10 @@ class RadeoniumTerrainPipelinesTest {
         assertTrue(RadeoniumTerrainPipelines.owns(depth));
         assertTrue(RadeoniumTerrainPipelines.owns(transmittance));
         assertTrue(RadeoniumTerrainPipelines.owns(accumulate));
-        assertTrue(depth.getLocation().toString().startsWith("radeonium:"));
-        assertTrue(transmittance.getLocation().toString().startsWith("radeonium:"));
-        assertTrue(accumulate.getLocation().toString().startsWith("radeonium:"));
+        OitPipelineSet vanilla = RenderPipelines.OIT_TERRAIN;
+        assertNotSame(depth, vanilla.depthBoundsPipeline());
+        assertNotSame(transmittance, vanilla.transmittancePipeline());
+        assertNotSame(accumulate, vanilla.accumulatePipeline());
     }
 
     @Test
