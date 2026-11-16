@@ -19,11 +19,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Radeonium-owned implementation of the per-layer terrain draw submission.
- * The existing Minecraft frame graph still owns pass scheduling and OIT,
- * while Radeonium binds the layer pipeline and submits the prepared section draws.
- */
 @Mixin(ChunkSectionsToRender.DrawSeparate.class)
 public abstract class ChunkSectionsToRenderMixin {
     @Shadow @Final
@@ -46,7 +41,8 @@ public abstract class ChunkSectionsToRenderMixin {
             RenderPipeline pipelineOverrideMultidraw,
             CallbackInfo ci
     ) {
-        RenderPipeline pipeline = RadeoniumTerrainPipelines.resolve(layer, pipelineOverride);
+        RenderPipeline pipeline = RadeoniumTerrainPipelines.resolve(
+                layer, pipelineOverride, pipelineOverrideMultidraw);
         renderPass.setPipeline(RenderSystem.getCompiledPipeline(pipeline));
 
         List<RenderPass.Draw<GpuBufferSlice[]>> layerDraws = drawsPerLayer.get(layer);
