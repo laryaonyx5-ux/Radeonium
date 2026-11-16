@@ -259,6 +259,23 @@ public final class RadeoniumChunkSectionsToRender {
                     draws.get(ChunkSectionLayer.TRANSLUCENT).add(entry.draw()));
         }
 
+        // Opaque and cutout draws are depth-tested: group equal vertex-buffer
+        // handles to reduce avoidable buffer switches without changing each
+        // draw's section uniform or index range. Translucent order is untouched.
+        for (ChunkSectionLayer layer : List.of(ChunkSectionLayer.SOLID, ChunkSectionLayer.CUTOUT)) {
+            List<RenderPass.Draw<GpuBufferSlice[]>> grouped = TerrainDrawBatcher.groupByVertexBuffer(
+                    draws.get(layer), RenderPass.Draw::vertexBuffer);
+            draws.put(layer, grouped);
+        }
+
+        TerrainDrawBatchMetrics batchMetrics = RadeoniumClient.terrainDrawBatchMetrics();
+        batchMetrics.beginFrame();
+        for (ChunkSectionLayer layer : ChunkSectionLayer.values()) {
+            for (RenderPass.Draw<GpuBufferSlice[]> draw : draws.get(layer)) {
+                batchMetrics.recordDraw(layer, draw.vertexBuffer());
+            }
+        }
+
         var atlas = Minecraft.getInstance().getTextureManager()
                 .getTexture(TextureAtlas.LOCATION_BLOCKS).getTextureView();
         GpuBufferSlice terrainUniform = RenderSystem.getDynamicUniforms().writeTerrainTransform(
