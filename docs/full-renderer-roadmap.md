@@ -352,12 +352,16 @@ The in-game validation matrix remains required before enabling the opt-in path b
 
 ## Step 15 — multithreaded terrain preparation
 
-**Status: first half (50%) implemented; CI validation pending; live workload profiling pending.**
+**Status: implementation and focused tests complete; GitHub Actions validation pending; live workload profiling pending.**
 
 - The existing bounded CPU meshing pool remains the only worker path for immutable section inputs; workers never access the live Minecraft world or GPU resources.
 - Added `SectionMeshingMetrics` to record accepted jobs, completed builds, build failures, rejected submissions, queue-wait duration and worker build duration (including maximum and average build time).
 - Instrumented both prototype voxel builds and Minecraft section-model builds. Rejected submissions remain exceptional futures and are not silently moved onto the caller/render thread.
 - Exposed worker-pool metrics and worker-count information for diagnostics.
 - Added focused tests for aggregation, failures versus queue rejections, reset and invalid timing values.
-- **Second half:** use worker/queue pressure and stale-generation information to improve scheduling/cancellation and shutdown behavior without violating immutable-snapshot rules, bounded memory or render-thread GPU ownership.
+- Added stale-snapshot predicates to both meshing entry points. The predicate is checked before work starts and again after the CPU build, so obsolete results are never published; callers can cancel queued futures, which removes those jobs from the bounded queue when they have not started.
+- Added cancellation telemetry, queue-capacity visibility and explicit closed-state reporting. Submissions after shutdown are rejected immediately rather than being accepted into a dead pool.
+- Shutdown now stops admission, allows a short graceful drain, then interrupts and completes abandoned queued jobs as cancelled. Repeated close calls are safe; GPU upload and resource disposal remain render-thread-owned.
+- Added focused tests for stale-result rejection, cancellation accounting, closed-pool rejection and idempotent shutdown, alongside the first-half worker metrics tests.
+- The executor accepts only immutable captures and a thread-safe validity predicate; it never reads the live world from a worker. Queue capacity remains bounded at 256.
 - These counters measure CPU-side queue/build time, not GPU time or FPS. No performance gain is claimed until measured in a live Minecraft workload.
