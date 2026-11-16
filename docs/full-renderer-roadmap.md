@@ -327,15 +327,14 @@ The existing Step 7.5 bridge still captures Minecraft-compiled geometry as a saf
 
 The in-game validation matrix remains required before enabling the opt-in path by default. The roadmap above describes the larger renderer project that follows; Milestone B completion does not mark those future milestones complete.
 
-## Step 13 — terrain draw batching (first half: 50%)
+## Step 13 — terrain draw batching
 
-**Status: batching measurement foundation implemented; live draw-path integration and actual batching remain for the second half.**
+**Status: code, automated tests and GitHub Actions build/test/JAR packaging complete; live-client performance validation pending.**
 
-- Added `TerrainDrawBatchMetrics`, a per-frame, per-layer measurement utility.
-- It counts draw entries, unique vertex-buffer identities and contiguous vertex-buffer bind runs in submission order.
-- Buffer identity uses object identity rather than `equals`, avoiding false merges between distinct GPU handles.
-- Frame metrics can be reset independently without changing the cumulative draw-source diagnostics.
-- Tests cover repeated and alternating buffers, per-layer isolation, frame reset, null-buffer handling and invalid input.
-- This first half is instrumentation only: it does not reorder translucent draws, combine GPU allocations or claim fewer actual GPU draw calls.
-
-**Second half:** connect these metrics to the live terrain submission path, use the measurements to choose safe compatible batching groups, preserve per-section uniforms and translucent ordering, then add tests and verify CI. Do not merge draws across incompatible pipelines, index formats, vertex layouts or fallback ownership.
+- Added `TerrainDrawBatchMetrics`, which measures per-frame draw entries, unique vertex-buffer identities and contiguous buffer-bind runs per terrain layer.
+- Added stable identity-based grouping for SOLID and CUTOUT submissions. Draws using the same exact vertex-buffer handle are placed together, preserving their relative order within each group.
+- Each draw retains its own section uniform, index range and geometry. This implementation reduces avoidable vertex-buffer switches where handles are shared; it does not merge draw calls or GPU allocations.
+- TRANSLUCENT submissions are deliberately excluded from regrouping so their blending order is preserved.
+- Metrics are connected to the live draw-list construction and report the final per-layer submission order.
+- Tests cover grouping stability, identity rather than equality, null handles, invalid input, per-layer metrics and frame resets.
+- No FPS gain or actual draw-call reduction is claimed until measured in a live client. If visible opaque/cutout ordering issues appear, the grouping must be disabled or narrowed.
