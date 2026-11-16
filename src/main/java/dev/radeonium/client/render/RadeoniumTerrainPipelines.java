@@ -27,7 +27,7 @@ public final class RadeoniumTerrainPipelines {
             .build();
 
     private static final OitPipelineSet TRANSLUCENT_OIT = OitPipelineSet.builder(
-            Identifier.fromNamespaceAndPath("radeonium", "terrain_translucent"),
+            "terrain_translucent",
             RenderPipeline.builder(RenderPipelines.MULTIDRAW_TERRAIN_SNIPPET)
                     .withVertexShader(VERTEX_SHADER)
                     .withFragmentShader(FRAGMENT_SHADER)
