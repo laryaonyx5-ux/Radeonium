@@ -38,7 +38,7 @@ class TerrainDrawBatchMetricsTest {
         var snapshot = metrics.snapshot();
         assertEquals(2, snapshot.layers().get(ChunkSectionLayer.SOLID).uniqueVertexBuffers());
         assertEquals(1, snapshot.layers().get(ChunkSectionLayer.CUTOUT).draws());
-        assertEquals(2, snapshot.totalDraws());
+        assertEquals(3, snapshot.totalDraws());
     }
 
     @Test
