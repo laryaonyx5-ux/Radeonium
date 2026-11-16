@@ -53,17 +53,32 @@ public final class RadeoniumTerrainPipelines {
         if (layer == null) throw new IllegalArgumentException("layer cannot be null");
         if (layer != ChunkSectionLayer.TRANSLUCENT) return forLayer(layer);
 
+        // A non-vanilla override belongs to another mod and must never be
+        // replaced merely because the other override slot contains a vanilla OIT stage.
+        if (hostOverride != null && !isVanillaOitStage(hostOverride)) return hostOverride;
+        if (hostOverrideMultidraw != null && !isVanillaOitStage(hostOverrideMultidraw)) {
+            return hostOverrideMultidraw;
+        }
+
         RenderPipeline ownedOit = resolveHostOitStage(hostOverride);
         if (ownedOit == null) ownedOit = resolveHostOitStage(hostOverrideMultidraw);
         if (ownedOit != null) return ownedOit;
-
-        if (hostOverride != null) return hostOverride;
-        if (hostOverrideMultidraw != null) return hostOverrideMultidraw;
         return layer.pipeline(false);
     }
 
     public static RenderPipeline resolve(ChunkSectionLayer layer, RenderPipeline hostOverride) {
         return resolve(layer, hostOverride, null);
+    }
+
+    private static boolean isVanillaOitStage(RenderPipeline candidate) {
+        if (candidate == null) return false;
+        OitPipelineSet separate = RenderPipelines.OIT_TERRAIN;
+        OitPipelineSet multidraw = RenderPipelines.OIT_TERRAIN_MULTIDRAW;
+        for (OitStage stage : OitStage.values()) {
+            if (candidate == separate.getPipeline(stage)
+                    || candidate == multidraw.getPipeline(stage)) return true;
+        }
+        return false;
     }
 
     private static RenderPipeline resolveHostOitStage(RenderPipeline candidate) {
