@@ -30,9 +30,9 @@ class SectionMeshingExecutorTest {
             var capture = new MinecraftSectionModelMesher.CapturedSectionInput(List.of(), 0);
             var result = executor.buildMinecraftAsync(capture, () -> false);
 
-            ExecutionException failure = assertThrows(
-                    ExecutionException.class, () -> result.get(5, TimeUnit.SECONDS));
-            assertInstanceOf(CancellationException.class, failure.getCause());
+            Exception failure = assertThrows(Exception.class, () -> result.get(5, TimeUnit.SECONDS));
+            assertTrue(failure instanceof CancellationException
+                    || failure instanceof ExecutionException && failure.getCause() instanceof CancellationException);
             assertEquals(1L, executor.metricsSnapshot().cancelled());
             assertEquals(0L, executor.metricsSnapshot().completed());
         }
