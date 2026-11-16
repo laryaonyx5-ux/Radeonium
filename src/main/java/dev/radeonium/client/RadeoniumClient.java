@@ -14,6 +14,7 @@ import dev.radeonium.client.render.RendererSectionTracker;
 import dev.radeonium.client.render.TerrainRenderDiagnostics;
 import dev.radeonium.client.render.TerrainDrawBatchMetrics;
 import dev.radeonium.client.render.TerrainGpuUploadMetrics;
+import dev.radeonium.client.render.TerrainGpuUploadBudget;
 import dev.radeonium.client.render.SectionMeshingExecutor;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
@@ -69,22 +70,38 @@ public final class RadeoniumClient implements ClientModInitializer {
     }
 
     private static void drainCompiledGeometryUploads() {
-        // Bound per-tick work so a burst of chunk compilation cannot monopolize a frame.
-        for (int i = 0; i < 4; i++) {
+        // Bound render-thread work by item count, payload bytes and elapsed CPU time.
+        long tickStartedAt = System.nanoTime();
+        long uploadedPayloadBytes = 0L;
+        int uploadsThisTick = 0;
+        while (true) {
+            MinecraftCompiledGeometryStore.Snapshot next = PENDING_GEOMETRY_UPLOADS.peek();
+            if (next == null) break;
+            long nextBytes = next.byteSize();
+            if (!TerrainGpuUploadBudget.canUploadNext(
+                    uploadsThisTick,
+                    uploadedPayloadBytes,
+                    System.nanoTime() - tickStartedAt,
+                    nextBytes)) {
+                break;
+            }
+
             MinecraftCompiledGeometryStore.Snapshot snapshot = PENDING_GEOMETRY_UPLOADS.poll();
             if (snapshot == null) break;
             long startedAt = System.nanoTime();
+            uploadsThisTick++;
+            uploadedPayloadBytes = Math.addExact(uploadedPayloadBytes, nextBytes);
             try {
                 boolean uploaded = COMPILED_GEOMETRY_GPU_CACHE.upload(snapshot);
                 long elapsed = System.nanoTime() - startedAt;
                 if (uploaded) {
-                    TERRAIN_GPU_UPLOAD_METRICS.record(snapshot.byteSize(), elapsed, true);
+                    TERRAIN_GPU_UPLOAD_METRICS.record(nextBytes, elapsed, true);
                 } else {
-                    TERRAIN_GPU_UPLOAD_METRICS.recordSkipped(snapshot.byteSize(), elapsed);
+                    TERRAIN_GPU_UPLOAD_METRICS.recordSkipped(nextBytes, elapsed);
                 }
             } catch (RuntimeException | Error failure) {
                 TERRAIN_GPU_UPLOAD_METRICS.record(
-                        snapshot.byteSize(), System.nanoTime() - startedAt, false);
+                        nextBytes, System.nanoTime() - startedAt, false);
                 throw failure;
             }
         }
