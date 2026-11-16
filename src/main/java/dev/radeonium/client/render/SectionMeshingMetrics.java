@@ -10,12 +10,14 @@ public final class SectionMeshingMetrics {
             long completed,
             long failed,
             long rejected,
+            long cancelled,
             long totalQueueWaitNanos,
             long totalBuildNanos,
             long maxBuildNanos
     ) {
         public long averageBuildNanos() {
-            return completed == 0 ? 0L : totalBuildNanos / completed;
+            long builds = completed + failed;
+            return builds == 0 ? 0L : totalBuildNanos / builds;
         }
     }
 
@@ -23,29 +25,28 @@ public final class SectionMeshingMetrics {
     private long completed;
     private long failed;
     private long rejected;
+    private long cancelled;
     private long totalQueueWaitNanos;
     private long totalBuildNanos;
     private long maxBuildNanos;
 
-    public synchronized void recordSubmitted() {
-        submitted = Math.addExact(submitted, 1L);
-    }
-
-    public synchronized void recordRejected() {
-        rejected = Math.addExact(rejected, 1L);
-    }
+    public synchronized void recordSubmitted() { submitted = Math.addExact(submitted, 1L); }
+    public synchronized void recordRejected() { rejected = Math.addExact(rejected, 1L); }
+    public synchronized void recordCancelled() { cancelled = Math.addExact(cancelled, 1L); }
 
     public synchronized void recordCompleted(long queueWaitNanos, long buildNanos) {
         validateDurations(queueWaitNanos, buildNanos);
         completed = Math.addExact(completed, 1L);
-        totalQueueWaitNanos = Math.addExact(totalQueueWaitNanos, queueWaitNanos);
-        totalBuildNanos = Math.addExact(totalBuildNanos, buildNanos);
-        maxBuildNanos = Math.max(maxBuildNanos, buildNanos);
+        recordDuration(queueWaitNanos, buildNanos);
     }
 
     public synchronized void recordFailed(long queueWaitNanos, long buildNanos) {
         validateDurations(queueWaitNanos, buildNanos);
         failed = Math.addExact(failed, 1L);
+        recordDuration(queueWaitNanos, buildNanos);
+    }
+
+    private void recordDuration(long queueWaitNanos, long buildNanos) {
         totalQueueWaitNanos = Math.addExact(totalQueueWaitNanos, queueWaitNanos);
         totalBuildNanos = Math.addExact(totalBuildNanos, buildNanos);
         maxBuildNanos = Math.max(maxBuildNanos, buildNanos);
@@ -58,17 +59,12 @@ public final class SectionMeshingMetrics {
     }
 
     public synchronized Snapshot snapshot() {
-        return new Snapshot(submitted, completed, failed, rejected,
+        return new Snapshot(submitted, completed, failed, rejected, cancelled,
                 totalQueueWaitNanos, totalBuildNanos, maxBuildNanos);
     }
 
     public synchronized void reset() {
-        submitted = 0L;
-        completed = 0L;
-        failed = 0L;
-        rejected = 0L;
-        totalQueueWaitNanos = 0L;
-        totalBuildNanos = 0L;
-        maxBuildNanos = 0L;
+        submitted = completed = failed = rejected = cancelled = 0L;
+        totalQueueWaitNanos = totalBuildNanos = maxBuildNanos = 0L;
     }
 }
