@@ -15,6 +15,7 @@ class TerrainGpuUploadMetricsTest {
         assertEquals(2, snapshot.attempts());
         assertEquals(2, snapshot.successes());
         assertEquals(0, snapshot.failures());
+        assertEquals(0, snapshot.skipped());
         assertEquals(3072, snapshot.submittedBytes());
         assertEquals(400, snapshot.totalNanos());
         assertEquals(300, snapshot.maxUploadNanos());
@@ -30,6 +31,7 @@ class TerrainGpuUploadMetricsTest {
         assertEquals(1, snapshot.attempts());
         assertEquals(0, snapshot.successes());
         assertEquals(1, snapshot.failures());
+        assertEquals(0, snapshot.skipped());
         assertEquals(512, snapshot.submittedBytes());
         assertEquals(0, snapshot.totalNanos());
         assertEquals(0, snapshot.averageUploadNanos());
@@ -41,7 +43,7 @@ class TerrainGpuUploadMetricsTest {
         metrics.record(128, 50, true);
         metrics.reset();
 
-        assertEquals(new TerrainGpuUploadMetrics.Snapshot(0, 0, 0, 0, 0, 0), metrics.snapshot());
+        assertEquals(new TerrainGpuUploadMetrics.Snapshot(0, 0, 0, 0, 0, 0, 0), metrics.snapshot());
     }
 
     @Test
