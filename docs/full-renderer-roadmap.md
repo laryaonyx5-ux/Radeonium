@@ -349,3 +349,15 @@ The in-game validation matrix remains required before enabling the opt-in path b
 - Uploads remain on the render thread. Existing bounded queue capacity, 64 MiB GPU cache limit, stale-snapshot checks, per-layer allocation cleanup and vanilla fallback are retained.
 - Added focused tests for metrics aggregation/reset/failure/skip accounting and scheduler count/byte/time limits, including oversized-first-item and invalid-input cases.
 - The measured duration is CPU-side wall time around the upload call, not GPU execution time. These limits are conservative starting values, not device-specific tuning; live profiling is still required before claiming an FPS improvement.
+
+## Step 15 — multithreaded terrain preparation
+
+**Status: first half (50%) implemented; CI validation pending; live workload profiling pending.**
+
+- The existing bounded CPU meshing pool remains the only worker path for immutable section inputs; workers never access the live Minecraft world or GPU resources.
+- Added `SectionMeshingMetrics` to record accepted jobs, completed builds, build failures, rejected submissions, queue-wait duration and worker build duration (including maximum and average build time).
+- Instrumented both prototype voxel builds and Minecraft section-model builds. Rejected submissions remain exceptional futures and are not silently moved onto the caller/render thread.
+- Exposed worker-pool metrics and worker-count information for diagnostics.
+- Added focused tests for aggregation, failures versus queue rejections, reset and invalid timing values.
+- **Second half:** use worker/queue pressure and stale-generation information to improve scheduling/cancellation and shutdown behavior without violating immutable-snapshot rules, bounded memory or render-thread GPU ownership.
+- These counters measure CPU-side queue/build time, not GPU time or FPS. No performance gain is claimed until measured in a live Minecraft workload.
