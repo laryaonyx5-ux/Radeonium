@@ -3,16 +3,10 @@ package dev.radeonium.client.render;
 import com.mojang.renderpearl.api.pipeline.RenderPipeline;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
+import net.minecraft.client.renderer.oit.OitPipelineSet;
+import net.minecraft.client.renderer.oit.OitStage;
 import net.minecraft.resources.Identifier;
 
-/**
- * Radeonium-owned RenderPearl pipelines and shader stages for opaque terrain.
- *
- * Radeonium supplies its own vertex and fragment shaders while reusing
- * Minecraft's terrain snippet for the compatible bind-group layout, vertex
- * format and fixed render state. Translucent terrain remains host-owned so
- * Minecraft's OIT/depth-bounds integration is not accidentally bypassed.
- */
 public final class RadeoniumTerrainPipelines {
     private static final Identifier VERTEX_SHADER =
             Identifier.fromNamespaceAndPath("radeonium", "core/terrain");
@@ -32,39 +26,76 @@ public final class RadeoniumTerrainPipelines {
             .withLocation(Identifier.fromNamespaceAndPath("radeonium", "pipeline/terrain_cutout"))
             .build();
 
+    private static final OitPipelineSet TRANSLUCENT_OIT = OitPipelineSet.builder(
+            Identifier.fromNamespaceAndPath("radeonium", "terrain_translucent"),
+            RenderPipeline.builder(RenderPipelines.MULTIDRAW_TERRAIN_SNIPPET)
+                    .withVertexShader(VERTEX_SHADER)
+                    .withFragmentShader(FRAGMENT_SHADER)
+    ).build();
+
     private RadeoniumTerrainPipelines() {}
 
-    /** Returns Radeonium's pipeline for an opaque/cutout layer. */
     public static RenderPipeline forLayer(ChunkSectionLayer layer) {
         if (layer == null) throw new IllegalArgumentException("layer cannot be null");
         return switch (layer) {
             case SOLID -> SOLID;
             case CUTOUT -> CUTOUT;
             case TRANSLUCENT -> throw new IllegalArgumentException(
-                    "translucent terrain remains host-owned until Milestone F");
+                    "translucent terrain uses the OIT stage resolver or the compatibility fallback");
         };
     }
 
-    /**
-     * Opaque and cutout draws always use Radeonium pipeline identities.
-     * Translucent draws preserve the frame graph's supplied OIT pipeline or
-     * fall back to Minecraft's matching translucent pipeline.
-     */
     public static RenderPipeline resolve(
-            ChunkSectionLayer layer, RenderPipeline hostOverride
+            ChunkSectionLayer layer,
+            RenderPipeline hostOverride,
+            RenderPipeline hostOverrideMultidraw
     ) {
         if (layer == null) throw new IllegalArgumentException("layer cannot be null");
-        if (layer == ChunkSectionLayer.TRANSLUCENT) {
-            return hostOverride != null ? hostOverride : layer.pipeline(false);
-        }
-        return forLayer(layer);
+        if (layer != ChunkSectionLayer.TRANSLUCENT) return forLayer(layer);
+
+        RenderPipeline ownedOit = resolveHostOitStage(hostOverride);
+        if (ownedOit == null) ownedOit = resolveHostOitStage(hostOverrideMultidraw);
+        if (ownedOit != null) return ownedOit;
+
+        if (hostOverride != null) return hostOverride;
+        if (hostOverrideMultidraw != null) return hostOverrideMultidraw;
+        return layer.pipeline(false);
     }
 
-    /** True when the pipeline is one of Radeonium's opaque/cutout identities. */
+    public static RenderPipeline resolve(ChunkSectionLayer layer, RenderPipeline hostOverride) {
+        return resolve(layer, hostOverride, null);
+    }
+
+    private static RenderPipeline resolveHostOitStage(RenderPipeline candidate) {
+        if (candidate == null) return null;
+        OitPipelineSet vanillaSeparate = RenderPipelines.OIT_TERRAIN;
+        OitPipelineSet vanillaMultiDraw = RenderPipelines.OIT_TERRAIN_MULTIDRAW;
+
+        if (candidate == vanillaSeparate.depthBoundsPipeline()
+                || candidate == vanillaMultiDraw.depthBoundsPipeline()) {
+            return TRANSLUCENT_OIT.getPipeline(OitStage.DEPTH_BOUNDS);
+        }
+        if (candidate == vanillaSeparate.transmittancePipeline()
+                || candidate == vanillaMultiDraw.transmittancePipeline()) {
+            return TRANSLUCENT_OIT.getPipeline(OitStage.TRANSMITTANCE);
+        }
+        if (candidate == vanillaSeparate.accumulatePipeline()
+                || candidate == vanillaMultiDraw.accumulatePipeline()) {
+            return TRANSLUCENT_OIT.getPipeline(OitStage.ACCUMULATE);
+        }
+        return null;
+    }
+
     public static boolean owns(RenderPipeline pipeline) {
         if (pipeline == null) return false;
-        String location = pipeline.getLocation().toString();
-        return location.equals("radeonium:pipeline/terrain_solid")
-                || location.equals("radeonium:pipeline/terrain_cutout");
+        if (pipeline == SOLID || pipeline == CUTOUT) return true;
+        for (OitStage stage : OitStage.values()) {
+            if (pipeline == TRANSLUCENT_OIT.getPipeline(stage)) return true;
+        }
+        return false;
+    }
+
+    static OitPipelineSet translucentOitPipelines() {
+        return TRANSLUCENT_OIT;
     }
 }
