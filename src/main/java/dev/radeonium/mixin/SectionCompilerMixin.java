@@ -94,7 +94,7 @@ public abstract class SectionCompilerMixin {
         AsyncCapture capture = RADEONIUM_CAPTURE.get().remove(sectionPos);
         if (capture != null) {
             dev.radeonium.client.RadeoniumClient.sectionMeshingExecutor()
-                    .buildMinecraftAsync(capture.input())
+                    .buildMinecraftAsync(capture.input(), () -> MinecraftSectionModelCaptureStore.isCurrent(capture.ticket()))
                     .whenComplete((mesh, error) -> {
                         if (error != null) MinecraftSectionModelCaptureStore.abortAsync(capture.ticket());
                         else {
