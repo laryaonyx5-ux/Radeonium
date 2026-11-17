@@ -54,7 +54,6 @@ class MinecraftSectionParityCheckerTest {
 
         assertFalse(report.layers().get(ChunkSectionLayer.CUTOUT).matches());
     }
-}
 
     @Test
     void nonQuadVertexCountIsNeverAccepted() {
@@ -89,3 +88,4 @@ class MinecraftSectionParityCheckerTest {
         assertEquals("Minecraft layer uses a different vertex format or topology",
                 report.layers().get(ChunkSectionLayer.TRANSLUCENT).reason());
     }
+}
