@@ -173,6 +173,41 @@ class MinecraftSectionModelCaptureStoreTest {
     }
 
     @Test
+    void asyncTicketIsCurrentOnlyWhileItsGenerationIsActive() {
+        SectionPos position = SectionPos.of(26, 2, 1);
+        var ticket = MinecraftSectionModelCaptureStore.beginAsyncCapture(position);
+
+        assertTrue(MinecraftSectionModelCaptureStore.isCurrent(ticket));
+        assertFalse(MinecraftSectionModelCaptureStore.isCurrent(null));
+
+        MinecraftSectionModelCaptureStore.abortAsync(ticket);
+        assertFalse(MinecraftSectionModelCaptureStore.isCurrent(ticket));
+    }
+
+    @Test
+    void supersededOrRemovedAsyncTicketIsNotCurrent() {
+        SectionPos position = SectionPos.of(27, 2, 1);
+        var oldTicket = MinecraftSectionModelCaptureStore.beginAsyncCapture(position);
+        var currentTicket = MinecraftSectionModelCaptureStore.beginAsyncCapture(position);
+
+        assertFalse(MinecraftSectionModelCaptureStore.isCurrent(oldTicket));
+        assertTrue(MinecraftSectionModelCaptureStore.isCurrent(currentTicket));
+
+        MinecraftSectionModelCaptureStore.remove(position);
+        assertFalse(MinecraftSectionModelCaptureStore.isCurrent(currentTicket));
+    }
+
+    @Test
+    void clearedWorldInvalidatesAsyncTicketBeforeWorkerBuildStarts() {
+        SectionPos position = SectionPos.of(28, 2, 1);
+        var ticket = MinecraftSectionModelCaptureStore.beginAsyncCapture(position);
+
+        MinecraftSectionModelCaptureStore.clear();
+
+        assertFalse(MinecraftSectionModelCaptureStore.isCurrent(ticket));
+    }
+
+    @Test
     void asyncCapturePublishesOnlyAfterItsWorkerFinishes() {
         SectionPos position = SectionPos.of(21, 2, 1);
         var mesh = new MinecraftSectionModelMesher().buildResolved(List.of());
