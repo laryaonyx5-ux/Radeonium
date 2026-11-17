@@ -60,7 +60,9 @@ public final class MinecraftSectionParityChecker {
             byte[] actual = vanillaLayer.vertexBytes();
             boolean validCounts = encoded.vertexCount() == vanillaLayer.vertexCount()
                     && expectedBytes == expected.length
-                    && actual.length >= expectedBytes
+                    && actual.length == expectedBytes
+                    && actual.length == Math.multiplyExact(
+                            vanillaLayer.vertexCount(), MinecraftMeshGpuUpload.VERTEX_STRIDE_BYTES)
                     && (encoded.vertexCount() % 4) == 0;
             boolean matches = validCounts && quadMultiset(expected).equals(
                     quadMultiset(Arrays.copyOf(actual, expectedBytes)));
