@@ -55,3 +55,37 @@ class MinecraftSectionParityCheckerTest {
         assertFalse(report.layers().get(ChunkSectionLayer.CUTOUT).matches());
     }
 }
+
+    @Test
+    void nonQuadVertexCountIsNeverAccepted() {
+        byte[] vanillaVertices = new byte[MinecraftMeshGpuUpload.VERTEX_STRIDE_BYTES * 3];
+        var layer = new MinecraftCompiledGeometryStore.LayerData(
+                vanillaVertices, new byte[0], DefaultVertexFormat.BLOCK.toString(),
+                PrimitiveTopology.QUADS.toString(), null, 3, 0);
+        var vanilla = new MinecraftCompiledGeometryStore.Snapshot(
+                SectionPos.of(1, 2, 3), Map.of(ChunkSectionLayer.SOLID, layer), 1L, 1L);
+        var mesh = new MinecraftSectionModelMesher().buildResolved(java.util.List.of());
+
+        var report = MinecraftSectionParityChecker.compare(mesh, vanilla);
+
+        assertFalse(report.layers().get(ChunkSectionLayer.SOLID).matches());
+        assertEquals("quad vertex records differ",
+                report.layers().get(ChunkSectionLayer.SOLID).reason());
+    }
+
+    @Test
+    void wrongPrimitiveTopologyIsNeverAccepted() {
+        byte[] vanillaVertices = new byte[MinecraftMeshGpuUpload.VERTEX_STRIDE_BYTES * 4];
+        var layer = new MinecraftCompiledGeometryStore.LayerData(
+                vanillaVertices, new byte[0], DefaultVertexFormat.BLOCK.toString(),
+                "TRIANGLES", null, 4, 0);
+        var vanilla = new MinecraftCompiledGeometryStore.Snapshot(
+                SectionPos.of(4, 5, 6), Map.of(ChunkSectionLayer.TRANSLUCENT, layer), 1L, 1L);
+        var mesh = new MinecraftSectionModelMesher().buildResolved(java.util.List.of());
+
+        var report = MinecraftSectionParityChecker.compare(mesh, vanilla);
+
+        assertFalse(report.layers().get(ChunkSectionLayer.TRANSLUCENT).matches());
+        assertEquals("Minecraft layer uses a different vertex format or topology",
+                report.layers().get(ChunkSectionLayer.TRANSLUCENT).reason());
+    }
