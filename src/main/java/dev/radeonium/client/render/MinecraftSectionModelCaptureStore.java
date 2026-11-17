@@ -61,6 +61,12 @@ public final class MinecraftSectionModelCaptureStore {
         return put(ticket.position(), mesh);
     }
 
+    /** Thread-safe generation check used to stop obsolete meshing work before it consumes CPU. */
+    public static synchronized boolean isCurrent(CaptureTicket ticket) {
+        return ticket != null && ticket.epoch() == epoch
+                && Objects.equals(CAPTURE_GENERATIONS.get(ticket.position()), ticket.generation());
+    }
+
     public static synchronized void abortAsync(CaptureTicket ticket) {
         if (ticket != null && ticket.epoch() == epoch
                 && Objects.equals(CAPTURE_GENERATIONS.get(ticket.position()), ticket.generation())) {
