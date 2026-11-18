@@ -135,7 +135,8 @@ class MinecraftSectionModelMesherTest {
                 new MinecraftSectionModelMesher.CapturedSectionInput(
                         List.of(), 0, 0, null, MinecraftFluidSectionMesher.SectionFluidMesh.empty()));
         assertThrows(IllegalArgumentException.class, () ->
-                new MinecraftSectionModelMesher.CapturedSectionInput(List.of(), 0, null));
+                new MinecraftSectionModelMesher.CapturedSectionInput(
+                        List.of(), 0, 0, List.of(), null));
     }
 
     @Test
