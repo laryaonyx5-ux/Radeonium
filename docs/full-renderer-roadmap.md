@@ -389,3 +389,5 @@ The in-game validation matrix remains required before enabling the opt-in path b
 - This is a completeness/safety prerequisite only. It does not yet route those special render paths through Radeonium, construct Minecraft's complete compiler result, or bypass the vanilla compiler.
 
 - Follow-up: unsupported block positions, render-shape classification and block-entity presence are now preserved as immutable metadata all the way from compiler-thread capture through the asynchronous Radeonium section mesh. This gives the future authoritative compiler a concrete per-block fallback manifest instead of only aggregate counters. It remains metadata for fallback planning; it does not yet invoke Minecraft's block-entity renderer or replace the vanilla compiler.
+
+- Radeonium's parity gate now refuses every layer in a section containing any non-air non-MODEL render shape. This is deliberately conservative: a model-only Radeonium mesh cannot be promoted for that section while its special render path remains unimplemented; Minecraft keeps the complete fallback. A focused regression test covers the rejection.
