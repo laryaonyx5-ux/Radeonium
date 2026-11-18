@@ -50,7 +50,9 @@ public final class MinecraftSectionModelMesher {
             SectionPos sectionPos, RenderSectionRegion region, BlockStateModelSet modelSet
     ) {
         CapturedSectionInput captured = captureInputs(sectionPos, region, modelSet);
-        return buildResolved(captured.blocks()).withUnsupportedBlockEntityCount(captured.unsupportedBlockEntityCount())
+        return buildResolved(captured.blocks())
+                .withUnsupportedBlockEntityCount(captured.unsupportedBlockEntityCount())
+                .withUnsupportedRenderShapeCount(captured.unsupportedRenderShapeCount())
                 .withFluids(captured.fluids());
     }
 
@@ -137,6 +139,7 @@ public final class MinecraftSectionModelMesher {
         }
         List<ResolvedBlockInput> resolved = new ArrayList<>(4096);
         int blockEntities = 0;
+        int unsupportedRenderShapes = 0;
         int baseX = sectionPos.minBlockX(), baseY = sectionPos.minBlockY(), baseZ = sectionPos.minBlockZ();
         BlockState[] states = new BlockState[18 * 18 * 18];
         BlockModelLighter lighter = new BlockModelLighter();
@@ -147,7 +150,14 @@ public final class MinecraftSectionModelMesher {
             BlockState state = states[haloIndex(x, y, z)];
             BlockPos pos = new BlockPos(baseX + x, baseY + y, baseZ + z);
             if (region.getBlockEntity(pos) != null) blockEntities++;
-            if (state.isAir() || state.getRenderShape() != RenderShape.MODEL) continue;
+            if (state.isAir()) continue;
+            if (state.getRenderShape() != RenderShape.MODEL) {
+                // Keep an explicit count for non-model render paths (for example,
+                // entity-rendered blocks). Radeonium must not silently treat a
+                // model-only mesh as a complete replacement for these sections.
+                unsupportedRenderShapes++;
+                continue;
+            }
             BlockStateModel blockModel = modelSet.get(state);
             List<BlockStateModelPart> selectedParts = new ArrayList<>();
             blockModel.collectParts(net.minecraft.util.RandomSource.create(state.getSeed(pos)), selectedParts);
@@ -167,7 +177,7 @@ public final class MinecraftSectionModelMesher {
         }
         MinecraftFluidSectionMesher.SectionFluidMesh fluids =
                 new MinecraftFluidSectionMesher().capture(sectionPos, region);
-        return new CapturedSectionInput(resolved, blockEntities, fluids);
+        return new CapturedSectionInput(resolved, blockEntities, unsupportedRenderShapes, fluids);
     }
 
     /**
@@ -265,17 +275,27 @@ public final class MinecraftSectionModelMesher {
     public record CapturedSectionInput(
             List<ResolvedBlockInput> blocks,
             int unsupportedBlockEntityCount,
+            int unsupportedRenderShapeCount,
             MinecraftFluidSectionMesher.SectionFluidMesh fluids
     ) {
         public CapturedSectionInput {
-            if (blocks == null || unsupportedBlockEntityCount < 0 || fluids == null) {
+            if (blocks == null || unsupportedBlockEntityCount < 0
+                    || unsupportedRenderShapeCount < 0 || fluids == null) {
                 throw new IllegalArgumentException("invalid capture");
             }
             blocks = List.copyOf(blocks);
         }
 
+        public CapturedSectionInput(
+                List<ResolvedBlockInput> blocks, int unsupportedBlockEntityCount,
+                MinecraftFluidSectionMesher.SectionFluidMesh fluids
+        ) {
+            this(blocks, unsupportedBlockEntityCount, 0, fluids);
+        }
+
         public CapturedSectionInput(List<ResolvedBlockInput> blocks, int unsupportedBlockEntityCount) {
-            this(blocks, unsupportedBlockEntityCount, MinecraftFluidSectionMesher.SectionFluidMesh.empty());
+            this(blocks, unsupportedBlockEntityCount, 0,
+                    MinecraftFluidSectionMesher.SectionFluidMesh.empty());
         }
     }
 
@@ -380,29 +400,32 @@ public final class MinecraftSectionModelMesher {
     public static final class SectionModelMesh {
         private final Map<ChunkSectionLayer, MinecraftBlockModelMesh> layers;
         private final int unsupportedBlockEntityCount;
+        private final int unsupportedRenderShapeCount;
         private final MinecraftFluidSectionMesher.SectionFluidMesh fluids;
 
         private SectionModelMesh(Map<ChunkSectionLayer, MinecraftBlockModelMesh> layers) {
-            this(layers, 0, MinecraftFluidSectionMesher.SectionFluidMesh.empty());
+            this(layers, 0, 0, MinecraftFluidSectionMesher.SectionFluidMesh.empty());
         }
 
         private SectionModelMesh(
                 Map<ChunkSectionLayer, MinecraftBlockModelMesh> layers,
                 int unsupportedBlockEntityCount
         ) {
-            this(layers, unsupportedBlockEntityCount, MinecraftFluidSectionMesher.SectionFluidMesh.empty());
+            this(layers, unsupportedBlockEntityCount, 0, MinecraftFluidSectionMesher.SectionFluidMesh.empty());
         }
 
         private SectionModelMesh(
                 Map<ChunkSectionLayer, MinecraftBlockModelMesh> layers,
                 int unsupportedBlockEntityCount,
+                int unsupportedRenderShapeCount,
                 MinecraftFluidSectionMesher.SectionFluidMesh fluids
         ) {
-            if (unsupportedBlockEntityCount < 0 || fluids == null) {
+            if (unsupportedBlockEntityCount < 0 || unsupportedRenderShapeCount < 0 || fluids == null) {
                 throw new IllegalArgumentException("invalid section model mesh metadata");
             }
             this.layers = Map.copyOf(layers);
             this.unsupportedBlockEntityCount = unsupportedBlockEntityCount;
+            this.unsupportedRenderShapeCount = unsupportedRenderShapeCount;
             this.fluids = fluids;
         }
 
@@ -422,12 +445,19 @@ public final class MinecraftSectionModelMesher {
         /** Block entities require their dedicated renderer and are not baked into these block meshes. */
         public int unsupportedBlockEntityCount() { return unsupportedBlockEntityCount; }
 
+        /** Non-air blocks whose geometry is not represented by the model mesher. */
+        public int unsupportedRenderShapeCount() { return unsupportedRenderShapeCount; }
+
         public SectionModelMesh withUnsupportedBlockEntityCount(int count) {
-            return new SectionModelMesh(layers, count, fluids);
+            return new SectionModelMesh(layers, count, unsupportedRenderShapeCount, fluids);
+        }
+
+        public SectionModelMesh withUnsupportedRenderShapeCount(int count) {
+            return new SectionModelMesh(layers, unsupportedBlockEntityCount, count, fluids);
         }
 
         public SectionModelMesh withFluids(MinecraftFluidSectionMesher.SectionFluidMesh fluids) {
-            return new SectionModelMesh(layers, unsupportedBlockEntityCount, fluids);
+            return new SectionModelMesh(layers, unsupportedBlockEntityCount, unsupportedRenderShapeCount, fluids);
         }
 
         public int quadCount() {
