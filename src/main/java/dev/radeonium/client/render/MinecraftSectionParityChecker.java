@@ -30,12 +30,15 @@ public final class MinecraftSectionParityChecker {
         EnumMap<ChunkSectionLayer, LayerParity> results =
                 new EnumMap<>(ChunkSectionLayer.class);
 
-        boolean unsupportedRenderShapes = model.unsupportedRenderShapeCount() > 0;
+        boolean unsupportedRenderShapes = model.unsupportedRenderShapeCount() > 0
+                || model.unsupportedBlockEntityCount() > 0;
         for (ChunkSectionLayer layer : ChunkSectionLayer.values()) {
             if (unsupportedRenderShapes) {
                 results.put(layer, new LayerParity(
                         layer, false, Math.multiplyExact(model.layer(layer).quadCount(), 4), 0,
-                        "section contains non-model render shapes; keep Minecraft fallback"));
+                        model.unsupportedBlockEntityCount() > 0
+                                ? "section contains block entities; keep Minecraft fallback"
+                                : "section contains non-model render shapes; keep Minecraft fallback"));
                 continue;
             }
             MinecraftMeshGpuUpload.EncodedLayer encoded = MinecraftMeshGpuUpload.encodeLayer(
