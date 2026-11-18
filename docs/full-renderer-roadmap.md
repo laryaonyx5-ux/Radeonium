@@ -387,3 +387,5 @@ The in-game validation matrix remains required before enabling the opt-in path b
 - Section input capture now separately counts non-air blocks whose render shape is not MODEL, in addition to block entities. Those blocks are not silently treated as if their geometry had been included in Radeonium's model mesh.
 - The unsupported-render-shape count is carried through the immutable worker input and resulting section mesh, with validation against negative metadata and focused unit coverage.
 - This is a completeness/safety prerequisite only. It does not yet route those special render paths through Radeonium, construct Minecraft's complete compiler result, or bypass the vanilla compiler.
+
+- Follow-up: unsupported block positions, render-shape classification and block-entity presence are now preserved as immutable metadata all the way from compiler-thread capture through the asynchronous Radeonium section mesh. This gives the future authoritative compiler a concrete per-block fallback manifest instead of only aggregate counters. It remains metadata for fallback planning; it does not yet invoke Minecraft's block-entity renderer or replace the vanilla compiler.
