@@ -81,6 +81,34 @@ class MinecraftSectionModelMesherTest {
         assertEquals(1, captured.colors()[0]);
     }
 
+
+    @Test
+    void capturedSectionInputCopiesItsBlockListForWorkerSafety() {
+        var source = new ArrayList<MinecraftSectionModelMesher.ResolvedBlockInput>();
+        var capture = new MinecraftSectionModelMesher.CapturedSectionInput(
+                source, 2, MinecraftFluidSectionMesher.SectionFluidMesh.empty());
+
+        source.add(new MinecraftSectionModelMesher.ResolvedBlockInput(
+                List.of(), 0, 0, 0, false, false, false, false, false, false,
+                java.util.Map.of(), -1, java.util.Map.of()));
+
+        assertTrue(capture.blocks().isEmpty());
+        assertEquals(2, capture.unsupportedBlockEntityCount());
+        assertThrows(UnsupportedOperationException.class, () -> capture.blocks().clear());
+    }
+
+    @Test
+    void capturedSectionInputRejectsInvalidMetadata() {
+        assertThrows(IllegalArgumentException.class, () ->
+                new MinecraftSectionModelMesher.CapturedSectionInput(
+                        null, 0, MinecraftFluidSectionMesher.SectionFluidMesh.empty()));
+        assertThrows(IllegalArgumentException.class, () ->
+                new MinecraftSectionModelMesher.CapturedSectionInput(
+                        List.of(), -1, MinecraftFluidSectionMesher.SectionFluidMesh.empty()));
+        assertThrows(IllegalArgumentException.class, () ->
+                new MinecraftSectionModelMesher.CapturedSectionInput(List.of(), 0, null));
+    }
+
     @Test
     void resolvedEmptySectionProducesAnEmptyMeshForEveryLayer() {
         var mesh = new MinecraftSectionModelMesher().buildResolved(List.of());
