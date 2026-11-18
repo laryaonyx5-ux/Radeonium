@@ -24,6 +24,22 @@ class MinecraftSectionParityCheckerTest {
     }
 
     @Test
+    void nonModelRenderShapeDisablesRadeoniumParityForTheWholeSection() {
+        var mesh = new MinecraftSectionModelMesher().buildResolved(java.util.List.of())
+                .withUnsupportedRenderShapeCount(1);
+        var vanilla = new MinecraftCompiledGeometryStore.Snapshot(
+                SectionPos.of(0, 0, 0), Map.of(), 1L, 1L);
+
+        var report = MinecraftSectionParityChecker.compare(mesh, vanilla);
+
+        assertFalse(report.matchesAllLayers());
+        assertTrue(report.verifiedLayers().isEmpty());
+        for (var parity : report.layers().values()) {
+            assertEquals("section contains non-model render shapes; keep Minecraft fallback", parity.reason());
+        }
+    }
+
+    @Test
     void mismatchedLayerFallsBackWithoutDisablingOtherVerifiedLayers() {
         byte[] vanillaVertices = new byte[MinecraftMeshGpuUpload.VERTEX_STRIDE_BYTES * 4];
         var layer = new MinecraftCompiledGeometryStore.LayerData(
