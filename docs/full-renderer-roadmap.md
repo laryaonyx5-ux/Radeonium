@@ -378,3 +378,12 @@ The in-game validation matrix remains required before enabling the opt-in path b
 - Preserves unknown third-party pipeline overrides even when the other override slot contains a recognized vanilla OIT stage, and retains Minecraft's classic non-OIT translucent pipeline as the compatibility fallback. No unverified classic blend-state replacement is forced.
 - Adds focused tests for distinct Radeonium OIT stage identities, both vanilla OIT stage mappings, compatibility fallback, third-party override precedence and opaque/cutout routing.
 - This is pipeline ownership, not proof of correct OIT shader compilation or visual parity. In-game checks for water, glass, ice, intersecting translucent surfaces, camera movement, resource packs and graphics backends remain mandatory. No FPS gain is claimed.
+
+
+## Step 17 — independent section compilation (active work)
+
+**Current implementation checkpoint: model/fluid mesh generation exists, but it is still a parallel capture path. It is not yet an authoritative replacement for Minecraft's SectionCompiler.**
+
+- Section input capture now separately counts non-air blocks whose render shape is not MODEL, in addition to block entities. Those blocks are not silently treated as if their geometry had been included in Radeonium's model mesh.
+- The unsupported-render-shape count is carried through the immutable worker input and resulting section mesh, with validation against negative metadata and focused unit coverage.
+- This is a completeness/safety prerequisite only. It does not yet route those special render paths through Radeonium, construct Minecraft's complete compiler result, or bypass the vanilla compiler.
