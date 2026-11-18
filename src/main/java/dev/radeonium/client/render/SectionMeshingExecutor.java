@@ -68,11 +68,7 @@ public final class SectionMeshingExecutor implements AutoCloseable {
     ) {
         if (input == null) throw new IllegalArgumentException("input cannot be null");
         if (stillCurrent == null) throw new IllegalArgumentException("stillCurrent cannot be null");
-        return submit(() -> minecraftMesher.buildResolved(input.blocks())
-                .withUnsupportedBlockEntityCount(input.unsupportedBlockEntityCount())
-                .withUnsupportedRenderShapeCount(input.unsupportedRenderShapeCount())
-                .withUnsupportedBlocks(input.unsupportedBlocks())
-                .withFluids(input.fluids()), stillCurrent);
+        return submit(() -> minecraftMesher.buildResolved(input.blocks()).withCaptureMetadata(input), stillCurrent);
     }
 
     private <T> CompletableFuture<T> submit(Supplier<T> build, BooleanSupplier stillCurrent) {
