@@ -53,6 +53,7 @@ public final class MinecraftSectionModelMesher {
         return buildResolved(captured.blocks())
                 .withUnsupportedBlockEntityCount(captured.unsupportedBlockEntityCount())
                 .withUnsupportedRenderShapeCount(captured.unsupportedRenderShapeCount())
+                .withUnsupportedBlocks(captured.unsupportedBlocks())
                 .withFluids(captured.fluids());
     }
 
@@ -422,31 +423,35 @@ public final class MinecraftSectionModelMesher {
         private final Map<ChunkSectionLayer, MinecraftBlockModelMesh> layers;
         private final int unsupportedBlockEntityCount;
         private final int unsupportedRenderShapeCount;
+        private final List<UnsupportedBlockInput> unsupportedBlocks;
         private final MinecraftFluidSectionMesher.SectionFluidMesh fluids;
 
         private SectionModelMesh(Map<ChunkSectionLayer, MinecraftBlockModelMesh> layers) {
-            this(layers, 0, 0, MinecraftFluidSectionMesher.SectionFluidMesh.empty());
+            this(layers, 0, 0, List.of(), MinecraftFluidSectionMesher.SectionFluidMesh.empty());
         }
 
         private SectionModelMesh(
                 Map<ChunkSectionLayer, MinecraftBlockModelMesh> layers,
                 int unsupportedBlockEntityCount
         ) {
-            this(layers, unsupportedBlockEntityCount, 0, MinecraftFluidSectionMesher.SectionFluidMesh.empty());
+            this(layers, unsupportedBlockEntityCount, 0, List.of(), MinecraftFluidSectionMesher.SectionFluidMesh.empty());
         }
 
         private SectionModelMesh(
                 Map<ChunkSectionLayer, MinecraftBlockModelMesh> layers,
                 int unsupportedBlockEntityCount,
                 int unsupportedRenderShapeCount,
+                List<UnsupportedBlockInput> unsupportedBlocks,
                 MinecraftFluidSectionMesher.SectionFluidMesh fluids
         ) {
-            if (unsupportedBlockEntityCount < 0 || unsupportedRenderShapeCount < 0 || fluids == null) {
+            if (unsupportedBlockEntityCount < 0 || unsupportedRenderShapeCount < 0
+                    || unsupportedBlocks == null || fluids == null) {
                 throw new IllegalArgumentException("invalid section model mesh metadata");
             }
             this.layers = Map.copyOf(layers);
             this.unsupportedBlockEntityCount = unsupportedBlockEntityCount;
             this.unsupportedRenderShapeCount = unsupportedRenderShapeCount;
+            this.unsupportedBlocks = List.copyOf(unsupportedBlocks);
             this.fluids = fluids;
         }
 
@@ -470,15 +475,23 @@ public final class MinecraftSectionModelMesher {
         public int unsupportedRenderShapeCount() { return unsupportedRenderShapeCount; }
 
         public SectionModelMesh withUnsupportedBlockEntityCount(int count) {
-            return new SectionModelMesh(layers, count, unsupportedRenderShapeCount, fluids);
+            return new SectionModelMesh(layers, count, unsupportedRenderShapeCount, unsupportedBlocks, fluids);
         }
 
         public SectionModelMesh withUnsupportedRenderShapeCount(int count) {
-            return new SectionModelMesh(layers, unsupportedBlockEntityCount, count, fluids);
+            return new SectionModelMesh(layers, unsupportedBlockEntityCount, count, unsupportedBlocks, fluids);
         }
 
+        public SectionModelMesh withUnsupportedBlocks(List<UnsupportedBlockInput> blocks) {
+            return new SectionModelMesh(layers, unsupportedBlockEntityCount,
+                    unsupportedRenderShapeCount, blocks, fluids);
+        }
+
+        public List<UnsupportedBlockInput> unsupportedBlocks() { return unsupportedBlocks; }
+
         public SectionModelMesh withFluids(MinecraftFluidSectionMesher.SectionFluidMesh fluids) {
-            return new SectionModelMesh(layers, unsupportedBlockEntityCount, unsupportedRenderShapeCount, fluids);
+            return new SectionModelMesh(layers, unsupportedBlockEntityCount,
+                    unsupportedRenderShapeCount, unsupportedBlocks, fluids);
         }
 
         public int quadCount() {
