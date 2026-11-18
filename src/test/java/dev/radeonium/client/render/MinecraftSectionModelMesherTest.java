@@ -140,6 +140,28 @@ class MinecraftSectionModelMesherTest {
     }
 
     @Test
+    void capturedSectionInputRejectsManifestCountMismatch() {
+        var unsupported = List.of(new MinecraftSectionModelMesher.UnsupportedBlockInput(
+                1, 2, 3, "ENTITY", true));
+        assertThrows(IllegalArgumentException.class, () ->
+                new MinecraftSectionModelMesher.CapturedSectionInput(
+                        List.of(), 0, 1, unsupported, MinecraftFluidSectionMesher.SectionFluidMesh.empty()));
+        assertThrows(IllegalArgumentException.class, () ->
+                new MinecraftSectionModelMesher.CapturedSectionInput(
+                        List.of(), 1, 0, unsupported, MinecraftFluidSectionMesher.SectionFluidMesh.empty()));
+    }
+
+    @Test
+    void capturedSectionInputRejectsDuplicateFallbackCoordinates() {
+        var first = new MinecraftSectionModelMesher.UnsupportedBlockInput(1, 2, 3, "MODEL", true);
+        var duplicate = new MinecraftSectionModelMesher.UnsupportedBlockInput(1, 2, 3, "MODEL", true);
+        assertThrows(IllegalArgumentException.class, () ->
+                new MinecraftSectionModelMesher.CapturedSectionInput(
+                        List.of(), 2, 0, List.of(first, duplicate),
+                        MinecraftFluidSectionMesher.SectionFluidMesh.empty()));
+    }
+
+    @Test
     void sectionMeshRetainsBothUnsupportedGeometryCounts() {
         var mesh = new MinecraftSectionModelMesher().buildResolved(List.of())
                 .withUnsupportedBlockEntityCount(3)
