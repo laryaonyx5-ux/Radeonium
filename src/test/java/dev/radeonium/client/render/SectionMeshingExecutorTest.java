@@ -14,7 +14,12 @@ class SectionMeshingExecutorTest {
     @Test
     void minecraftModelMeshingRunsOnDedicatedWorkerAndReturnsIndependentLayerMeshes() throws Exception {
         try (SectionMeshingExecutor executor = new SectionMeshingExecutor()) {
-            var capture = new MinecraftSectionModelMesher.CapturedSectionInput(List.of(), 3);
+            var unsupported = List.of(
+                    new MinecraftSectionModelMesher.UnsupportedBlockInput(0, 0, 0, "MODEL", true),
+                    new MinecraftSectionModelMesher.UnsupportedBlockInput(1, 0, 0, "MODEL", true),
+                    new MinecraftSectionModelMesher.UnsupportedBlockInput(2, 0, 0, "MODEL", true));
+            var capture = new MinecraftSectionModelMesher.CapturedSectionInput(
+                    List.of(), 3, 0, unsupported, MinecraftFluidSectionMesher.SectionFluidMesh.empty());
             var result = executor.buildMinecraftAsync(capture);
             var mesh = result.get(5, TimeUnit.SECONDS);
 
@@ -43,7 +48,8 @@ class SectionMeshingExecutorTest {
     @Test
     void staleCaptureIsDiscardedBeforePublishingResult() {
         try (SectionMeshingExecutor executor = new SectionMeshingExecutor()) {
-            var capture = new MinecraftSectionModelMesher.CapturedSectionInput(List.of(), 0);
+            var capture = new MinecraftSectionModelMesher.CapturedSectionInput(
+                    List.of(), 0, 0, List.of(), MinecraftFluidSectionMesher.SectionFluidMesh.empty());
             var result = executor.buildMinecraftAsync(capture, () -> false);
 
             Exception failure = assertThrows(Exception.class, () -> result.get(5, TimeUnit.SECONDS));
