@@ -94,6 +94,7 @@ class MinecraftSectionModelMesherTest {
 
         assertTrue(capture.blocks().isEmpty());
         assertEquals(2, capture.unsupportedBlockEntityCount());
+        assertEquals(0, capture.unsupportedRenderShapeCount());
         assertThrows(UnsupportedOperationException.class, () -> capture.blocks().clear());
     }
 
@@ -104,9 +105,21 @@ class MinecraftSectionModelMesherTest {
                         null, 0, MinecraftFluidSectionMesher.SectionFluidMesh.empty()));
         assertThrows(IllegalArgumentException.class, () ->
                 new MinecraftSectionModelMesher.CapturedSectionInput(
-                        List.of(), -1, MinecraftFluidSectionMesher.SectionFluidMesh.empty()));
+                        List.of(), -1, 0, MinecraftFluidSectionMesher.SectionFluidMesh.empty()));
+        assertThrows(IllegalArgumentException.class, () ->
+                new MinecraftSectionModelMesher.CapturedSectionInput(
+                        List.of(), 0, -1, MinecraftFluidSectionMesher.SectionFluidMesh.empty()));
         assertThrows(IllegalArgumentException.class, () ->
                 new MinecraftSectionModelMesher.CapturedSectionInput(List.of(), 0, null));
+    }
+
+    @Test
+    void sectionMeshRetainsBothUnsupportedGeometryCounts() {
+        var mesh = new MinecraftSectionModelMesher().buildResolved(List.of())
+                .withUnsupportedBlockEntityCount(3)
+                .withUnsupportedRenderShapeCount(5);
+        assertEquals(3, mesh.unsupportedBlockEntityCount());
+        assertEquals(5, mesh.unsupportedRenderShapeCount());
     }
 
     @Test
