@@ -295,18 +295,21 @@ public final class MinecraftSectionModelMesher {
             }
             blocks = List.copyOf(blocks);
             unsupportedBlocks = List.copyOf(unsupportedBlocks);
-        }
-
-        public CapturedSectionInput(
-                List<ResolvedBlockInput> blocks, int unsupportedBlockEntityCount,
-                MinecraftFluidSectionMesher.SectionFluidMesh fluids
-        ) {
-            this(blocks, unsupportedBlockEntityCount, 0, List.of(), fluids);
-        }
-
-        public CapturedSectionInput(List<ResolvedBlockInput> blocks, int unsupportedBlockEntityCount) {
-            this(blocks, unsupportedBlockEntityCount, 0, List.of(),
-                    MinecraftFluidSectionMesher.SectionFluidMesh.empty());
+            long blockEntityEntries = unsupportedBlocks.stream()
+                    .filter(UnsupportedBlockInput::hasBlockEntity).count();
+            long nonModelEntries = unsupportedBlocks.stream()
+                    .filter(block -> !RenderShape.MODEL.name().equals(block.renderShape())).count();
+            if (blockEntityEntries != unsupportedBlockEntityCount
+                    || nonModelEntries != unsupportedRenderShapeCount) {
+                throw new IllegalArgumentException("unsupported block manifest does not match its counts");
+            }
+            java.util.Set<Integer> occupied = new java.util.HashSet<>();
+            for (UnsupportedBlockInput block : unsupportedBlocks) {
+                int key = block.localX() | (block.localY() << 4) | (block.localZ() << 8);
+                if (!occupied.add(key)) {
+                    throw new IllegalArgumentException("unsupported block manifest contains duplicate coordinates");
+                }
+            }
         }
     }
 
