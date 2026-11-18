@@ -114,9 +114,10 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
             throw new IllegalArgumentException("position and sectionMesh are required");
         }
         // A model-only mesh cannot replace a section containing non-model render
-        // shapes. Drop any older Radeonium entry and leave the complete section to
-        // Minecraft rather than partially submitting terrain.
-        if (sectionMesh.unsupportedRenderShapeCount() > 0) {
+        // shapes or block entities with separate renderers. Drop any older Radeonium
+        // entry and leave the complete section to Minecraft rather than partially
+        // submitting terrain.
+        if (sectionMesh.unsupportedRenderShapeCount() > 0 || sectionMesh.unsupportedBlockEntityCount() > 0) {
             remove(position);
             return;
         }
