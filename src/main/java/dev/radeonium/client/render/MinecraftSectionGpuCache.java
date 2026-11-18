@@ -113,6 +113,14 @@ public final class MinecraftSectionGpuCache implements AutoCloseable {
         if (position == null || sectionMesh == null || parityVerifiedLayers == null) {
             throw new IllegalArgumentException("position and sectionMesh are required");
         }
+        // A model-only mesh cannot replace a section containing non-model render
+        // shapes. Drop any older Radeonium entry and leave the complete section to
+        // Minecraft rather than partially submitting terrain.
+        if (sectionMesh.unsupportedRenderShapeCount() > 0) {
+            remove(position);
+            return;
+        }
+
         // Validate/copy the set before acquiring any GPU or material resources.
         Set<ChunkSectionLayer> verifiedLayers = Set.copyOf(parityVerifiedLayers);
 
