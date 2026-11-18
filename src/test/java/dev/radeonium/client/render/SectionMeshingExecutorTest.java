@@ -64,7 +64,8 @@ class SectionMeshingExecutorTest {
     void cancellationPredicateIsRecheckedAfterBuild() throws Exception {
         try (SectionMeshingExecutor executor = new SectionMeshingExecutor()) {
             AtomicBoolean current = new AtomicBoolean(true);
-            var capture = new MinecraftSectionModelMesher.CapturedSectionInput(List.of(), 0);
+            var capture = new MinecraftSectionModelMesher.CapturedSectionInput(
+                    List.of(), 0, 0, List.of(), MinecraftFluidSectionMesher.SectionFluidMesh.empty());
             var result = executor.buildMinecraftAsync(capture, current::get);
             // Empty captures are quick; the test also verifies the accepted future remains cancellable.
             var mesh = result.get(5, TimeUnit.SECONDS);
