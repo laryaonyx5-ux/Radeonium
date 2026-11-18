@@ -25,6 +25,22 @@ class SectionMeshingExecutorTest {
     }
 
     @Test
+    void unsupportedFallbackManifestSurvivesAsyncMeshing() throws Exception {
+        try (SectionMeshingExecutor executor = new SectionMeshingExecutor()) {
+            var unsupported = List.of(new MinecraftSectionModelMesher.UnsupportedBlockInput(
+                    4, 5, 6, "ENTITY", true));
+            var capture = new MinecraftSectionModelMesher.CapturedSectionInput(
+                    List.of(), 1, 1, unsupported, MinecraftFluidSectionMesher.SectionFluidMesh.empty());
+
+            var mesh = executor.buildMinecraftAsync(capture).get(5, TimeUnit.SECONDS);
+
+            assertEquals(1, mesh.unsupportedBlockEntityCount());
+            assertEquals(1, mesh.unsupportedRenderShapeCount());
+            assertEquals(unsupported, mesh.unsupportedBlocks());
+        }
+    }
+
+    @Test
     void staleCaptureIsDiscardedBeforePublishingResult() {
         try (SectionMeshingExecutor executor = new SectionMeshingExecutor()) {
             var capture = new MinecraftSectionModelMesher.CapturedSectionInput(List.of(), 0);
