@@ -50,11 +50,7 @@ public final class MinecraftSectionModelMesher {
             SectionPos sectionPos, RenderSectionRegion region, BlockStateModelSet modelSet
     ) {
         CapturedSectionInput captured = captureInputs(sectionPos, region, modelSet);
-        return buildResolved(captured.blocks())
-                .withUnsupportedBlockEntityCount(captured.unsupportedBlockEntityCount())
-                .withUnsupportedRenderShapeCount(captured.unsupportedRenderShapeCount())
-                .withUnsupportedBlocks(captured.unsupportedBlocks())
-                .withFluids(captured.fluids());
+        return buildResolved(captured.blocks()).withCaptureMetadata(captured);
     }
 
     private static Map<BakedQuad, CapturedQuadLighting> captureQuadLighting(
@@ -477,6 +473,13 @@ public final class MinecraftSectionModelMesher {
 
         /** Non-air blocks whose geometry is not represented by the model mesher. */
         public int unsupportedRenderShapeCount() { return unsupportedRenderShapeCount; }
+
+        /** Applies the complete immutable compiler-thread capture as one atomic metadata update. */
+        public SectionModelMesh withCaptureMetadata(CapturedSectionInput captured) {
+            if (captured == null) throw new IllegalArgumentException("captured input is required");
+            return new SectionModelMesh(layers, captured.unsupportedBlockEntityCount(),
+                    captured.unsupportedRenderShapeCount(), captured.unsupportedBlocks(), captured.fluids());
+        }
 
         public SectionModelMesh withUnsupportedBlockEntityCount(int count) {
             return new SectionModelMesh(layers, count, unsupportedRenderShapeCount, unsupportedBlocks, fluids);
