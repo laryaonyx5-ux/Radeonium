@@ -34,7 +34,7 @@ public final class MinecraftSectionParityChecker {
         for (ChunkSectionLayer layer : ChunkSectionLayer.values()) {
             if (unsupportedRenderShapes) {
                 results.put(layer, new LayerParity(
-                        layer, false, model.layer(layer).quadCount(), 0,
+                        layer, false, Math.multiplyExact(model.layer(layer).quadCount(), 4), 0,
                         "section contains non-model render shapes; keep Minecraft fallback"));
                 continue;
             }
