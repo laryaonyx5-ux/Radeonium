@@ -294,6 +294,7 @@ public final class MinecraftSectionModelMesher {
                 throw new IllegalArgumentException("invalid capture");
             }
             blocks = List.copyOf(blocks);
+            unsupportedBlocks = List.copyOf(unsupportedBlocks);
         }
 
         public CapturedSectionInput(
