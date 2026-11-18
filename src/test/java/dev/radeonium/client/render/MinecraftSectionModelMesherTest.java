@@ -86,14 +86,14 @@ class MinecraftSectionModelMesherTest {
     void capturedSectionInputCopiesItsBlockListForWorkerSafety() {
         var source = new ArrayList<MinecraftSectionModelMesher.ResolvedBlockInput>();
         var capture = new MinecraftSectionModelMesher.CapturedSectionInput(
-                source, 2, MinecraftFluidSectionMesher.SectionFluidMesh.empty());
+                source, 0, 0, List.of(), MinecraftFluidSectionMesher.SectionFluidMesh.empty());
 
         source.add(new MinecraftSectionModelMesher.ResolvedBlockInput(
                 List.of(), 0, 0, 0, false, false, false, false, false, false,
                 java.util.Map.of(), -1, java.util.Map.of()));
 
         assertTrue(capture.blocks().isEmpty());
-        assertEquals(2, capture.unsupportedBlockEntityCount());
+        assertEquals(0, capture.unsupportedBlockEntityCount());
         assertEquals(0, capture.unsupportedRenderShapeCount());
         assertTrue(capture.unsupportedBlocks().isEmpty());
         assertThrows(UnsupportedOperationException.class, () -> capture.blocks().clear());
@@ -124,13 +124,13 @@ class MinecraftSectionModelMesherTest {
     void capturedSectionInputRejectsInvalidMetadata() {
         assertThrows(IllegalArgumentException.class, () ->
                 new MinecraftSectionModelMesher.CapturedSectionInput(
-                        null, 0, MinecraftFluidSectionMesher.SectionFluidMesh.empty()));
+                        null, 0, 0, List.of(), MinecraftFluidSectionMesher.SectionFluidMesh.empty()));
         assertThrows(IllegalArgumentException.class, () ->
                 new MinecraftSectionModelMesher.CapturedSectionInput(
-                        List.of(), -1, 0, MinecraftFluidSectionMesher.SectionFluidMesh.empty()));
+                        List.of(), -1, 0, List.of(), MinecraftFluidSectionMesher.SectionFluidMesh.empty()));
         assertThrows(IllegalArgumentException.class, () ->
                 new MinecraftSectionModelMesher.CapturedSectionInput(
-                        List.of(), 0, -1, MinecraftFluidSectionMesher.SectionFluidMesh.empty()));
+                        List.of(), 0, -1, List.of(), MinecraftFluidSectionMesher.SectionFluidMesh.empty()));
         assertThrows(IllegalArgumentException.class, () ->
                 new MinecraftSectionModelMesher.CapturedSectionInput(
                         List.of(), 0, 0, null, MinecraftFluidSectionMesher.SectionFluidMesh.empty()));
