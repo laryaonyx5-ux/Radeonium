@@ -78,7 +78,8 @@ class SectionMeshingExecutorTest {
     void rejectsNullMinecraftCaptureAndNullValidityPredicate() {
         try (SectionMeshingExecutor executor = new SectionMeshingExecutor()) {
             assertThrows(IllegalArgumentException.class, () -> executor.buildMinecraftAsync(null));
-            var capture = new MinecraftSectionModelMesher.CapturedSectionInput(List.of(), 0);
+            var capture = new MinecraftSectionModelMesher.CapturedSectionInput(
+                List.of(), 0, 0, List.of(), MinecraftFluidSectionMesher.SectionFluidMesh.empty());
             assertThrows(IllegalArgumentException.class,
                     () -> executor.buildMinecraftAsync(capture, null));
         }
@@ -91,7 +92,8 @@ class SectionMeshingExecutorTest {
         executor.close();
         assertTrue(executor.isClosed());
 
-        var capture = new MinecraftSectionModelMesher.CapturedSectionInput(List.of(), 0);
+        var capture = new MinecraftSectionModelMesher.CapturedSectionInput(
+                List.of(), 0, 0, List.of(), MinecraftFluidSectionMesher.SectionFluidMesh.empty());
         assertThrows(ExecutionException.class,
                 () -> executor.buildMinecraftAsync(capture).get(5, TimeUnit.SECONDS));
         assertEquals(1L, executor.metricsSnapshot().rejected());
