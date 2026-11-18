@@ -176,6 +176,19 @@ class MinecraftSectionModelMesherTest {
     }
 
     @Test
+    void captureMetadataIsAppliedAtomicallyToTheBuiltSectionMesh() {
+        var unsupported = List.of(new MinecraftSectionModelMesher.UnsupportedBlockInput(
+                2, 3, 4, "ENTITY", true));
+        var capture = new MinecraftSectionModelMesher.CapturedSectionInput(
+                List.of(), 1, 1, unsupported, MinecraftFluidSectionMesher.SectionFluidMesh.empty());
+        var mesh = new MinecraftSectionModelMesher().buildResolved(List.of()).withCaptureMetadata(capture);
+
+        assertEquals(1, mesh.unsupportedBlockEntityCount());
+        assertEquals(1, mesh.unsupportedRenderShapeCount());
+        assertEquals(unsupported, mesh.unsupportedBlocks());
+    }
+
+    @Test
     void resolvedEmptySectionProducesAnEmptyMeshForEveryLayer() {
         var mesh = new MinecraftSectionModelMesher().buildResolved(List.of());
         assertEquals(0, mesh.quadCount());
