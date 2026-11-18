@@ -145,6 +145,11 @@ class MinecraftSectionModelMesherTest {
                 .withUnsupportedRenderShapeCount(5);
         assertEquals(3, mesh.unsupportedBlockEntityCount());
         assertEquals(5, mesh.unsupportedRenderShapeCount());
+        var fallback = List.of(new MinecraftSectionModelMesher.UnsupportedBlockInput(
+                1, 2, 3, "ENTITY", true));
+        var withFallback = mesh.withUnsupportedBlocks(fallback);
+        assertEquals(fallback, withFallback.unsupportedBlocks());
+        assertThrows(UnsupportedOperationException.class, () -> withFallback.unsupportedBlocks().clear());
     }
 
     @Test
