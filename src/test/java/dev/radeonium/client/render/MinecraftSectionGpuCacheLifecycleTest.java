@@ -67,6 +67,26 @@ class MinecraftSectionGpuCacheLifecycleTest {
 
 
     @Test
+    void unsupportedRenderShapeForcesVanillaFallbackAndReleasesOldOwnedBuffers() {
+        MinecraftGpuResourceOwner owner = new MinecraftGpuResourceOwner(() -> {});
+        MinecraftSectionGpuCache cache = new MinecraftSectionGpuCache(owner, () -> {});
+        SectionPos position = new SectionPos(7, 0, 0);
+        MinecraftMeshGpuUpload previous = MinecraftMeshGpuUpload.forTesting(4, 40L, () -> {});
+        owner.track(previous, null);
+        cache.installPreparedEntry(position, entry(previous));
+
+        var mesh = new MinecraftSectionModelMesher().buildResolved(List.of())
+                .withUnsupportedRenderShapeCount(1);
+        var snapshot = new MinecraftSectionModelCaptureStore.Snapshot(position, mesh, 0, 1L);
+        cache.rebuild(position, snapshot, Set.of(ChunkSectionLayer.SOLID));
+
+        assertTrue(previous.isClosed());
+        assertEquals(0, cache.sectionCount());
+        assertEquals(0, cache.gpuAllocationCount());
+        assertEquals(0L, cache.uploadedBytes());
+    }
+
+    @Test
     void cacheRejectsForeignGpuUploadsBeforeReplacingAnExistingEntry() {
         MinecraftGpuResourceOwner owner = new MinecraftGpuResourceOwner(() -> {});
         MinecraftSectionGpuCache cache =
