@@ -140,6 +140,7 @@ public final class MinecraftSectionModelMesher {
         List<ResolvedBlockInput> resolved = new ArrayList<>(4096);
         int blockEntities = 0;
         int unsupportedRenderShapes = 0;
+        List<UnsupportedBlockInput> unsupportedBlocks = new ArrayList<>();
         int baseX = sectionPos.minBlockX(), baseY = sectionPos.minBlockY(), baseZ = sectionPos.minBlockZ();
         BlockState[] states = new BlockState[18 * 18 * 18];
         BlockModelLighter lighter = new BlockModelLighter();
@@ -149,9 +150,15 @@ public final class MinecraftSectionModelMesher {
         for (int y = 0; y < 16; y++) for (int z = 0; z < 16; z++) for (int x = 0; x < 16; x++) {
             BlockState state = states[haloIndex(x, y, z)];
             BlockPos pos = new BlockPos(baseX + x, baseY + y, baseZ + z);
-            if (region.getBlockEntity(pos) != null) blockEntities++;
+            boolean hasBlockEntity = region.getBlockEntity(pos) != null;
+            if (hasBlockEntity) blockEntities++;
             if (state.isAir()) continue;
-            if (state.getRenderShape() != RenderShape.MODEL) {
+            RenderShape renderShape = state.getRenderShape();
+            if (hasBlockEntity || renderShape != RenderShape.MODEL) {
+                unsupportedBlocks.add(new UnsupportedBlockInput(
+                        x, y, z, renderShape.name(), hasBlockEntity));
+            }
+            if (renderShape != RenderShape.MODEL) {
                 // Keep an explicit count for non-model render paths (for example,
                 // entity-rendered blocks). Radeonium must not silently treat a
                 // model-only mesh as a complete replacement for these sections.
@@ -177,7 +184,8 @@ public final class MinecraftSectionModelMesher {
         }
         MinecraftFluidSectionMesher.SectionFluidMesh fluids =
                 new MinecraftFluidSectionMesher().capture(sectionPos, region);
-        return new CapturedSectionInput(resolved, blockEntities, unsupportedRenderShapes, fluids);
+        return new CapturedSectionInput(
+                resolved, blockEntities, unsupportedRenderShapes, unsupportedBlocks, fluids);
     }
 
     /**
@@ -276,11 +284,12 @@ public final class MinecraftSectionModelMesher {
             List<ResolvedBlockInput> blocks,
             int unsupportedBlockEntityCount,
             int unsupportedRenderShapeCount,
+            List<UnsupportedBlockInput> unsupportedBlocks,
             MinecraftFluidSectionMesher.SectionFluidMesh fluids
     ) {
         public CapturedSectionInput {
             if (blocks == null || unsupportedBlockEntityCount < 0
-                    || unsupportedRenderShapeCount < 0 || fluids == null) {
+                    || unsupportedRenderShapeCount < 0 || unsupportedBlocks == null || fluids == null) {
                 throw new IllegalArgumentException("invalid capture");
             }
             blocks = List.copyOf(blocks);
@@ -290,12 +299,24 @@ public final class MinecraftSectionModelMesher {
                 List<ResolvedBlockInput> blocks, int unsupportedBlockEntityCount,
                 MinecraftFluidSectionMesher.SectionFluidMesh fluids
         ) {
-            this(blocks, unsupportedBlockEntityCount, 0, fluids);
+            this(blocks, unsupportedBlockEntityCount, 0, List.of(), fluids);
         }
 
         public CapturedSectionInput(List<ResolvedBlockInput> blocks, int unsupportedBlockEntityCount) {
-            this(blocks, unsupportedBlockEntityCount, 0,
+            this(blocks, unsupportedBlockEntityCount, 0, List.of(),
                     MinecraftFluidSectionMesher.SectionFluidMesh.empty());
+        }
+    }
+
+    /** Position and fallback classification for a block not fully owned by the model mesher. */
+    public record UnsupportedBlockInput(
+            int localX, int localY, int localZ, String renderShape, boolean hasBlockEntity
+    ) {
+        public UnsupportedBlockInput {
+            validateCoordinates(localX, localY, localZ);
+            if (renderShape == null || renderShape.isBlank()) {
+                throw new IllegalArgumentException("renderShape is required");
+            }
         }
     }
 
